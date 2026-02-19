@@ -73,11 +73,6 @@ stages:
         purpose: development
     project:
       name: dev-project        # Required: Project name
-      create: true             # Optional: Auto-create project (default: false)
-      owners:                  # Optional: Project owners (required if create: true)
-        - Eng1
-        - arn:aws:iam::*:role/MyRole
-      contributors: []         # Optional: Project contributors
       role:
         # Option 1: Use existing role
         arn: arn:aws:iam::123456789012:role/MyProjectRole
@@ -221,8 +216,6 @@ stages:
       region: us-east-1
     project:
       name: test-analytics
-      create: true
-      owners: [Eng1]
     environment_variables:
       DATABASE: test_db
   

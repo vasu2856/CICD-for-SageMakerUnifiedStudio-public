@@ -45,12 +45,7 @@ stages:
       region: us-east-1
     project:
       name: test-project
-      create: true
     bootstrap:
-      project:
-        create: true
-        profileName: 'All capabilities'
-        owners: [admin@example.com]
       environments:
         - EnvironmentConfigurationName: 'OnDemand Workflows'
       
@@ -402,14 +397,8 @@ stages:
       region: us-east-1
     project:
       name: test-data-platform
-      create: true
     
     bootstrap:
-      project:
-        create: true
-        profileName: 'All capabilities'
-        owners: [admin@example.com]
-      
       environments:
         - EnvironmentConfigurationName: 'OnDemand Workflows'
       

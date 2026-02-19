@@ -48,20 +48,6 @@ stages:
       region: ${DEV_DOMAIN_REGION:us-east-1}
     project:
       name: test-marketing-demo
-    initialization:
-      project:
-        create: true
-        profileName: All capabilities
-        owners:
-        - arn:aws:iam::123456789012:role/GitHubActionsRole-SMUS-CLI-Tests
-        - Eng1
-        contributors: []
-        userParameters:
-        - EnvironmentConfigurationName: Lakehouse Database
-          parameters:
-          - name: glueDbName
-            value: demo-serverless-db
-      environments: []
     environment_variables:
       ENV_NAME: test
       S3_PREFIX: test-data
@@ -81,20 +67,6 @@ stages:
       region: ${PROD_DOMAIN_REGION:us-east-1}
     project:
       name: prod-marketing-demo
-    initialization:
-      project:
-        create: true
-        profileName: All capabilities
-        owners:
-        - arn:aws:iam::123456789012:role/GitHubActionsRole-SMUS-CLI-Tests
-        - Eng1
-        contributors: []
-        userParameters:
-        - EnvironmentConfigurationName: Lakehouse Database
-          parameters:
-          - name: glueDbName
-            value: demo-serverless-prod-db
-      environments: []
     environment_variables:
       ENV_NAME: prod
       S3_PREFIX: prod-data
