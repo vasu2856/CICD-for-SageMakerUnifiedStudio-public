@@ -716,7 +716,7 @@ ml_training_workflow:
         input_params:
           mlflow_tracking_server_arn: "{proj.connection.mlflow-server.trackingServerArn}"
           mlflow_artifact_location: "{proj.connection.default.s3_shared.s3Uri}ml/mlflow-artifacts"
-          sklearn_version: "1.4-2"
+          sklearn_version: "1.2-1"
           python_version: "py3"
           training_instance_type: "ml.m5.large"
           model_name: "realistic-classifier-v1"
@@ -838,7 +838,7 @@ ml_deployment_workflow:
         input_path: "ml/bundle/deployment-workflows/ml_deployment_notebook.ipynb"
         input_params:
           model_s3_uri: "{proj.connection.default.s3_shared.s3Uri}ml/output/model-artifacts/latest/output/model.tar.gz"
-          sklearn_version: "1.4-2"
+          sklearn_version: "1.2-1"
           python_version: "py3"
           inference_instance_type: "ml.m5.large"
       output_config:
