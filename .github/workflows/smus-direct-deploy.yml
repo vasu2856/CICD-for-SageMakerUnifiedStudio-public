@@ -69,12 +69,6 @@ jobs:
           aws-region: ${{ vars.DOMAIN_REGION }}
           role-session-name: smus-deploy-test-session
       
-      - name: Register AWS CLI model patch
-        run: |
-          aws configure add-model \
-            --service-model file://src/smus_cicd/resources/mwaaserverless-2024-07-26.normal-edited-2.json \
-            --service-name mwaaserverless-internal
-      
       - name: Get AWS Account ID
         id: aws-account
         run: |
@@ -236,13 +230,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_TEST }}
           aws-region: ${{ vars.DOMAIN_REGION }}
           role-session-name: smus-test-session
-      
-      - name: Register AWS CLI model patch
-        run: |
-          aws configure add-model \
-            --service-model file://src/smus_cicd/resources/mwaaserverless-2024-07-26.normal-edited-2.json \
-            --service-name mwaaserverless-internal
-      
+          
       - name: Get AWS Account ID
         id: aws-account-test
         run: |
