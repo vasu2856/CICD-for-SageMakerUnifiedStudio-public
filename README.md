@@ -668,7 +668,6 @@ stages:
       region: us-east-1
     project:
       name: test-ml-training
-      create: true
       owners:
         - Eng1
         - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
@@ -794,7 +793,6 @@ stages:
       region: us-east-1
     project:
       name: test-ml-deployment
-      create: true
       owners:
         - Eng1
         - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests

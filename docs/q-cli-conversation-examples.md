@@ -55,9 +55,6 @@ stages:
       region: ${AWS_REGION}
     project:
       name: test-project
-    bootstrap:
-      project:
-        create: true
 
   prod:
     stage: PROD

@@ -189,17 +189,8 @@ stages:
       region: ${AWS_REGION:us-east-1}
     project:
       name: test-marketing
-      create: true
-      profileName: 'All capabilities'
-      owners: ['alice@company.com']
-      contributors: ['bob@company.com']
       role:
         arn: arn:aws:iam::123456789012:role/MyProjectRole
-      user_parameters:
-        - environment_configuration_name: 'Lakehouse Database'
-          parameters:
-            - name: glueDbName
-              value: test_marketing_db
     
     # Bootstrap actions for project setup
     bootstrap:
@@ -260,10 +251,6 @@ stages:
       region: ${AWS_REGION:us-east-1}
     project:
       name: prod-marketing
-      create: true
-      profileName: 'All capabilities'
-      owners: ['alice@company.com']
-      contributors: []
     
     bootstrap:
       actions:
@@ -437,9 +424,9 @@ stages:
 - `domain.region` (required): AWS region where domain exists
 - `project.name` (required): Project name in the domain
 
-### Target Initialization
+### Bootstrap Actions
 
-Auto-create projects, environments, and connections:
+Configure environments, connections, and post-deployment workflows:
 
 ```yaml
 stages:
@@ -450,15 +437,6 @@ stages:
       region: us-east-1
     project:
       name: test-marketing
-      create: true
-      profileName: 'All capabilities'
-      owners: ['alice@company.com']
-      contributors: ['bob@company.com', 'charlie@company.com']
-      user_parameters:
-        - environment_configuration_name: 'Lakehouse Database'
-          parameters:
-            - name: glueDbName
-              value: my_unique_db_name
     
     bootstrap:
       actions:
@@ -480,12 +458,6 @@ stages:
 ```
 
 **Project Properties:**
-- `create` (optional): Auto-create project (default: `false`)
-- `profileName` (required if create=true): Project profile name
-- `owners` (optional): List of owner email addresses or IAM ARNs
-  - Use `*` as wildcard for account ID: `arn:aws:iam::*:role/MyRole` (replaced with current account)
-- `contributors` (optional): List of contributor email addresses or IAM ARNs
-  - Use `*` as wildcard for account ID: `arn:aws:iam::*:role/MyRole` (replaced with current account)
 - `role` (optional): Customer-provided IAM role for the project
   - `arn`: IAM role ARN (e.g., `arn:aws:iam::123456789012:role/MyProjectRole`)
   - Use `*` as wildcard for account ID: `arn:aws:iam::*:role/MyProjectRole` (replaced with current account)

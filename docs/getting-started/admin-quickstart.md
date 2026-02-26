@@ -69,122 +69,16 @@ stages:
       region: us-east-1        # AWS region
     project:
       name: test-project       # SMUS project name
-      create: true             # Let CLI create project
-    bootstrap:            # Project creation settings
-      project:
-        create: true
-        profileName: 'All capabilities'
-        owners: [admin@example.com]
-      environments:
-        - EnvironmentConfigurationName: 'OnDemand Workflows'
 ```
 
 **Key points:**
-- `create: false` - Project already exists, CLI will deploy to it
-- `create: true` - CLI will create project on first deployment
-- `initialization` - Only used when `create: true`
-
-### Project Isolation Models
-
-The `create` flag enables two organizational models:
-
-**Shared Projects (create: false)** - Multiple applications deploy to the same test/prod projects:
-```yaml
-# Application 1: monthly-metrics/manifest.yaml
-stages:
-  test:
-    project:
-      name: shared-data-platform-test
-      create: false  # Use existing shared project
-  prod:
-    project:
-      name: shared-data-platform-prod
-      create: false
-
-# Application 2: churn-model/manifest.yaml
-stages:
-  test:
-    project:
-      name: shared-data-platform-test
-      create: false  # Same shared project
-  prod:
-    project:
-      name: shared-data-platform-prod
-      create: false
-```
-
-**Isolated Projects (create: true)** - Each application gets its own dedicated projects:
-```yaml
-# Application 1: monthly-metrics/manifest.yaml
-stages:
-  test:
-    project:
-      name: monthly-metrics-test
-      create: true  # Create dedicated project
-    bootstrap:
-      project:
-        create: true
-        profileName: 'Analytics'
-        owners: [metrics-team@example.com]
-  prod:
-    project:
-      name: monthly-metrics-prod
-      create: true
-
-# Application 2: churn-model/manifest.yaml
-stages:
-  test:
-    project:
-      name: churn-model-test
-      create: true  # Create separate dedicated project
-    bootstrap:
-      project:
-        create: true
-        profileName: 'ML and AI'
-        owners: [ml-team@example.com]
-  prod:
-    project:
-      name: churn-model-prod
-      create: true
-```
-
-**When to use each model:**
-- **Shared projects** - Teams collaborating, shared resources, centralized governance
-- **Isolated projects** - Team autonomy, different profiles/permissions, cost isolation
+- The project must already exist in the SMUS domain before deploying
+- Use the same project name across multiple applications to share resources
+- Different applications can deploy to the same project
 
 ---
 
-## Step 3: Configure Project Initialization
-
-When `create: true`, the CLI automatically creates projects with these settings:
-
-### Basic Project Creation
-
-```yaml
-bootstrap:
-  project:
-    create: true
-    profileName: 'All capabilities'    # Project profile
-    owners:                             # Project owners
-      - admin@example.com
-      - arn:aws:iam::123456789:role/GitHubActionsRole
-```
-
-### With Environment Configuration
-
-```yaml
-bootstrap:
-  project:
-    create: true
-    profileName: 'All capabilities'
-    owners: [admin@example.com]
-  environments:
-    - EnvironmentConfigurationName: 'OnDemand Workflows'  # Enables MWAA
-```
-
----
-
-## Step 4: Set Up Multi-Stage Configuration
+## Step 3: Set Up Multi-Stage Configuration
 
 Create a reference `manifest.yaml` for your organization:
 
@@ -208,14 +102,6 @@ stages:
       region: us-east-1
     project:
       name: test-data-platform
-      create: true
-    bootstrap:
-      project:
-        create: true
-        profileName: 'All capabilities'
-        owners: [arn:aws:iam::123456789:role/GitHubActionsRole]
-      environments:
-        - EnvironmentConfigurationName: 'OnDemand Workflows'
     
   prod:
     domain:
@@ -223,23 +109,15 @@ stages:
       region: us-east-1
     project:
       name: prod-data-platform
-      create: true
-    bootstrap:
-      project:
-        create: true
-        profileName: 'All capabilities'
-        owners: [arn:aws:iam::123456789:role/GitHubActionsRole]
-      environments:
-        - EnvironmentConfigurationName: 'OnDemand Workflows'
 ```
 
 **Note:** Dev project is typically created manually in the console by data teams.
 
 ---
 
-## Step 5: Configure Project Connections
+## Step 4: Configure Project Connections
 
-Connections define integrations with AWS services and data sources. They can be created automatically during project initialization or manually via the console.
+Connections define integrations with AWS services and data sources. They can be created automatically during deployment or manually via the console.
 
 ### Default Connections
 
@@ -261,16 +139,10 @@ stages:
       region: us-east-1
     project:
       name: test-data-platform
-      create: true
     bootstrap:
-      project:
-        create: true
-        profileName: 'All capabilities'
-        owners: [admin@example.com]
       environments:
         - EnvironmentConfigurationName: 'OnDemand Workflows'
       
-      # Connections created automatically during initialization
       connections:
         - name: s3-raw-data
           type: S3
@@ -401,7 +273,7 @@ tasks:
 
 ---
 
-## Step 6: Understand CLI Usage Across Stages
+## Step 5: Understand CLI Usage Across Stages
 
 The CLI is used differently depending on your deployment approach:
 
@@ -457,114 +329,7 @@ smus-cli monitor --stages test --manifest manifest.yaml
 
 ---
 
-## Step 7: Choose Your Project Organization Model
-
-Organizations can choose between shared or isolated project models using the `create` flag.
-
-### Shared Projects Model (create: false)
-
-Multiple applications deploy to the same test/prod projects. Best for teams that collaborate and share resources.
-
-```
-my-organization/
-├── monthly-metrics/           # Data application 1
-│   ├── manifest.yaml          # Points to shared-data-platform-test/prod
-│   ├── workflows/
-│   │   ├── metrics_etl.yaml
-│   │   └── metrics_report.yaml
-│   └── notebooks/
-│       └── metrics_analysis.ipynb
-│
-├── churn-model/               # Data application 2
-│   ├── manifest.yaml          # Points to shared-data-platform-test/prod
-│   ├── workflows/
-│   │   ├── feature_engineering.yaml
-│   │   └── model_training.yaml
-│   └── notebooks/
-│       └── train_model.ipynb
-│
-└── README.md
-```
-
-**Deployment:**
-```bash
-# Both applications deploy to the same shared projects
-cd monthly-metrics
-smus-cli deploy --targets test --manifest manifest.yaml  # → shared-data-platform-test
-
-cd ../churn-model
-smus-cli deploy --targets test --manifest manifest.yaml  # → shared-data-platform-test
-```
-
-All workflows from both applications appear in the same MWAA environment.
-
-**Benefits:**
-- Shared resources and connections
-- Centralized governance
-- Lower infrastructure costs
-- Easier cross-application workflows
-
-### Isolated Projects Model (create: true)
-
-Each application gets its own dedicated projects. Best for team autonomy and cost isolation.
-
-```
-my-organization/
-├── monthly-metrics/           # Data application 1
-│   ├── manifest.yaml          # Creates monthly-metrics-test/prod
-│   └── workflows/
-│
-├── churn-model/               # Data application 2
-│   ├── manifest.yaml          # Creates churn-model-test/prod
-│   └── workflows/
-│
-└── README.md
-```
-
-**Deployment:**
-```bash
-# Each application creates and deploys to its own projects
-cd monthly-metrics
-smus-cli deploy --stages test --manifest manifest.yaml  # → monthly-metrics-test (created)
-
-cd ../churn-model
-smus-cli deploy --stages test --manifest manifest.yaml  # → churn-model-test (created)
-```
-
-Each application has its own isolated MWAA environment and resources.
-
-**Benefits:**
-- Team autonomy and ownership
-- Different profiles/permissions per application
-- Cost tracking per application
-- No naming conflicts between applications
-
-### Hybrid Model
-
-You can also mix both approaches - shared test, isolated prod:
-
-```yaml
-# manifest.yaml
-stages:
-  test:
-    project:
-      name: shared-test-platform
-      create: false  # Shared test environment
-  
-  prod:
-    project:
-      name: my-app-prod
-      create: true   # Isolated production
-    bootstrap:
-      project:
-        create: true
-        profileName: 'All capabilities'
-        owners: [my-team@example.com]
-```
-
----
-
-## Step 8: Set Up CI/CD Authentication (Optional)
+## Step 6: Set Up CI/CD Authentication (Optional)
 
 If you want to automate deployments via CI/CD, configure authentication between your CI/CD platform and AWS.
 
@@ -609,7 +374,7 @@ aws cloudformation describe-stacks \
 
 ---
 
-## Step 9: Set Up CI/CD Workflows (Optional)
+## Step 7: Set Up CI/CD Workflows (Optional)
 
 Automate deployments using your CI/CD platform. The SMUS CLI commands are the same across all platforms.
 
@@ -732,7 +497,7 @@ jobs:
 
 ---
 
-## Step 10: Validate Deployment with Monitoring
+## Step 8: Validate Deployment with Monitoring
 
 After deployment, use these commands to verify everything works:
 
@@ -789,7 +554,7 @@ All tests passed
 
 ---
 
-## Step 11: Set Up Monitoring and Metrics Integration
+## Step 9: Set Up Monitoring and Metrics Integration
 
 ### CloudWatch Integration
 
@@ -859,7 +624,7 @@ aws cloudwatch put-metric-alarm \
 
 ---
 
-## Step 12: Document for Data Teams
+## Step 10: Document for Data Teams
 
 Create team documentation explaining the setup:
 
@@ -911,7 +676,7 @@ Multiple data applications can deploy to the same project.
 
 1. **Projects are deployment stages** - One SMUS project can host multiple data applications
 2. **Three deployment approaches** - Direct git-based, bundle-based, or hybrid
-3. **Initialization is automatic** - CLI creates projects with proper settings on first deployment
+3. **Projects must exist before deploying** - Create projects manually in the SMUS console before first deployment
 4. **Monitoring is essential** - Use `monitor`, `logs`, and `test` commands to validate deployments
 5. **CI/CD automates flow** - GitHub Actions handles test → prod progression
 

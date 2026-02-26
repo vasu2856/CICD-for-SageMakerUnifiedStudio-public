@@ -58,17 +58,6 @@ stages:
     stage: TEST
     project:
       name: dev-marketing-test
-      create: true
-    initialization:
-      project:
-        create: true
-        profileName: All capabilities
-        owners:
-        - arn:aws:iam::123456789012:role/GitHubActionsRole-SMUS-CLI-Tests
-        - Eng1
-        contributors: []
-      environments:
-      - EnvironmentConfigurationName: OnDemand Workflows
     deployment_configuration:
       storage:
       - connectionName: default.s3_shared
@@ -84,17 +73,6 @@ stages:
     stage: PROD
     project:
       name: prod-marketing
-      create: true
-    initialization:
-      project:
-        create: true
-        profileName: All capabilities
-        owners:
-        - arn:aws:iam::123456789012:role/GitHubActionsRole-SMUS-CLI-Tests
-        - Eng1
-        contributors: []
-      environments:
-      - EnvironmentConfigurationName: OnDemand Workflows
     deployment_configuration:
       catalog:
         disable: true
