@@ -142,7 +142,7 @@ Internal helpers:
 | `_build_identifier_map(client, domain_id, project_id, catalog_data)` | Query target project by name for each resource type, build source→target ID map |
 | `_resolve_cross_references(resource, id_map)` | Replace source IDs in cross-reference fields (e.g., glossaryId in GlossaryTerm) with target IDs |
 | `_import_resource(client, domain_id, project_id, resource, resource_type, id_map)` | Call create or update API; handle ConflictException for idempotency |
-| `_import_schedule(scheduler_client, schedule_def, target_account, target_region)` | Create or update EventBridge Scheduler schedule in target; remap target ARN |
+| `_import_schedule(scheduler_client, schedule_def, target_account, target_region, target_project_schedule_group)` | Create or update EventBridge Scheduler schedule in target project's schedule group; remap target ARN |
 | `_validate_catalog_json(catalog_data)` | Validate required top-level keys and metadata fields |
 
 ### 4. Bundle Command Integration
@@ -361,7 +361,7 @@ For all assets `A` in the export with `typeIdentifier` equal to `SageMakerUnifie
 ### Property 16: Schedule Import Creates or Updates Schedule
 **Validates: Requirements 8.3, 8.4**
 
-For all schedule assets `A` in the `catalog_export.json` that contain a `scheduleDefinition`, the `Schedule_Importer` SHALL call EventBridge Scheduler `CreateSchedule` or `UpdateSchedule` in the target account. If a schedule with the same name and group already exists, the `Schedule_Importer` SHALL update it rather than fail.
+For all schedule assets `A` in the `catalog_export.json` that contain a `scheduleDefinition`, the `Schedule_Importer` SHALL call EventBridge Scheduler `CreateSchedule` or `UpdateSchedule` in the target account, placing the schedule within the schedule group associated with the target project. If a schedule with the same name already exists within the target project's schedule group, the `Schedule_Importer` SHALL update it rather than fail.
 
 ### Property 17: Schedule Target ARN Remapping
 **Validates: Requirement 8.7**
@@ -382,7 +382,7 @@ For all schedule assets `A` imported into a target account, the `scheduleDefinit
 | `deployment_configuration.catalog.disable: true` | Skip catalog import, log message |
 | EventBridge Scheduler `GetSchedule` fails during export | Log warning, export asset without `scheduleDefinition` |
 | EventBridge Scheduler `CreateSchedule`/`UpdateSchedule` fails during import | Log error (schedule name, group, message), continue with next resource, include in failure count |
-| Schedule already exists in target (same name + group) | Update existing schedule via `UpdateSchedule` |
+| Schedule already exists in target (same name within target project's schedule group) | Update existing schedule via `UpdateSchedule` |
 
 ## Testing Strategy
 

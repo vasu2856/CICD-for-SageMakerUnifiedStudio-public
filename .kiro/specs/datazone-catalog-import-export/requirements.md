@@ -122,8 +122,8 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 
 1. WHEN the Catalog_Exporter encounters an Asset of managed type `SageMakerUnifiedStudioScheduleAssetType`, THE Schedule_Exporter SHALL retrieve the associated EventBridge Scheduler schedule definition using the EventBridge Scheduler `GetSchedule` API
 2. THE Schedule_Exporter SHALL serialize the schedule definition (schedule expression, flexible time window, target, state, description, group name) alongside the asset metadata in the `scheduleAssets` array of the Catalog_Export_JSON, separate from the `assets` array
-3. WHEN the Catalog_Importer processes a Schedule_Asset, THE Schedule_Importer SHALL create or update the EventBridge Scheduler schedule in the target account using the `CreateSchedule` or `UpdateSchedule` API
-4. IF the EventBridge Scheduler schedule already exists in the target account (matched by name and group), THEN THE Schedule_Importer SHALL update the existing schedule with the exported definition
+3. WHEN the Catalog_Importer processes a Schedule_Asset, THE Schedule_Importer SHALL create or update the EventBridge Scheduler schedule in the target account using the `CreateSchedule` or `UpdateSchedule` API, placing the schedule within the schedule group associated with the target project
+4. IF the EventBridge Scheduler schedule already exists in the target account (matched by name within the target project's schedule group), THEN THE Schedule_Importer SHALL update the existing schedule with the exported definition
 5. IF the EventBridge Scheduler `GetSchedule` API fails during export for a Schedule_Asset, THEN THE Catalog_Exporter SHALL log a warning and export the asset metadata without the schedule definition
 6. IF the EventBridge Scheduler `CreateSchedule` or `UpdateSchedule` API fails during import, THEN THE Schedule_Importer SHALL log the error, continue processing remaining resources, and include the failure in the import summary
 7. THE Schedule_Importer SHALL remap the schedule target ARN to reference the correct target account and region

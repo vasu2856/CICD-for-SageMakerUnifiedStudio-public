@@ -85,9 +85,10 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - Produce `catalog_import.json` with remapped identifiers before API calls
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 5.1, 5.2, 5.3, 5.4, 5.5, 7.3, 7.4_
   - [ ] 5.2 Implement schedule import logic in CatalogImporter
-    - Implement `_import_schedule(scheduler_client, schedule_def, target_account, target_region)` to call EventBridge Scheduler `CreateSchedule` or `UpdateSchedule`
+    - Implement `_import_schedule(scheduler_client, schedule_def, target_account, target_region, target_project_schedule_group)` to call EventBridge Scheduler `CreateSchedule` or `UpdateSchedule`
+    - Place the schedule within the schedule group associated with the target project
     - Remap `target.Arn` in the schedule definition to reference the target account and region
-    - If schedule already exists (ResourceNotFoundException not raised), call `UpdateSchedule`
+    - If schedule already exists within the target project's schedule group (ResourceNotFoundException not raised), call `UpdateSchedule`
     - If `CreateSchedule`/`UpdateSchedule` fails, log error and include in failure count
     - Wire into `_import_resource()` so schedule import happens before the DataZone asset create/update for schedule assets
     - _Requirements: 8.3, 8.4, 8.6, 8.7_
