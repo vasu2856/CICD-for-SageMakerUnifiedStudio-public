@@ -48,7 +48,7 @@ def test_describe_basic(mock_load_config, mock_get_region, sample_manifest):
         result = runner.invoke(app, ["describe", "--manifest", "test.yaml"])
         assert result.exit_code == 0
         assert "Pipeline: TestPipeline" in result.stdout
-        assert "Domain: test-domain" in result.stdout
+        assert "dev: test-project (domain: test-domain, region: us-east-1)" in result.stdout
 
 
 @patch("smus_cicd.commands.describe.load_config")
@@ -116,3 +116,44 @@ def test_describe_with_connect_flag(sample_manifest):
         # Should at least show pipeline info even if connect fails
         if result.stdout:
             assert "Pipeline:" in result.stdout or "error" in result.stdout.lower()
+
+
+def test_describe_no_aws_credentials_required_without_connect():
+    """Verify describe works without AWS credentials when --connect is not used.
+
+    The describe command should never call STS or boto3 unless --connect is
+    explicitly passed. This test uses a manifest with AWS pseudo vars
+    (${AWS_ACCOUNT_ID}, ${STS_REGION}) and asserts no STS calls are made.
+    """
+    manifest_content = """
+applicationName: NoCredsPipeline
+content:
+  storage: []
+stages:
+  dev:
+    domain:
+      name: my-domain
+      region: ${STS_REGION:us-west-2}
+    stage: DEV
+    project:
+      name: project-${AWS_ACCOUNT_ID:unknown}
+      create: false
+"""
+    runner = CliRunner()
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        f.write(manifest_content)
+        manifest_path = f.name
+
+    try:
+        with patch("boto3.client") as mock_boto3_client:
+            result = runner.invoke(app, ["describe", "--manifest", manifest_path])
+
+        assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.output}"
+        assert "Pipeline: NoCredsPipeline" in result.stdout
+        # Pseudo vars fall back to defaults when resolve_aws_pseudo_vars=False
+        assert "us-west-2" in result.stdout
+        assert "unknown" in result.stdout
+        # STS must NOT have been called
+        mock_boto3_client.assert_not_called()
+    finally:
+        os.unlink(manifest_path)
