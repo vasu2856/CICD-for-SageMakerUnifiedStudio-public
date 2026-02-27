@@ -16,19 +16,19 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 - **DataZone_Project**: A project within a DataZone domain that owns catalog resources
 - **Glossary**: A DataZone business glossary that organizes domain-specific terminology
 - **Glossary_Term**: An individual term within a Glossary, containing definitions and metadata
-- **Form_Type**: A DataZone metadata form type that defines custom metadata schemas
+- **Form_Type**: A DataZone metadata form type that defines custom metadata schemas with fields and validation rules
+- **Metadata_Form**: An instance of a Form_Type containing actual metadata values for an asset
 - **Asset_Type**: A DataZone asset type that defines the structure and metadata for a category of assets
 - **Asset**: A DataZone catalog asset representing a data resource with metadata and forms
+- **Data_Product**: A DataZone data product that bundles one or more data assets for publishing and sharing
 - **Catalog_Export_JSON**: The JSON file produced during bundling that contains serialized catalog resources from the source project
 - **Catalog_Import_JSON**: The JSON file produced during deployment that contains catalog resources with identifiers remapped for the target project
 - **Manifest**: The `manifest.yaml` file that defines application content, stages, and deployment configuration
-- **Search_API**: The DataZone `search` API used to find Assets and GlossaryTerms
+- **Search_API**: The DataZone `search` API used to find Assets, GlossaryTerms, and Data Products
 - **SearchTypes_API**: The DataZone `searchTypes` API used to find FormTypes and AssetTypes
 - **Updated_At_Filter**: A filter on the `updatedAt` attribute that limits exported resources to those modified after a user-specified timestamp
-- **Schedule_Asset**: A DataZone catalog asset of managed type `SageMakerUnifiedStudioScheduleAssetType` that represents an Amazon EventBridge Scheduler schedule
-- **EventBridge_Schedule**: An Amazon EventBridge Scheduler schedule resource that defines a time-based trigger (cron or rate expression) with a target action
-- **Schedule_Exporter**: The sub-component of Catalog_Exporter responsible for retrieving the EventBridge Scheduler schedule definition associated with a Schedule_Asset
-- **Schedule_Importer**: The sub-component of Catalog_Importer responsible for creating or updating the EventBridge Scheduler schedule in the target account and linking it to the imported Schedule_Asset
+- **Data_Product_Filter**: A filter that limits exported data products to only those explicitly listed in the manifest by name
+
 
 ## Requirements
 
@@ -38,10 +38,19 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 
 #### Acceptance Criteria
 
-1. THE Manifest SHALL support a `content.catalog.export` section that specifies which resource types to export (glossaries, glossaryTerms, formTypes, assetTypes, assets)
-2. WHEN a user specifies `content.catalog.export.resourceTypes` in the manifest, THE Bundle_Command SHALL only export the listed resource types
-3. WHERE a user specifies `content.catalog.export.updatedAfter` in the manifest, THE Bundle_Command SHALL only export resources with `updatedAt` greater than or equal to the specified ISO 8601 timestamp
-4. IF `content.catalog.export` is present but `resourceTypes` is omitted, THEN THE Bundle_Command SHALL export all five supported resource types by default
+1. THE Manifest SHALL support a `content.catalog` section with `assets`, `glossaries`, `dataProducts`, and `metadataForms` subsections for organizing catalog resource export configuration
+2. WHEN a user specifies `content.catalog.assets.include` in the manifest, THE Bundle_Command SHALL only export the listed asset-related resource types (formTypes, assetTypes, assets)
+2a. WHEN a user specifies `content.catalog.metadataForms.include` in the manifest, THE Bundle_Command SHALL export metadata form types and their field definitions
+3. WHEN a user specifies `content.catalog.glossaries.include` in the manifest, THE Bundle_Command SHALL only export the listed glossary-related resource types (glossaries, glossaryTerms)
+4. WHERE a user specifies `content.catalog.assets.updatedAfter` in the manifest, THE Bundle_Command SHALL only export asset-related resources with `updatedAt` greater than or equal to the specified ISO 8601 timestamp
+5. WHERE a user specifies `content.catalog.glossaries.updatedAfter` in the manifest, THE Bundle_Command SHALL only export glossary-related resources with `updatedAt` greater than or equal to the specified ISO 8601 timestamp
+6. IF `content.catalog.assets` is present but `include` is omitted, THEN THE Bundle_Command SHALL export all three asset-related resource types (formTypes, assetTypes, assets) by default
+7. IF `content.catalog.glossaries` is present but `include` is omitted, THEN THE Bundle_Command SHALL export both glossary-related resource types (glossaries, glossaryTerms) by default
+8. WHEN a user specifies `content.catalog.dataProducts.names` in the manifest, THE Bundle_Command SHALL only export data products whose names match the specified list
+9. WHERE a user specifies `content.catalog.dataProducts.updatedAfter` in the manifest, THE Bundle_Command SHALL only export data products with `updatedAt` greater than or equal to the specified ISO 8601 timestamp
+10. IF `content.catalog.dataProducts` is present but `names` is omitted, THEN THE Bundle_Command SHALL export all data products from the source project
+11. WHEN a user specifies `content.catalog.metadataForms.updatedAfter` in the manifest, THE Bundle_Command SHALL only export metadata forms with `updatedAt` greater than or equal to the specified ISO 8601 timestamp
+12. IF `content.catalog.metadataForms` is present but `include` is omitted, THEN THE Bundle_Command SHALL export all metadata form types from the source project
 
 ### Requirement 2: Export Catalog Resources During Bundle
 
@@ -49,13 +58,17 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 
 #### Acceptance Criteria
 
-1. WHEN the bundle command runs and `content.catalog.export` is configured, THE Catalog_Exporter SHALL query the DataZone Search_API for Assets and GlossaryTerms owned by the source project
-2. WHEN the bundle command runs and `content.catalog.export` is configured, THE Catalog_Exporter SHALL query the DataZone SearchTypes_API for FormTypes and AssetTypes owned by the source project
-3. THE Catalog_Exporter SHALL use a sort clause of `{"attribute": "updatedAt", "order": "DESCENDING"}` for all search queries
-4. WHERE an `updatedAfter` filter is specified, THE Catalog_Exporter SHALL apply a filter on the `updatedAt` attribute to only include resources modified at or after the specified timestamp
-5. THE Catalog_Exporter SHALL handle pagination by following `nextToken` until all matching results are retrieved
-6. WHEN the Catalog_Exporter retrieves Glossaries, THE Catalog_Exporter SHALL use the Search_API with `searchScope` set to `GLOSSARY`
-7. THE Catalog_Exporter SHALL serialize all retrieved resources into a single `catalog_export.json` file within the bundle archive under a `catalog/` directory
+1. WHEN the bundle command runs and `content.catalog.assets` or `content.catalog.glossaries` is configured, THE Catalog_Exporter SHALL query the DataZone Search_API for Assets and GlossaryTerms owned by the source project
+2. WHEN the bundle command runs and `content.catalog.assets` or `content.catalog.metadataForms` is configured, THE Catalog_Exporter SHALL query the DataZone SearchTypes_API for FormTypes and AssetTypes owned by the source project
+2a. WHEN the bundle command runs and `content.catalog.metadataForms` is configured, THE Catalog_Exporter SHALL export the complete form type definition including the model (field definitions, types, and validation rules)
+3. WHEN the bundle command runs and `content.catalog.dataProducts` is configured, THE Catalog_Exporter SHALL query the DataZone Search_API for Data Products owned by the source project
+4. THE Catalog_Exporter SHALL use a sort clause of `{"attribute": "updatedAt", "order": "DESCENDING"}` for all search queries
+5. WHERE an `updatedAfter` filter is specified for assets, glossaries, or data products, THE Catalog_Exporter SHALL apply a filter on the `updatedAt` attribute to only include resources modified at or after the specified timestamp
+6. WHERE a `names` filter is specified for data products, THE Catalog_Exporter SHALL only export data products whose names match the specified list
+7. THE Catalog_Exporter SHALL handle pagination by following `nextToken` until all matching results are retrieved
+8. WHEN the Catalog_Exporter retrieves Glossaries, THE Catalog_Exporter SHALL use the Search_API with `searchScope` set to `GLOSSARY`
+9. WHEN the Catalog_Exporter retrieves Data Products, THE Catalog_Exporter SHALL use the Search_API with `searchScope` set to `DATA_PRODUCT`
+10. THE Catalog_Exporter SHALL serialize all retrieved resources into a single `catalog_export.json` file within the bundle archive under a `catalog/` directory
 
 ### Requirement 3: Catalog Export JSON Serialization
 
@@ -63,9 +76,10 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 
 #### Acceptance Criteria
 
-1. THE Catalog_Exporter SHALL produce a JSON file containing a top-level object with keys: `metadata`, `glossaries`, `glossaryTerms`, `formTypes`, `assetTypes`, `assets`, and `scheduleAssets`
+1. THE Catalog_Exporter SHALL produce a JSON file containing a top-level object with keys: `metadata`, `glossaries`, `glossaryTerms`, `formTypes`, `assetTypes`, `assets`, and `metadataForms`
 2. THE `metadata` section SHALL include `sourceProjectId`, `sourceDomainId`, `exportTimestamp`, and `resourceTypes` fields
 3. WHEN serializing each resource, THE Catalog_Exporter SHALL preserve the `name` field, all user-configurable attributes, and the source identifier
+3a. WHEN serializing metadata form types, THE Catalog_Exporter SHALL preserve the complete `model` structure including all field definitions, data types, constraints, and validation rules
 4. THE Catalog_Export_JSON SHALL be valid JSON that can be deserialized back into equivalent data structures (round-trip property)
 
 ### Requirement 4: Identifier Mapping During Deploy
@@ -87,8 +101,10 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 #### Acceptance Criteria
 
 1. WHEN a resource is marked for creation, THE Catalog_Importer SHALL call the corresponding DataZone create API (CreateGlossary, CreateGlossaryTerm, CreateFormType, CreateAssetType, CreateAsset)
+1a. WHEN creating metadata form types, THE Catalog_Importer SHALL preserve the complete model structure including all field definitions and validation rules
 2. WHEN a resource already exists in the target project (matched by name), THE Catalog_Importer SHALL call the corresponding DataZone update API to synchronize the resource
 3. THE Catalog_Importer SHALL create resources in dependency order: FormTypes before AssetTypes, Glossaries before GlossaryTerms, AssetTypes before Assets
+3a. THE Catalog_Importer SHALL create metadata form types before any assets or asset types that reference them
 4. IF a DataZone API call fails during import, THEN THE Catalog_Importer SHALL log the error, continue processing remaining resources, and report a summary of failures at the end
 5. THE Catalog_Importer SHALL produce a Catalog_Import_JSON file with the remapped identifiers before making API calls, for auditability
 
@@ -113,17 +129,3 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 2. IF the source project has no catalog resources matching the filter criteria, THEN THE Catalog_Exporter SHALL produce an empty Catalog_Export_JSON with zero resources and log an informational message
 3. IF a create or update API call fails for a specific resource during import, THEN THE Catalog_Importer SHALL log the resource name, type, and error, then continue with the next resource
 4. IF the Catalog_Export_JSON is malformed or missing required fields, THEN THE Catalog_Importer SHALL raise a validation error before attempting any API calls
-
-### Requirement 8: Schedule Asset Export and Import
-
-**User Story:** As a developer, I want schedule assets and their associated EventBridge Scheduler schedules to be exported and imported alongside other catalog resources, so that time-based triggers are promoted across stages.
-
-#### Acceptance Criteria
-
-1. WHEN the Catalog_Exporter encounters an Asset of managed type `SageMakerUnifiedStudioScheduleAssetType`, THE Schedule_Exporter SHALL retrieve the associated EventBridge Scheduler schedule definition using the EventBridge Scheduler `GetSchedule` API
-2. THE Schedule_Exporter SHALL serialize the schedule definition (schedule expression, flexible time window, target, state, description, group name) alongside the asset metadata in the `scheduleAssets` array of the Catalog_Export_JSON, separate from the `assets` array
-3. WHEN the Catalog_Importer processes a Schedule_Asset, THE Schedule_Importer SHALL create or update the EventBridge Scheduler schedule in the target account using the `CreateSchedule` or `UpdateSchedule` API, placing the schedule within the schedule group associated with the target project
-4. IF the EventBridge Scheduler schedule already exists in the target account (matched by name within the target project's schedule group), THEN THE Schedule_Importer SHALL update the existing schedule with the exported definition
-5. IF the EventBridge Scheduler `GetSchedule` API fails during export for a Schedule_Asset, THEN THE Catalog_Exporter SHALL log a warning and export the asset metadata without the schedule definition
-6. IF the EventBridge Scheduler `CreateSchedule` or `UpdateSchedule` API fails during import, THEN THE Schedule_Importer SHALL log the error, continue processing remaining resources, and include the failure in the import summary
-7. THE Schedule_Importer SHALL remap the schedule target ARN to reference the correct target account and region
