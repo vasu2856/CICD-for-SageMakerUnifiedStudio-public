@@ -57,4 +57,80 @@ class TestDomainConfigGetName:
         """Test get_name returns None when neither name nor tags are set."""
         config = DomainConfig(region="us-east-1")
         assert config.get_name() is None
+
+    def test_get_name_with_id_resolves_from_api(self):
+        """Test get_name resolves domain name from id via API."""
+        config = DomainConfig(id="dzd-abc123", region="us-east-1")
+
+        with patch("smus_cicd.helpers.datazone.get_domain_name_by_id") as mock_get:
+            mock_get.return_value = "resolved-domain-name"
+            result = config.get_name()
+
+        assert result == "resolved-domain-name"
+        mock_get.assert_called_once_with("dzd-abc123", "us-east-1")
+
+    def test_get_name_with_id_returns_none_when_not_found(self):
+        """Test get_name returns None when domain not found by id."""
+        config = DomainConfig(id="dzd-nonexistent", region="us-east-1")
+
+        with patch("smus_cicd.helpers.datazone.get_domain_name_by_id") as mock_get:
+            mock_get.return_value = None
+            result = config.get_name()
+
+        assert result is None
+
+    def test_get_name_prefers_explicit_name_over_id(self):
+        """Test get_name prefers explicit name even when id is also present."""
+        config = DomainConfig(name="explicit-name", id="dzd-abc123", region="us-east-1")
+
+        with patch("smus_cicd.helpers.datazone.get_domain_name_by_id") as mock_get:
+            result = config.get_name()
+
+        assert result == "explicit-name"
+        mock_get.assert_not_called()
+
+    def test_get_name_prefers_id_over_tags(self):
+        """Test get_name uses id before falling back to tags."""
+        config = DomainConfig(
+            id="dzd-abc123",
+            tags={"purpose": "test"},
+            region="us-east-1",
+        )
+
+        with patch("smus_cicd.helpers.datazone.get_domain_name_by_id") as mock_id:
+            mock_id.return_value = "id-resolved-name"
+            with patch("smus_cicd.helpers.datazone.resolve_domain_id") as mock_tags:
+                result = config.get_name()
+
+        assert result == "id-resolved-name"
+        mock_id.assert_called_once()
+        mock_tags.assert_not_called()
+
+
+class TestDomainConfigParsing:
+    """Test DomainConfig is parsed correctly from manifest dict."""
+
+    def test_manifest_parses_domain_id(self):
+        """Test that domain.id is parsed from manifest and stored on DomainConfig."""
+        from smus_cicd.application.application_manifest import ApplicationManifest
+
+        data = {
+            "applicationName": "TestApp",
+            "content": {"workflows": [{"workflowName": "wf", "connectionName": "c"}]},
+            "stages": {
+                "dev": {
+                    "domain": {
+                        "id": "dzd-abc123",
+                        "region": "us-east-1",
+                    },
+                    "project": {"name": "my-project"},
+                }
+            },
+        }
+
+        manifest = ApplicationManifest.from_dict(data)
+        assert manifest.stages["dev"].domain.id == "dzd-abc123"
+        assert manifest.stages["dev"].domain.name is None
+        assert manifest.stages["dev"].domain.tags is None
+
 # Trigger workflow - Fri Nov 21 16:56:07 EST 2025

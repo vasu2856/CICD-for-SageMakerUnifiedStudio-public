@@ -12,7 +12,7 @@
 
 - ✅ Python 3.8+ installed
 - ✅ AWS CLI configured with credentials
-- ✅ SageMaker Unified Studio domain and project created
+- ✅ SageMaker Unified Studio domain and project created manually in the console (the CLI cannot create these)
 - ✅ Basic understanding of Jupyter notebooks
 
 ---
@@ -68,8 +68,12 @@ stages:
 ```
 
 **What to change:**
-- `applicationName`: Your application name
+- `applicationName`: A logical name for this CI/CD manifest environment — not a SMUS resource. This name can be anything.
 - `domain.region`: Your AWS region
+- Domain identifier — use one of:
+  - `domain.id`: Your domain ID (visible in the SMUS portal)
+  - `domain.name`: Your domain name
+  - `domain.tags`: Tag key-value pairs to look up the domain
 - `project.name`: Your SageMaker Unified Studio project name
 
 ---
@@ -92,7 +96,7 @@ smus-cli deploy --targets dev --manifest manifest.yaml
 
 ## Step 5: Verify Deployment
 
-Check your deployment in SageMaker Unified Studio console:
+Check your deployment in SageMaker Unified Studio portal:
 
 1. Navigate to your project
 2. Go to **Workflows** section

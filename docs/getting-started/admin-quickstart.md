@@ -12,7 +12,7 @@
 ## Prerequisites
 
 - ✅ AWS account with admin access
-- ✅ SageMaker Unified Studio domain created
+- ✅ SageMaker Unified Studio domain and project(s) created manually in the portal (the CLI cannot create these)
 - ✅ Python 3.8+ and AWS CLI installed
 - ✅ Understanding of AWS IAM and S3
 
@@ -22,7 +22,7 @@
 
 As an admin, you'll configure:
 - **Deployment stages** - Test and Prod environments where data applications deploy
-- **Project initialization** - Automated project creation with proper settings
+- **Project initialization** - Projects must be created manually in the SMUS portal before deploying
 - **CI/CD pipelines** - GitHub Actions or similar automation
 - **Monitoring** - Deployment validation and health checks
 
@@ -65,13 +65,17 @@ Each stage in `manifest.yaml` specifies:
 stages:
   test:
     domain:
-      name: my-domain          # SMUS domain name
-      region: us-east-1        # AWS region
+      id: dzd_xxxxxxxxxxxx    # Option 1: domain ID (visible in the SMUS portal)
+      # name: my-domain       # Option 2: domain name
+      # tags:                 # Option 3: tag-based lookup
+      #   purpose: my-tag
+      region: us-east-1       # AWS region
     project:
-      name: test-project       # SMUS project name
+      name: test-project      # SMUS project name
 ```
 
 **Key points:**
+- Identify your domain using `domain.id`, `domain.name`, or `domain.tags`
 - The project must already exist in the SMUS domain before deploying
 - Use the same project name across multiple applications to share resources
 - Different applications can deploy to the same project
@@ -248,7 +252,7 @@ stages:
 
 ### Create Connections Manually (Console)
 
-For existing projects, you can also create connections via the SMUS console:
+For existing projects, you can also create connections via the SMUS portal:
 
 1. Navigate to SMUS project
 2. Go to **Connections** tab
@@ -676,7 +680,7 @@ Multiple data applications can deploy to the same project.
 
 1. **Projects are deployment stages** - One SMUS project can host multiple data applications
 2. **Three deployment approaches** - Direct git-based, bundle-based, or hybrid
-3. **Projects must exist before deploying** - Create projects manually in the SMUS console before first deployment
+3. **Projects must exist before deploying** - Create projects manually in the SMUS portal before first deployment
 4. **Monitoring is essential** - Use `monitor`, `logs`, and `test` commands to validate deployments
 5. **CI/CD automates flow** - GitHub Actions handles test → prod progression
 
