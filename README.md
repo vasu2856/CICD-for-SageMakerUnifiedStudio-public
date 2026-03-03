@@ -10,6 +10,8 @@
 
 > **[Preview]** Amazon SageMaker Unified Studio CI/CD CLI is currently in preview and is subject to change. Commands, configuration formats, and APIs may evolve based on customer feedback. We recommend evaluating this tool in non-production environments during preview. For feedback and bug reports, please open an issue https://github.com/aws/CICD-for-SageMakerUnifiedStudio/issues
 
+> **[IAM Domains Only]** This CLI currently supports SMUS domains using IAM-based authentication only. Support for IAM Identity Center (IdC)-based domains is coming soon.
+
 **Automate deployment of data applications across SageMaker Unified Studio environments**
 
 Deploy Airflow DAGs, Jupyter notebooks, and ML workflows from development to production with confidence. Built for data scientists, data engineers, ML engineers, and GenAI app developers working with DevOps teams.

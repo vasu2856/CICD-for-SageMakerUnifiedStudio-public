@@ -158,7 +158,10 @@ def get_project_user_role_arn(project_name: str, domain_name: str, region: str) 
                         return role_arn
 
         raise ValueError(
-            f"No tooling environment with userRoleArn found for project '{project_name}'"
+            f"Project '{project_name}' does not have a Tooling Environment configured. "
+            "The target project must have a Tooling Environment set up in SageMaker Unified Studio "
+            "before it can be used with the SMUS CLI. "
+            "Please configure a Tooling Environment for this project in the SMUS portal and try again."
         )
 
     except Exception as e:

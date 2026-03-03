@@ -291,3 +291,115 @@ class TestDataZoneConnectionDetection:
         result = datazone.target_uses_serverless_airflow(manifest, target_config)
 
         assert result is False
+
+
+class TestListWorkflowRuns:
+    """Test list_workflow_runs error handling."""
+
+    def test_raises_on_api_error(self):
+        """list_workflow_runs should raise instead of returning empty list on API error."""
+        with patch(
+            "smus_cicd.helpers.airflow_serverless.create_airflow_serverless_client"
+        ) as mock_client:
+            mock_airflow = MagicMock()
+            mock_client.return_value = mock_airflow
+            mock_airflow.list_workflow_runs.side_effect = Exception(
+                "An error occurred (ValidationException) when calling the "
+                "ListWorkflowRuns operation: Validation failed. "
+                "Arn account must match caller account"
+            )
+
+            with pytest.raises(Exception, match="Arn account must match caller account"):
+                airflow_serverless.list_workflow_runs(
+                    workflow_arn="arn:aws:airflow-serverless:ca-central-1:111111111111:workflow/test",
+                    region="ca-central-1",
+                )
+
+    def test_returns_runs_on_success(self):
+        """list_workflow_runs should return parsed runs on success."""
+        with patch(
+            "smus_cicd.helpers.airflow_serverless.create_airflow_serverless_client"
+        ) as mock_client:
+            mock_airflow = MagicMock()
+            mock_client.return_value = mock_airflow
+            mock_airflow.list_workflow_runs.return_value = {
+                "WorkflowRuns": [
+                    {
+                        "RunId": "run-abc",
+                        "WorkflowArn": "arn:aws:airflow-serverless:us-east-1:123:workflow/test",
+                        "RunDetailSummary": {"Status": "SUCCEEDED"},
+                    }
+                ]
+            }
+
+            runs = airflow_serverless.list_workflow_runs(
+                workflow_arn="arn:aws:airflow-serverless:us-east-1:123:workflow/test",
+                region="us-east-1",
+            )
+
+            assert len(runs) == 1
+            assert runs[0]["run_id"] == "run-abc"
+            assert runs[0]["status"] == "SUCCEEDED"
+
+
+class TestMonitorWorkflowLogsLive:
+    """Test monitor_workflow_logs_live error handling and exit conditions."""
+
+    def test_exits_after_max_consecutive_errors(self):
+        """Should return error result after MAX_CONSECUTIVE_ERRORS consecutive failures."""
+        with patch(
+            "smus_cicd.helpers.airflow_serverless.list_workflow_runs"
+        ) as mock_runs, patch(
+            "smus_cicd.helpers.airflow_serverless.time.sleep"
+        ):
+            mock_runs.side_effect = Exception("Arn account must match caller account")
+
+            result = airflow_serverless.monitor_workflow_logs_live(
+                workflow_arn="arn:aws:airflow-serverless:ca-central-1:111111111111:workflow/test",
+                region="ca-central-1",
+            )
+
+            assert result["success"] is False
+            assert result["final_status"] == "ERROR"
+            assert "Arn account must match caller account" in result["error"]
+            # Should have been called exactly MAX_CONSECUTIVE_ERRORS times
+            assert mock_runs.call_count == 10
+
+    def test_resets_error_count_on_success(self):
+        """Consecutive error count should reset after a successful poll."""
+        completed_run = {
+            "run_id": "run-1",
+            "status": "SUCCEEDED",
+            "ended_at": "2024-01-01T00:00:00",
+            "started_at": "2024-01-01T00:00:00",
+        }
+
+        call_count = {"n": 0}
+
+        def side_effect(*args, **kwargs):
+            call_count["n"] += 1
+            # Fail 9 times, then succeed on 10th (resets counter), then complete
+            if call_count["n"] < 10:
+                raise Exception("transient error")
+            return [completed_run]
+
+        with patch(
+            "smus_cicd.helpers.airflow_serverless.list_workflow_runs",
+            side_effect=side_effect,
+        ), patch(
+            "smus_cicd.helpers.airflow_serverless.get_cloudwatch_logs",
+            return_value=[],
+        ), patch(
+            "smus_cicd.helpers.airflow_serverless.is_workflow_run_active",
+            return_value=False,
+        ), patch(
+            "smus_cicd.helpers.airflow_serverless.time.sleep"
+        ):
+            result = airflow_serverless.monitor_workflow_logs_live(
+                workflow_arn="arn:aws:airflow-serverless:us-east-1:123:workflow/test",
+                region="us-east-1",
+            )
+
+            # 9 errors then 1 success — should complete, not error out
+            assert result["success"] is False  # SUCCEEDED not in ["COMPLETED", "SUCCESS"]
+            assert result["final_status"] == "SUCCEEDED"
