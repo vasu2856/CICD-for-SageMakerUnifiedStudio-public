@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This feature adds support for importing and exporting DataZone catalog assets (Glossaries, GlossaryTerms, FormTypes, AssetTypes, and Assets) as part of the SMUS CI/CD `bundle` and `deploy` commands. During bundling, the CLI exports catalog resources from a source project using the DataZone Search and SearchTypes APIs, filtered by `updatedAt` timestamp, and serializes them to JSON. During deployment, the CLI reads the exported JSON, maps source identifiers to target project identifiers by name, and creates or updates the resources in the target project via DataZone create/update APIs.
+This feature adds support for importing and exporting DataZone catalog assets (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products) as part of the SMUS CI/CD `bundle` and `deploy` commands. During bundling, the CLI exports all catalog resources from a source project using the DataZone Search and SearchTypes APIs and serializes them to JSON. During deployment, the CLI reads the exported JSON, maps source identifiers to target project identifiers using externalIdentifier (when present) or name as fallback, and creates or updates the resources in the target project via DataZone create/update APIs.
 
 ## Glossary
 
@@ -11,7 +11,8 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 - **Deploy_Command**: The CLI command that deploys a bundle archive to a target stage's DataZone project
 - **Catalog_Exporter**: The component responsible for querying DataZone Search/SearchTypes APIs and serializing catalog resources to JSON
 - **Catalog_Importer**: The component responsible for reading exported catalog JSON, mapping identifiers from source to target project, and creating/updating resources in the target project
-- **Identifier_Mapper**: The component that builds a mapping between source project resource identifiers and target project resource identifiers using the `name` field
+- **Identifier_Mapper**: The component that builds a mapping between source project resource identifiers and target project resource identifiers using the `externalIdentifier` field (when present) or `name` field as fallback
+- **External_Identifier**: A unique identifier for a resource that may contain AWS account and region information that must be normalized before mapping
 - **DataZone_Domain**: An Amazon DataZone domain that contains projects and catalog resources
 - **DataZone_Project**: A project within a DataZone domain that owns catalog resources
 - **Glossary**: A DataZone business glossary that organizes domain-specific terminology
@@ -19,56 +20,48 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 - **Form_Type**: A DataZone metadata form type that defines custom metadata schemas with fields and validation rules
 - **Metadata_Form**: An instance of a Form_Type containing actual metadata values for an asset
 - **Asset_Type**: A DataZone asset type that defines the structure and metadata for a category of assets
-- **Asset**: A DataZone catalog asset representing a data resource with metadata and forms
+- **Asset**: A DataZone catalog asset representing a data resource with metadata, forms, and optional glossary term associations
 - **Data_Product**: A DataZone data product that bundles one or more data assets for publishing and sharing
 - **Catalog_Export_JSON**: The JSON file produced during bundling that contains serialized catalog resources from the source project
 - **Catalog_Import_JSON**: The JSON file produced during deployment that contains catalog resources with identifiers remapped for the target project
 - **Manifest**: The `manifest.yaml` file that defines application content, stages, and deployment configuration
-- **Search_API**: The DataZone `search` API used to find Assets, GlossaryTerms, and Data Products
+- **Search_API**: The DataZone `search` API used to find Assets, GlossaryTerms, Glossaries, and Data Products
 - **SearchTypes_API**: The DataZone `searchTypes` API used to find FormTypes and AssetTypes
-- **Updated_At_Filter**: A filter on the `updatedAt` attribute that limits exported resources to those modified after a user-specified timestamp
-- **Data_Product_Filter**: A filter that limits exported data products to only those explicitly listed in the manifest by name
 
 
 ## Requirements
 
 ### Requirement 1: Manifest Configuration for Catalog Export
 
-**User Story:** As a developer, I want to configure catalog resource export in my manifest.yaml, so that the bundle command knows which catalog resource types to export and with what filters.
+**User Story:** As a developer, I want to enable or disable catalog resource export in my manifest.yaml, so that the bundle command knows whether to export all catalog resources owned by my project.
 
 #### Acceptance Criteria
 
-1. THE Manifest SHALL support a `content.catalog` section with `assets`, `glossaries`, `dataProducts`, and `metadataForms` subsections for organizing catalog resource export configuration
-2. WHEN a user specifies `content.catalog.assets.include` in the manifest, THE Bundle_Command SHALL only export the listed asset-related resource types (formTypes, assetTypes, assets)
-2a. WHEN a user specifies `content.catalog.metadataForms.include` in the manifest, THE Bundle_Command SHALL export metadata form types and their field definitions
-3. WHEN a user specifies `content.catalog.glossaries.include` in the manifest, THE Bundle_Command SHALL only export the listed glossary-related resource types (glossaries, glossaryTerms)
-4. WHERE a user specifies `content.catalog.assets.updatedAfter` in the manifest, THE Bundle_Command SHALL only export asset-related resources with `updatedAt` greater than or equal to the specified ISO 8601 timestamp
-5. WHERE a user specifies `content.catalog.glossaries.updatedAfter` in the manifest, THE Bundle_Command SHALL only export glossary-related resources with `updatedAt` greater than or equal to the specified ISO 8601 timestamp
-6. IF `content.catalog.assets` is present but `include` is omitted, THEN THE Bundle_Command SHALL export all three asset-related resource types (formTypes, assetTypes, assets) by default
-7. IF `content.catalog.glossaries` is present but `include` is omitted, THEN THE Bundle_Command SHALL export both glossary-related resource types (glossaries, glossaryTerms) by default
-8. WHEN a user specifies `content.catalog.dataProducts.names` in the manifest, THE Bundle_Command SHALL only export data products whose names match the specified list
-9. WHERE a user specifies `content.catalog.dataProducts.updatedAfter` in the manifest, THE Bundle_Command SHALL only export data products with `updatedAt` greater than or equal to the specified ISO 8601 timestamp
-10. IF `content.catalog.dataProducts` is present but `names` is omitted, THEN THE Bundle_Command SHALL export all data products from the source project
-11. WHEN a user specifies `content.catalog.metadataForms.updatedAfter` in the manifest, THE Bundle_Command SHALL only export metadata forms with `updatedAt` greater than or equal to the specified ISO 8601 timestamp
-12. IF `content.catalog.metadataForms` is present but `include` is omitted, THEN THE Bundle_Command SHALL export all metadata form types from the source project
+1. THE Manifest SHALL support a `content.catalog.enabled` boolean field to enable or disable catalog export (default: false)
+2. WHEN `content.catalog.enabled` is set to true, THE Bundle_Command SHALL export ALL catalog resource types owned by the source project (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products)
+3. WHEN `content.catalog.enabled` is set to false or omitted, THE Bundle_Command SHALL NOT export any catalog resources
+4. THE Manifest SHALL support an optional `content.catalog.publish` boolean field to enable automatic publishing of assets and data products during deployment (default: false)
+5. THE Catalog_Exporter SHALL export the `inputForms` field as part of asset serialization
+6. THE Catalog_Exporter SHALL export the `termRelations` field as part of glossary term serialization
 
 ### Requirement 2: Export Catalog Resources During Bundle
 
-**User Story:** As a developer, I want the bundle command to export DataZone catalog resources from my source project, so that I can promote catalog definitions across stages.
+**User Story:** As a developer, I want the bundle command to export DataZone catalog resources owned by my source project, so that I can promote catalog definitions across stages.
 
 #### Acceptance Criteria
 
-1. WHEN the bundle command runs and `content.catalog.assets` or `content.catalog.glossaries` is configured, THE Catalog_Exporter SHALL query the DataZone Search_API for Assets and GlossaryTerms owned by the source project
-2. WHEN the bundle command runs and `content.catalog.assets` or `content.catalog.metadataForms` is configured, THE Catalog_Exporter SHALL query the DataZone SearchTypes_API for FormTypes and AssetTypes owned by the source project
-2a. WHEN the bundle command runs and `content.catalog.metadataForms` is configured, THE Catalog_Exporter SHALL export the complete form type definition including the model (field definitions, types, and validation rules)
-3. WHEN the bundle command runs and `content.catalog.dataProducts` is configured, THE Catalog_Exporter SHALL query the DataZone Search_API for Data Products owned by the source project
-4. THE Catalog_Exporter SHALL use a sort clause of `{"attribute": "updatedAt", "order": "DESCENDING"}` for all search queries
-5. WHERE an `updatedAfter` filter is specified for assets, glossaries, or data products, THE Catalog_Exporter SHALL apply a filter on the `updatedAt` attribute to only include resources modified at or after the specified timestamp
-6. WHERE a `names` filter is specified for data products, THE Catalog_Exporter SHALL only export data products whose names match the specified list
-7. THE Catalog_Exporter SHALL handle pagination by following `nextToken` until all matching results are retrieved
-8. WHEN the Catalog_Exporter retrieves Glossaries, THE Catalog_Exporter SHALL use the Search_API with `searchScope` set to `GLOSSARY`
-9. WHEN the Catalog_Exporter retrieves Data Products, THE Catalog_Exporter SHALL use the Search_API with `searchScope` set to `DATA_PRODUCT`
-10. THE Catalog_Exporter SHALL serialize all retrieved resources into a single `catalog_export.json` file within the bundle archive under a `catalog/` directory
+1. WHEN the bundle command runs and `content.catalog.enabled` is true, THE Catalog_Exporter SHALL query the DataZone Search_API for all Assets, GlossaryTerms, Glossaries, and Data Products owned by the source project
+2. WHEN the bundle command runs and `content.catalog.enabled` is true, THE Catalog_Exporter SHALL query the DataZone SearchTypes_API for all FormTypes and AssetTypes owned by the source project
+3. THE Catalog_Exporter SHALL ONLY export resources where the `owningProjectId` matches the source project identifier
+4. THE Catalog_Exporter SHALL export the complete form type definition including the model (field definitions, types, and validation rules)
+5. THE Catalog_Exporter SHALL use a sort clause of `{"attribute": "updatedAt", "order": "DESCENDING"}` for all search queries
+6. THE Catalog_Exporter SHALL handle pagination by following `nextToken` until all matching results are retrieved
+7. WHEN the Catalog_Exporter retrieves Glossaries, THE Catalog_Exporter SHALL use the Search_API with `searchScope` set to `GLOSSARY`
+8. WHEN the Catalog_Exporter retrieves Data Products, THE Catalog_Exporter SHALL use the Search_API with `searchScope` set to `DATA_PRODUCT`
+9. THE Catalog_Exporter SHALL serialize all retrieved resources into a single `catalog_export.json` file within the bundle archive under a `catalog/` directory
+10. WHEN serializing assets, THE Catalog_Exporter SHALL include the `inputForms` field in the exported JSON
+11. WHEN serializing glossary terms, THE Catalog_Exporter SHALL include the `termRelations` field in the exported JSON
+12. WHEN the bundle command is invoked with an optional `--updated-after` CLI flag, THE Catalog_Exporter SHALL filter exported resources to only include those with `updatedAt` timestamp greater than or equal to the specified ISO 8601 timestamp
 
 ### Requirement 3: Catalog Export JSON Serialization
 
@@ -76,11 +69,13 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 
 #### Acceptance Criteria
 
-1. THE Catalog_Exporter SHALL produce a JSON file containing a top-level object with keys: `metadata`, `glossaries`, `glossaryTerms`, `formTypes`, `assetTypes`, `assets`, and `metadataForms`
+1. THE Catalog_Exporter SHALL produce a JSON file containing a top-level object with keys: `metadata`, `glossaries`, `glossaryTerms`, `formTypes`, `assetTypes`, `assets`, and `dataProducts`
 2. THE `metadata` section SHALL include `sourceProjectId`, `sourceDomainId`, `exportTimestamp`, and `resourceTypes` fields
 3. WHEN serializing each resource, THE Catalog_Exporter SHALL preserve the `name` field, all user-configurable attributes, and the source identifier
-3a. WHEN serializing metadata form types, THE Catalog_Exporter SHALL preserve the complete `model` structure including all field definitions, data types, constraints, and validation rules
-4. THE Catalog_Export_JSON SHALL be valid JSON that can be deserialized back into equivalent data structures (round-trip property)
+4. WHEN serializing metadata form types, THE Catalog_Exporter SHALL preserve the complete `model` structure including all field definitions, data types, constraints, and validation rules
+5. WHEN serializing assets, THE Catalog_Exporter SHALL preserve the `inputForms` field containing the asset's metadata form instances
+6. WHEN serializing glossary terms, THE Catalog_Exporter SHALL preserve the `termRelations` field containing relationships to other terms
+7. THE Catalog_Export_JSON SHALL be valid JSON that can be deserialized back into equivalent data structures (round-trip property)
 
 ### Requirement 4: Identifier Mapping During Deploy
 
@@ -88,25 +83,33 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 
 #### Acceptance Criteria
 
-1. WHEN the deploy command processes a Catalog_Export_JSON, THE Identifier_Mapper SHALL build a mapping from source resource identifiers to target resource identifiers using the `name` field
-2. THE Identifier_Mapper SHALL query the target project for existing resources by name to find matching target identifiers
-3. IF a resource with the same name already exists in the target project, THEN THE Identifier_Mapper SHALL map the source identifier to the existing target identifier
-4. IF a resource with the same name does not exist in the target project, THEN THE Identifier_Mapper SHALL mark the resource for creation
-5. THE Identifier_Mapper SHALL resolve cross-resource references (e.g., GlossaryTerm referencing a Glossary, Asset referencing an AssetType) using the built mapping
+1. WHEN the deploy command processes a Catalog_Export_JSON, THE Identifier_Mapper SHALL build a mapping from source resource identifiers to target resource identifiers using the `externalIdentifier` field when present, or the `name` field as fallback
+2. WHEN a resource has an `externalIdentifier` field, THE Identifier_Mapper SHALL normalize it by removing AWS account ID and region information before using it for mapping
+3. THE Identifier_Mapper SHALL query the target project for existing resources by normalized externalIdentifier (when present) or name to find matching target identifiers
+4. IF a resource with the same normalized externalIdentifier or name already exists in the target project, THEN THE Identifier_Mapper SHALL map the source identifier to the existing target identifier
+5. IF a resource with the same normalized externalIdentifier or name does not exist in the target project, THEN THE Identifier_Mapper SHALL mark the resource for creation
+6. THE Identifier_Mapper SHALL resolve cross-resource references (e.g., GlossaryTerm referencing a Glossary, Asset referencing an AssetType, Asset or FormType referencing GlossaryTerms) using the built mapping
 
-### Requirement 5: Create and Update Catalog Resources in Target Project
+### Requirement 5: Create, Update, and Delete Catalog Resources in Target Project
 
-**User Story:** As a developer, I want the deploy command to create or update catalog resources in the target project, so that my catalog definitions are promoted across stages.
+**User Story:** As a developer, I want the deploy command to synchronize catalog resources in the target project with the bundle, so that my catalog definitions are promoted across stages and obsolete resources are removed.
 
 #### Acceptance Criteria
 
 1. WHEN a resource is marked for creation, THE Catalog_Importer SHALL call the corresponding DataZone create API (CreateGlossary, CreateGlossaryTerm, CreateFormType, CreateAssetType, CreateAsset)
-1a. WHEN creating metadata form types, THE Catalog_Importer SHALL preserve the complete model structure including all field definitions and validation rules
-2. WHEN a resource already exists in the target project (matched by name), THE Catalog_Importer SHALL call the corresponding DataZone update API to synchronize the resource
-3. THE Catalog_Importer SHALL create resources in dependency order: FormTypes before AssetTypes, Glossaries before GlossaryTerms, AssetTypes before Assets
-3a. THE Catalog_Importer SHALL create metadata form types before any assets or asset types that reference them
-4. IF a DataZone API call fails during import, THEN THE Catalog_Importer SHALL log the error, continue processing remaining resources, and report a summary of failures at the end
-5. THE Catalog_Importer SHALL produce a Catalog_Import_JSON file with the remapped identifiers before making API calls, for auditability
+2. WHEN creating metadata form types, THE Catalog_Importer SHALL preserve the complete model structure including all field definitions and validation rules
+3. WHEN a resource already exists in the target project (matched by normalized externalIdentifier or name), THE Catalog_Importer SHALL call the corresponding DataZone update API to synchronize the resource
+4. WHEN a resource exists in the target project but is NOT present in the Catalog_Export_JSON, THE Catalog_Importer SHALL call the corresponding DataZone delete API to remove the resource
+5. THE Catalog_Importer SHALL delete resources in reverse dependency order: Assets before AssetTypes, AssetTypes before FormTypes, GlossaryTerms before Glossaries (to avoid breaking references)
+6. THE Catalog_Importer SHALL create resources in dependency order: Glossaries before GlossaryTerms, FormTypes before AssetTypes, AssetTypes before Assets (noting that Assets and FormTypes can reference GlossaryTerms)
+7. THE Catalog_Importer SHALL create metadata form types before any assets or asset types that reference them
+8. WHEN importing assets, THE Catalog_Importer SHALL preserve the `inputForms` field containing the asset's metadata form instances
+9. WHEN importing glossary terms, THE Catalog_Importer SHALL preserve the `termRelations` field containing relationships to other terms
+10. IF a DataZone API call fails during import, THEN THE Catalog_Importer SHALL log the error, continue processing remaining resources, and report a summary of failures at the end
+11. THE Catalog_Importer SHALL produce a Catalog_Import_JSON file with the remapped identifiers before making API calls, for auditability
+12. THE Catalog_Importer SHALL report counts of created, updated, deleted, and failed resources in the import summary
+13. WHEN `content.catalog.publish` is set to true in the manifest, THE Catalog_Importer SHALL automatically publish all imported assets and data products after creation or update
+14. WHEN publishing assets or data products, IF the publish API call fails, THEN THE Catalog_Importer SHALL log the error and continue processing remaining resources
 
 ### Requirement 6: Deploy Command Integration
 
