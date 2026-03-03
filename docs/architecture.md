@@ -28,7 +28,7 @@ The SMUS CI/CD CLI is a command-line tool that automates the deployment of data 
 - **Separation of Concerns**: Data teams define WHAT to deploy, DevOps teams define HOW and WHEN
 - **AWS Abstraction**: CLI encapsulates all AWS complexity (DataZone, Glue, SageMaker, MWAA, etc.)
 - **Generic CI/CD**: Same workflow works for any application type (Glue, SageMaker, Bedrock, etc.)
-- **Multi-Environment**: Support dev → test → prod promotion with environment-specific configs
+- **Multi-Environment**: Support dev → test → prod promotion with environment-specific configs. Each stage can target an independent project in an independent domain for maximum flexibility and isolation.
 - **Infrastructure as Code**: Version-controlled manifests and reproducible deployments
 
 ---
@@ -39,7 +39,7 @@ The SMUS CI/CD CLI is a command-line tool that automates the deployment of data 
 
 Applications are defined in YAML manifests (`manifest.yaml`) that describe:
 - Application content (code, data, workflows)
-- Deployment stages (dev, test, prod)
+- Deployment stages (dev, test, prod) - each stage can target a different project and domain
 - Environment-specific configurations
 - Bootstrap actions for initialization
 
@@ -90,14 +90,19 @@ graph TB
     
     subgraph AWSCloud[AWS Cloud]
         subgraph SMUS[SageMaker Unified Studio]
-            Domain[Domain]
-            ProjectDev[Project Dev]
-            ProjectTest[Project Test]
-            ProjectProd[Project Prod]
+            subgraph DomainDev[Domain Dev Optional]
+                ProjectDev[Project Dev]
+            end
             
-            Domain --> ProjectDev
-            Domain --> ProjectTest
-            Domain --> ProjectProd
+            subgraph DomainTest[Domain Test Optional]
+                ProjectTest[Project Test]
+            end
+            
+            subgraph DomainProd[Domain Prod Optional]
+                ProjectProd[Project Prod]
+            end
+            
+            Note[Note: Each stage can target<br/>an independent project in<br/>an independent domain]
         end
         
         SMUS --> AWSServices
@@ -118,7 +123,48 @@ graph TB
     style AWSCloud fill:#fff4e1
     style SMUS fill:#ffe1f5
     style AWSServices fill:#e1ffe1
+    style DomainDev fill:#fff9e6
+    style DomainTest fill:#fff9e6
+    style DomainProd fill:#fff9e6
 ```
+
+### Multi-Domain and Multi-Project Architecture
+
+The SMUS CI/CD CLI supports flexible deployment topologies where each stage (dev, test, prod) can target:
+
+1. **Independent Projects in the Same Domain**: Multiple projects within a single DataZone domain
+2. **Independent Projects in Different Domains**: Each stage can target a completely separate domain
+
+This architecture provides:
+
+- **Isolation**: Complete separation between environments for security and compliance
+- **Flexibility**: Different organizational units can own different domains
+- **Cross-Account Support**: Stages can span multiple AWS accounts
+- **Independent Governance**: Each domain can have its own governance policies and access controls
+
+**Configuration Example:**
+
+```yaml
+stages:
+  dev:
+    domain_id: dzd_dev123456  # Development domain
+    project_name: my-app-dev
+    
+  test:
+    domain_id: dzd_test789012  # Test domain (different from dev)
+    project_name: my-app-test
+    
+  prod:
+    domain_id: dzd_prod345678  # Production domain (different from dev and test)
+    project_name: my-app-prod
+```
+
+**Use Cases:**
+
+- **Organizational Boundaries**: Dev in engineering domain, prod in operations domain
+- **Compliance Requirements**: Separate domains for regulated vs non-regulated data
+- **Multi-Tenant Deployments**: Each customer/tenant gets their own domain
+- **Cross-Account Isolation**: Dev/test in one AWS account, prod in another
 
 ---
 
@@ -260,11 +306,13 @@ src/smus_cicd/helpers/
 **Key Helpers:**
 
 1. **DataZone Helper** (`datazone.py`):
-   - Resolve domain IDs from tags
-   - Create/update projects
+   - Resolve domain IDs from tags or explicit domain_id configuration
+   - Support multiple domains across different stages
+   - Create/update projects in any specified domain
    - Manage connections (S3, Athena, Glue, MLflow, etc.)
    - Subscribe to catalog assets
    - Handle pagination for list operations
+   - Cross-domain resource management
 
 2. **Airflow Serverless Helper** (`airflow_serverless.py`):
    - Create/update workflows
@@ -326,8 +374,9 @@ sequenceDiagram
     App->>App: Resolve environment variables
     App->>App: Build ApplicationManifest object
     App->>Int: Resolve domain/project/connections
-    Int->>Int: Resolve domain ID from tags
-    Int->>Int: Fetch project information
+    Int->>Int: Resolve domain ID from tags or explicit config
+    Int->>Int: Support multiple domains per stage
+    Int->>Int: Fetch project information from each domain
     Int->>Int: Retrieve connection details
     Int->>Int: Validate IAM roles
     Int->>Output: Return results
@@ -341,10 +390,11 @@ flowchart TD
     Start[User: smus-cli deploy --manifest manifest.yaml --targets test] --> CLI[CLI Layer: Parse arguments, Load manifest, Identify target stages]
     
     CLI --> Init[Initialization Phase]
-    Init --> Init1[Resolve domain ID]
-    Init1 --> Init2[Create project if needed]
-    Init2 --> Init3[Setup IAM roles]
-    Init3 --> Init4[Create default connections]
+    Init --> Init1[Resolve domain ID for target stage]
+    Init1 --> Init1a[Support independent domain per stage]
+    Init1a --> Init2[Create project if needed in target domain]
+    Init2 --> Init3[Setup IAM roles for target domain/project]
+    Init3 --> Init4[Create default connections in target project]
     
     Init4 --> Content[Content Deployment Phase]
     Content --> Content1{For each deployment_configuration}
@@ -437,14 +487,14 @@ graph TB
         DataTeam[Data Team:<br/>Write Code, Notebooks, Scripts, Workflows]
         DevOpsTeam[DevOps Team:<br/>Create CI/CD Workflows, GitHub Actions, Test Gates]
         DataTeam --> Manifest[Create Manifest<br/>manifest.yaml]
-        DevOpsTeam --> Stages[Define Stages<br/>dev, test, prod]
+        DevOpsTeam --> Stages[Define Stages<br/>dev, test, prod<br/>Each can target independent domain/project]
     end
     
     Manifest --> Validation
     Stages --> Validation
     
     subgraph Validation[Validation Phase]
-        Validate[smus-cli describe --manifest manifest.yaml --connect<br/><br/>✓ Validate YAML syntax<br/>✓ Validate schema<br/>✓ Resolve environment variables<br/>✓ Check AWS connectivity<br/>✓ Verify domain/project existence<br/>✓ Validate connections]
+        Validate[smus-cli describe --manifest manifest.yaml --connect<br/><br/>✓ Validate YAML syntax<br/>✓ Validate schema<br/>✓ Resolve environment variables<br/>✓ Check AWS connectivity<br/>✓ Verify domain/project existence per stage<br/>✓ Validate connections<br/>✓ Support multi-domain configuration]
     end
     
     Validation --> Bundle
@@ -456,7 +506,7 @@ graph TB
     Bundle --> Deploy
     
     subgraph Deploy[Deployment Phase]
-        DeployOp[smus-cli deploy --manifest manifest.yaml --targets test<br/><br/>Phase 1: Infrastructure Initialization<br/>Phase 2: Content Deployment<br/>Phase 3: Workflow Deployment<br/>Phase 4: Bootstrap Execution]
+        DeployOp[smus-cli deploy --manifest manifest.yaml --targets test<br/><br/>Phase 1: Infrastructure Initialization target domain/project<br/>Phase 2: Content Deployment<br/>Phase 3: Workflow Deployment<br/>Phase 4: Bootstrap Execution]
     end
     
     Deploy --> Monitor
@@ -939,6 +989,36 @@ bootstrap:
         workgroup: ${ATHENA_WORKGROUP}
 ```
 
+### 4. Multi-Domain Configuration
+
+```yaml
+# Configure independent domains per stage
+stages:
+  dev:
+    domain_id: dzd_dev123456  # Development domain
+    project_name: my-app-dev
+    # Rapid iteration, shared resources
+    
+  test:
+    domain_id: dzd_test789012  # Separate test domain
+    project_name: my-app-test
+    # Isolated testing environment
+    
+  prod:
+    domain_id: dzd_prod345678  # Production domain in different account
+    project_name: my-app-prod
+    # Strict governance and compliance
+```
+
+**Multi-Domain Best Practices:**
+
+- Use separate domains for compliance boundaries (e.g., PCI, HIPAA)
+- Configure domain-specific IAM roles and permissions
+- Test cross-domain deployments in lower environments first
+- Document domain ownership and governance policies
+- Use consistent naming conventions across domains
+- Consider network connectivity between domains for data sharing
+
 ---
 
 ## Troubleshooting Guide
@@ -977,7 +1057,9 @@ Solution: Ensure workflow.create runs before workflow.run
 
 - **Application**: Data/analytics workload being deployed
 - **Manifest**: YAML file defining application configuration
-- **Stage**: Deployment environment (dev, test, prod)
+- **Stage**: Deployment environment (dev, test, prod). Each stage can target an independent project in an independent domain
+- **Domain**: DataZone domain that provides governance and isolation. Multiple domains can be used across stages
+- **Project**: DataZone project within a domain. Each stage typically targets a different project
 - **Bootstrap**: Initialization actions during deployment
 - **Connection**: DataZone connection to AWS services
 - **Workflow**: Airflow DAG for orchestration
