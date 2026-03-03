@@ -273,7 +273,7 @@ task = PythonOperator(
 
         # Verify it shows pipeline info
         assert "Pipeline: GlueMwaaCatalogApp" in result["output"]
-        assert "Domain:" in result["output"]  # Check domain field exists (name varies by environment)
+        assert "domain:" in result["output"]  # Check domain field exists inline per-target (name varies by environment)
 
         # Verify it shows target info with connections
         assert "Targets:" in result["output"]
@@ -1017,9 +1017,9 @@ stages:
             # Get the actual region from environment variable
             expected_region = os.environ.get('DEV_DOMAIN_REGION')
             assert expected_region, "DEV_DOMAIN_REGION environment variable must be set"
-            # Use regex to match any domain name with expected region
+            # Domain is now inline per-target: "- stage: project (domain: <name>, region: <region>)"
             import re
-            domain_pattern = rf"Domain: .+ \({re.escape(expected_region)}\)"
+            domain_pattern = rf"domain: .+, region: {re.escape(expected_region)}"
             assert re.search(domain_pattern, describe_output), \
                 f"Describe output missing domain with region {expected_region}: {describe_output}"
             assert (
