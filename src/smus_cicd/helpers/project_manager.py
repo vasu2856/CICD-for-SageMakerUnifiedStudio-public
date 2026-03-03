@@ -102,7 +102,9 @@ class ProjectManager:
         print(
             "🔍 DEBUG: Project doesn't exist - NOT calling _ensure_environments_exist"
         )
-        handle_error(f"Project '{project_name}' not found, make sure the SMUS project is pre-created manually before using the SMUS CLI")
+        handle_error(
+            f"Project '{project_name}' not found, make sure the SMUS project is pre-created manually before using the SMUS CLI"
+        )
         return project_info
 
     def _should_create_project(self, target_config) -> bool:

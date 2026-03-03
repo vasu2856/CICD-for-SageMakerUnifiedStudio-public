@@ -218,7 +218,9 @@ def get_domain_from_target_config(
         # Domain ID provided directly — resolve name from API
         resolved_name = get_domain_name_by_id(domain_id, region)
         if not resolved_name:
-            raise Exception(f"Domain with id '{domain_id}' not found in region {region}")
+            raise Exception(
+                f"Domain with id '{domain_id}' not found in region {region}"
+            )
         return domain_id, resolved_name
     elif domain_name:
         # Domain name provided, resolve ID
