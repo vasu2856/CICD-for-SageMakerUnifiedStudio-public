@@ -5,6 +5,9 @@ from typing import Dict, List, Optional, Tuple
 
 """
 DataZone integration functions for SMUS CI/CD CLI.
+
+This module provides helper functions for interacting with AWS DataZone using the
+public boto3 DataZone client. All operations use the standard DataZone API.
 """
 
 import boto3
@@ -12,21 +15,26 @@ import typer
 
 
 def _get_datazone_client(region: str):
-    """Create DataZone client with optional custom endpoint from environment."""
+    """
+    Create public DataZone client with optional custom endpoint from environment.
+
+    This function creates a standard boto3 DataZone client. For testing purposes,
+    a custom endpoint URL can be specified via the DATAZONE_ENDPOINT_URL environment
+    variable.
+
+    Args:
+        region: AWS region for the client
+
+    Returns:
+        Configured boto3 DataZone client using the public API
+
+    Environment Variables:
+        DATAZONE_ENDPOINT_URL: Optional custom endpoint URL for testing
+    """
     endpoint_url = os.environ.get("DATAZONE_ENDPOINT_URL")
     if endpoint_url:
         return boto3.client("datazone", region_name=region, endpoint_url=endpoint_url)
     return boto3.client("datazone", region_name=region)
-
-
-def _get_datazone_internal_client(region: str):
-    """Create DataZone-internal client for project operations with customerProvidedRoleConfigs support."""
-    endpoint_url = os.environ.get("DATAZONE_ENDPOINT_URL")
-    if endpoint_url:
-        return boto3.client(
-            "datazone-internal", region_name=region, endpoint_url=endpoint_url
-        )
-    return boto3.client("datazone-internal", region_name=region)
 
 
 def resolve_domain_id(

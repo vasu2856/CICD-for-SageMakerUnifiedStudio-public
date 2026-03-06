@@ -13,103 +13,6 @@ class ConnectionCreator:
         self.domain_id = domain_id
         self.region = region
         self.client = boto3.client("datazone", region_name=region)
-        self._custom_client = None
-        self._internal_client = None
-        self._temp_dir = None
-
-    def _get_custom_datazone_client(self):
-        """Get DataZone client with custom model that supports MLFlow connections."""
-        if self._custom_client is None:
-            import json
-            import os
-            import shutil
-            import tempfile
-            from pathlib import Path
-
-            from botocore.loaders import Loader
-            from botocore.session import Session as BotocoreSession
-
-            # Get the path to the custom DataZone model
-            current_dir = Path(__file__).parent.parent
-            model_path = current_dir / "resources" / "datazone-2018-05-10.json"
-
-            if not model_path.exists():
-                raise FileNotFoundError(
-                    f"Custom DataZone model not found at {model_path}"
-                )
-
-            # Load the custom model
-            with open(model_path, "r") as f:
-                service_model_data = json.load(f)
-
-            # Create a temporary directory for the custom model
-            temp_dir = tempfile.mkdtemp()
-
-            try:
-                # Create the expected directory structure for botocore
-                service_dir = os.path.join(temp_dir, "datazone", "2018-05-10")
-                os.makedirs(service_dir, exist_ok=True)
-
-                # Write the service model
-                service_file = os.path.join(service_dir, "service-2.json")
-                with open(service_file, "w") as f:
-                    json.dump(service_model_data, f)
-
-                # Create a custom loader with our model directory
-                loader = Loader(extra_search_paths=[temp_dir])
-
-                # Create a botocore session with custom loader
-                botocore_session = BotocoreSession()
-                botocore_session.register_component("data_loader", loader)
-
-                # Get credentials from boto3 session
-                boto3_session = boto3.Session()
-                credentials = boto3_session.get_credentials()
-                botocore_session.set_credentials(
-                    access_key=credentials.access_key,
-                    secret_key=credentials.secret_key,
-                    token=credentials.token,
-                )
-
-                # Get endpoint URL
-                endpoint_url = os.environ.get("DATAZONE_ENDPOINT_URL")
-
-                # Create the custom client
-                self._custom_client = botocore_session.create_client(
-                    "datazone",
-                    region_name=self.region,
-                    endpoint_url=endpoint_url,
-                    api_version="2018-05-10",
-                )
-
-                # Store temp_dir for cleanup later
-                self._temp_dir = temp_dir
-
-            except Exception as e:
-                # Clean up temp directory on error
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                raise e
-
-        return self._custom_client
-
-    def _get_internal_datazone_client(self):
-        """Get DataZone-internal client for workflow connections (WORKFLOWS_MWAA, WORKFLOWS_SERVERLESS)."""
-        if self._internal_client is None:
-            import os
-
-            endpoint_url = os.environ.get("DATAZONE_ENDPOINT_URL")
-            if endpoint_url:
-                self._internal_client = boto3.client(
-                    "datazone-internal",
-                    region_name=self.region,
-                    endpoint_url=endpoint_url,
-                )
-            else:
-                self._internal_client = boto3.client(
-                    "datazone-internal", region_name=self.region
-                )
-
-        return self._internal_client
 
     def create_from_config(
         self,
@@ -153,7 +56,7 @@ class ConnectionCreator:
         Args:
             environment_id: DataZone environment ID
             name: Connection name
-            connection_type: Type of connection (S3, IAM, SPARK_GLUE, etc.)
+            connection_type: Type of connection (S3, IAM, SPARK_GLUE, MLFLOW, etc.)
             description: Optional description
             **kwargs: Connection-specific properties
 
@@ -165,19 +68,8 @@ class ConnectionCreator:
         """
         props = self._build_connection_props(connection_type, **kwargs)
 
-        # Determine which client to use based on connection type
-        if connection_type == "MLFLOW":
-            # Use custom client with MLflow support
-            client = self._get_custom_datazone_client()
-        elif connection_type in ["WORKFLOWS_MWAA", "WORKFLOWS_SERVERLESS"]:
-            # Use internal client for workflow connections
-            client = self._get_internal_datazone_client()
-        else:
-            # Use standard client for other connection types
-            client = self.client
-
         try:
-            response = client.create_connection(
+            response = self.client.create_connection(
                 domainIdentifier=self.domain_id,
                 environmentIdentifier=environment_id,
                 name=name,
@@ -342,15 +234,7 @@ class ConnectionCreator:
         print(f"🔄 Updating connection '{name}'")
 
         try:
-            # Determine which client to use based on connection type
-            if connection_type == "MLFLOW":
-                client = self._get_custom_datazone_client()
-            elif connection_type in ["WORKFLOWS_MWAA", "WORKFLOWS_SERVERLESS"]:
-                client = self._get_internal_datazone_client()
-            else:
-                client = self.client
-
-            client.update_connection(
+            self.client.update_connection(
                 domainIdentifier=self.domain_id, identifier=connection_id, props=props
             )
             print(f"✅ Connection '{name}' updated: {connection_id}")
@@ -359,11 +243,3 @@ class ConnectionCreator:
             raise Exception(
                 f"Failed to update {connection_type} connection '{name}': {str(e)}"
             )
-
-    def cleanup(self):
-        """Clean up temporary directory."""
-        if hasattr(self, "_temp_dir") and self._temp_dir:
-            import shutil
-
-            shutil.rmtree(self._temp_dir, ignore_errors=True)
-            self._temp_dir = None

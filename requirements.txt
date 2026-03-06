@@ -1,4 +1,4 @@
 typer[all]
 PyYAML
-boto3
+boto3>=1.42.60
 jsonschema

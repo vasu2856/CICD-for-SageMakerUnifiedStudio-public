@@ -42,7 +42,20 @@ def create_environment(
 def create_connection(
     action: BootstrapAction, context: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """Create or update DataZone connection (idempotent)."""
+    """
+    Create or update DataZone connection (idempotent).
+
+    This function creates or updates DataZone connections using the public boto3
+    DataZone client. The ConnectionCreator handles all connection types using
+    the standard public client.
+
+    Args:
+        action: Bootstrap action containing connection parameters
+        context: Execution context with config and metadata
+
+    Returns:
+        Dictionary with action status and connection ID
+    """
     logger.info("Creating DataZone connection")
 
     # Extract context
@@ -76,11 +89,6 @@ def create_connection(
     environment_id = environments[0].get("id")
     datazone_client = boto3.client("datazone", region_name=region)
 
-    # Create internal client for WORKFLOWS_SERVERLESS connections
-    internal_client = None
-    if connection_type == "WORKFLOWS_SERVERLESS":
-        internal_client = boto3.client("datazone-internal", region_name=region)
-
     # Check if connection already exists using the connections helper
     # This properly checks both project-level and all environment-level connections
     existing_connections = connections.get_project_connections(
@@ -106,10 +114,8 @@ def create_connection(
 
         if connection_id:
             # Get full connection details to find its environment
-            # Use internal client for WORKFLOWS_SERVERLESS connections
             try:
-                client = internal_client if internal_client else datazone_client
-                detail = client.get_connection(
+                detail = datazone_client.get_connection(
                     domainIdentifier=domain_id, identifier=connection_id
                 )
                 existing_connection = detail

@@ -206,24 +206,7 @@ class ProjectManager:
                 if a.type.startswith("datazone.create_environment")
             ]
 
-        # TODO: Re-enable CloudFormation path once service role permissions are configured for gamma endpoints
-        # typer.echo(f"Creating project '{project_name}' via CloudFormation...")
-        # success = cloudformation.create_project_via_cloudformation(
-        #     project_name,
-        #     profile_name,
-        #     domain_name,
-        #     region,
-        #     self.manifest.application_name,
-        #     stage_name,
-        #     target_config.stage,
-        #     user_parameters,
-        #     owners,
-        #     contributors,
-        #     environments,
-        #     role_arn,
-        # )
-
-        # Temporary: Use DataZone API directly for gamma endpoints
+        # Create project using DataZone API
         typer.echo(f"Creating project '{project_name}' via DataZone API...")
         created_project_id = self._create_project_via_datazone_api(
             project_name,
@@ -427,7 +410,30 @@ class ProjectManager:
         owners,
         contributors,
     ):
-        """Create project using DataZone API directly (for gamma endpoints)."""
+        """
+        Create project using public DataZone API.
+
+        This method uses the public boto3 DataZone client to create projects.
+        It implements graceful degradation for the customerProvidedRoleConfigs
+        parameter - if the public API does not support this parameter, the project
+        is created without the custom role configuration and a warning is displayed.
+
+        Args:
+            project_name: Name of the project to create
+            profile_name: Project profile name
+            domain_name: DataZone domain name
+            region: AWS region
+            role_arn: Optional customer-provided role ARN
+            owners: List of project owners
+            contributors: List of project contributors
+
+        Returns:
+            Project ID if successful, None otherwise
+
+        Note:
+            If customerProvidedRoleConfigs is not supported by the public API,
+            the project will be created without custom role configuration.
+        """
         print(
             f"🔍 DEBUG _create_project_via_datazone_api: domain_name={domain_name}, region={region}"
         )
@@ -438,8 +444,8 @@ class ProjectManager:
             handle_error(f"Domain '{domain_name}' not found")
             return False
 
-        # Use datazone-internal client for project creation (supports customerProvidedRoleConfigs)
-        dz_client = datazone._get_datazone_internal_client(region)
+        # Use public DataZone client for project creation
+        dz_client = datazone._get_datazone_client(region)
 
         # Get profile ID (use regular datazone client for listing profiles)
         response = dz_client.list_project_profiles(domainIdentifier=domain_id)
@@ -481,6 +487,9 @@ class ProjectManager:
         }
 
         # Add customer-provided role if specified
+        # Note: This parameter may not be supported in all versions of the public API.
+        # If not supported, we gracefully degrade by creating the project without
+        # the custom role configuration (see exception handling below).
         if role_arn:
             params["customerProvidedRoleConfigs"] = [
                 {"roleArn": role_arn, "roleDesignation": "PROJECT_OWNER"}
@@ -501,6 +510,33 @@ class ProjectManager:
 
             # Return project_id for use by caller
             return project_id
+        except (TypeError, KeyError) as e:
+            # Graceful degradation: customerProvidedRoleConfigs not supported in public API
+            # Remove the parameter and retry project creation without custom role
+            if role_arn and "customerProvidedRoleConfigs" in params:
+                typer.echo("⚠️ customerProvidedRoleConfigs not supported in public API")
+                typer.echo("   Creating project without custom role configuration")
+                del params["customerProvidedRoleConfigs"]
+                try:
+                    response = dz_client.create_project(**params)
+                    project_id = response["id"]
+                    typer.echo(f"✅ Project created: {project_id}")
+
+                    # Manage memberships if provided
+                    if owners or contributors:
+                        typer.echo("🔧 Managing project memberships...")
+                        datazone.manage_project_memberships(
+                            project_id, domain_id, region, owners, contributors
+                        )
+
+                    # Return project_id for use by caller
+                    return project_id
+                except Exception as retry_error:
+                    typer.echo(f"❌ Error creating project: {retry_error}")
+                    return None
+            else:
+                typer.echo(f"❌ Error creating project: {e}")
+                return None
         except dz_client.exceptions.ConflictException as e:
             # Project already exists - extract project ID from error message
             # Error format: "Conflict with project <project_id>"
@@ -528,8 +564,32 @@ class ProjectManager:
                 typer.echo(f"❌ Error creating project: {e}")
                 return None
         except Exception as e:
-            typer.echo(f"❌ Error creating project: {e}")
-            return None
+            # Check if it's a ValidationException related to customerProvidedRoleConfigs
+            # This handles cases where the public API validates but rejects the parameter
+            if role_arn and "customerProvidedRoleConfigs" in str(e):
+                typer.echo("⚠️ customerProvidedRoleConfigs not supported in public API")
+                typer.echo("   Creating project without custom role configuration")
+                del params["customerProvidedRoleConfigs"]
+                try:
+                    response = dz_client.create_project(**params)
+                    project_id = response["id"]
+                    typer.echo(f"✅ Project created: {project_id}")
+
+                    # Manage memberships if provided
+                    if owners or contributors:
+                        typer.echo("🔧 Managing project memberships...")
+                        datazone.manage_project_memberships(
+                            project_id, domain_id, region, owners, contributors
+                        )
+
+                    # Return project_id for use by caller
+                    return project_id
+                except Exception as retry_error:
+                    typer.echo(f"❌ Error creating project: {retry_error}")
+                    return None
+            else:
+                typer.echo(f"❌ Error creating project: {e}")
+                return None
 
     def _get_role_arn(self, target_config) -> Optional[str]:
         """Extract role ARN from target configuration."""
