@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/cicd-for-smus
+      url: https://pypi.org/p/smus-cli
     permissions:
       id-token: write
     steps:

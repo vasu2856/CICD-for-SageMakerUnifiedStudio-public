@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "smus-cicd-cli"
+name = "smus-cli"
 version = "1.0.0"
 authors = [
     {name = "AWS SageMaker Unified Studio Team", email = "sagemaker-unified-studio@amazon.com"},
