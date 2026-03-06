@@ -14,11 +14,26 @@ class ConnectionCreator:
         self.region = region
         self.client = boto3.client("datazone", region_name=region)
         self._custom_client = None
-        self._internal_client = None
         self._temp_dir = None
 
     def _get_custom_datazone_client(self):
-        """Get DataZone client with custom model that supports MLFlow connections."""
+        """
+        Get DataZone client with custom model that supports MLFlow connections.
+
+        The public boto3 DataZone client does not yet support the MLFLOW connection type.
+        This method loads a custom service model (datazone-2018-05-10.json) that extends
+        the DataZone API to include MLflow connection support.
+
+        This is a temporary workaround until the public boto3 DataZone client includes
+        native support for MLflow connections. All other connection types use the
+        standard public client.
+
+        Returns:
+            Configured boto3 DataZone client with MLflow support
+
+        See:
+            src/smus_cicd/resources/README.md for more details on custom models
+        """
         if self._custom_client is None:
             import json
             import os
@@ -92,25 +107,6 @@ class ConnectionCreator:
 
         return self._custom_client
 
-    def _get_internal_datazone_client(self):
-        """Get DataZone-internal client for workflow connections (WORKFLOWS_MWAA, WORKFLOWS_SERVERLESS)."""
-        if self._internal_client is None:
-            import os
-
-            endpoint_url = os.environ.get("DATAZONE_ENDPOINT_URL")
-            if endpoint_url:
-                self._internal_client = boto3.client(
-                    "datazone-internal",
-                    region_name=self.region,
-                    endpoint_url=endpoint_url,
-                )
-            else:
-                self._internal_client = boto3.client(
-                    "datazone-internal", region_name=self.region
-                )
-
-        return self._internal_client
-
     def create_from_config(
         self,
         environment_id: str,
@@ -150,10 +146,13 @@ class ConnectionCreator:
         """
         Create a DataZone connection and wait for it to be ready.
 
+        This method uses the public boto3 DataZone client for all connection types
+        except MLFLOW, which requires a custom client with extended API support.
+
         Args:
             environment_id: DataZone environment ID
             name: Connection name
-            connection_type: Type of connection (S3, IAM, SPARK_GLUE, etc.)
+            connection_type: Type of connection (S3, IAM, SPARK_GLUE, MLFLOW, etc.)
             description: Optional description
             **kwargs: Connection-specific properties
 
@@ -162,18 +161,21 @@ class ConnectionCreator:
 
         Raises:
             Exception: If connection creation fails or times out
+
+        Note:
+            MLFLOW connections use a custom client with extended API support.
+            All other connection types use the standard public DataZone client.
         """
         props = self._build_connection_props(connection_type, **kwargs)
 
         # Determine which client to use based on connection type
+        # MLFLOW requires custom client with extended API support
+        # All other types use the standard public DataZone client
         if connection_type == "MLFLOW":
             # Use custom client with MLflow support
             client = self._get_custom_datazone_client()
-        elif connection_type in ["WORKFLOWS_MWAA", "WORKFLOWS_SERVERLESS"]:
-            # Use internal client for workflow connections
-            client = self._get_internal_datazone_client()
         else:
-            # Use standard client for other connection types
+            # Use standard public client for all other connection types
             client = self.client
 
         try:
@@ -345,8 +347,6 @@ class ConnectionCreator:
             # Determine which client to use based on connection type
             if connection_type == "MLFLOW":
                 client = self._get_custom_datazone_client()
-            elif connection_type in ["WORKFLOWS_MWAA", "WORKFLOWS_SERVERLESS"]:
-                client = self._get_internal_datazone_client()
             else:
                 client = self.client
 
