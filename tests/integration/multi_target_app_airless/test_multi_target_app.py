@@ -113,7 +113,7 @@ class TestMultiTargetApp(IntegrationTestBase):
 
         # Verify it shows pipeline info
         assert "Pipeline: IntegrationTestMultiTarget" in result["output"]
-        assert "Domain:" in result["output"]  # Check domain field exists (name varies by environment)
+        assert "domain:" in result["output"]  # Check domain field exists inline per-target (name varies by environment)
 
         # Verify it shows target info with connections
         assert "Targets:" in result["output"]
@@ -839,14 +839,14 @@ stages:
             # Verify domain with region from environment variable using regex
             expected_region = os.environ.get('DEV_DOMAIN_REGION')
             if expected_region:
-                # Use regex to match "Domain: <any-name> (<region>)"
+                # Domain is now inline per-target: "- stage: project (domain: <name>, region: <region>)"
                 import re
-                domain_pattern = rf"Domain: .+ \({re.escape(expected_region)}\)"
+                domain_pattern = rf"domain: .+, region: {re.escape(expected_region)}"
                 assert re.search(domain_pattern, describe_output), \
                     f"Describe output missing domain with region {expected_region}: {describe_output}"
             else:
                 # Fallback if no environment variable set
-                assert "Domain:" in describe_output, \
+                assert "domain:" in describe_output, \
                     f"Describe output missing domain info: {describe_output}"
 
             assert (
