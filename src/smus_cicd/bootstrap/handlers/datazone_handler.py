@@ -46,9 +46,8 @@ def create_connection(
     Create or update DataZone connection (idempotent).
 
     This function creates or updates DataZone connections using the public boto3
-    DataZone client. The ConnectionCreator handles all connection types and
-    automatically selects the appropriate client (standard public client for most
-    types, custom client for MLFLOW connections).
+    DataZone client. The ConnectionCreator handles all connection types using
+    the standard public client.
 
     Args:
         action: Bootstrap action containing connection parameters
@@ -56,10 +55,6 @@ def create_connection(
 
     Returns:
         Dictionary with action status and connection ID
-
-    Note:
-        All connection types are handled by ConnectionCreator using the public
-        DataZone API, with the exception of MLFLOW which requires extended support.
     """
     logger.info("Creating DataZone connection")
 
