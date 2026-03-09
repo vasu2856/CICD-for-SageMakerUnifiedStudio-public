@@ -82,7 +82,9 @@ def test_command(
 
         if output.upper() != "JSON":
             typer.echo(f"Pipeline: {manifest.application_name}")
-            typer.echo(f"Domain: {domain_config.name or domain_config.id} ({domain_config.region})")
+            typer.echo(
+                f"Domain: {domain_config.name or domain_config.id} ({domain_config.region})"
+            )
             typer.echo()
 
         test_results = {}
