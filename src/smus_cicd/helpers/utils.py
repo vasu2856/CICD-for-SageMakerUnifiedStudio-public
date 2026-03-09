@@ -24,6 +24,8 @@ def build_domain_config(target_config) -> Dict[str, Any]:
     config["domain"] = {
         "region": target_config.domain.region,
     }
+    if target_config.domain.id:
+        config["domain"]["id"] = target_config.domain.id
     if target_config.domain.name:
         config["domain"]["name"] = target_config.domain.name
         config["domain_name"] = target_config.domain.name

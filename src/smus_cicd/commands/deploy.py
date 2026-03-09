@@ -393,7 +393,7 @@ def _display_deployment_info(
     """
     typer.echo(f"Deploying to target: {stage_name}")
     typer.echo(f"Project: {target_config.project.name}")
-    typer.echo(f"Domain: {target_config.domain.name}")
+    typer.echo(f"Domain: {target_config.domain.name or target_config.domain.id}")
     typer.echo(f"Region: {target_config.domain.region}")
 
 
@@ -1785,6 +1785,7 @@ def _process_bootstrap_actions(
         "project_name": target_config.project.name,  # Add for ContextResolver
         "domain": {
             "name": target_config.domain.name,
+            "id": target_config.domain.id,
             "region": target_config.domain.region,
         },
         "domain_id": config.get("domain_id"),  # Add for ContextResolver
