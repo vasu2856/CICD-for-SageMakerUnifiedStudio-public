@@ -16,7 +16,7 @@ Connections enable your workflows to interact with:
 
 **Two ways to create connections:**
 1. **Manifest-based** (recommended) - Define in `manifest.yaml` for automated creation
-2. **Console-based** - Create manually in SMUS console
+2. **Console-based** - Create manually in SMUS portal
 
 ---
 

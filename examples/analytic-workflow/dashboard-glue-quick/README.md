@@ -29,8 +29,8 @@ This ensures:
 1. **AWS Credentials**: Configure credentials for both dev and test accounts
 2. **QuickSight Setup**: QuickSight must be set up in both regions with the Admin user
 3. **QuickSight S3 Permissions**: Grant S3 access to QuickSight service role (see below)
-4. **DataZone Domain**: Tagged domain must exist in both accounts (use `aws datazone tag-resource` with domain ARN)
-5. **SMUS Project**: SageMaker Unified Studio Project inside the domain with name listed in the manifest file
+4. **DataZone Domain**: Tagged domain must exist in both accounts (use `aws datazone tag-resource` with domain ARN) — must be created manually in the console, the CLI cannot create domains
+5. **SMUS Project**: SageMaker Unified Studio Project inside the domain with name listed in the manifest file — must be created manually in the console, the CLI cannot create projects
 
 #### Grant QuickSight S3 Access
 

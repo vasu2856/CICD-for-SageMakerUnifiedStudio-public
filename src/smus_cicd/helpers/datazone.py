@@ -166,7 +166,10 @@ def get_project_user_role_arn(project_name: str, domain_name: str, region: str) 
                         return role_arn
 
         raise ValueError(
-            f"No tooling environment with userRoleArn found for project '{project_name}'"
+            f"Project '{project_name}' does not have a Tooling Environment configured. "
+            "The target project must have a Tooling Environment set up in SageMaker Unified Studio "
+            "before it can be used with the SMUS CLI. "
+            "Please configure a Tooling Environment for this project in the SMUS portal and try again."
         )
 
     except Exception as e:
@@ -180,18 +183,33 @@ def get_domain_id_by_name(domain_name, region):
     return domain_id
 
 
+def get_domain_name_by_id(domain_id: str, region: str) -> Optional[str]:
+    """Get DataZone domain name by its ID. Returns None if not found."""
+    try:
+        datazone_client = _get_datazone_client(region)
+        response = datazone_client.get_domain(identifier=domain_id)
+        return response.get("name")
+    except Exception as e:
+        from .logger import get_logger
+
+        logger = get_logger("datazone")
+        logger.error(f"Error getting domain name for id {domain_id}: {e}")
+        raise
+
+
 def get_domain_from_target_config(
     target_config, region: str = None
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Get domain ID and name from target configuration.
 
-    Handles both cases:
+    Handles three cases:
+    - Domain id is provided: use directly, resolve name from API
     - Domain name is provided: resolve ID from name
     - Domain name is not provided: resolve both ID and name from tags
 
     Args:
-        target_config: Target configuration object with domain.name, domain.tags, domain.region
+        target_config: Target configuration object with domain.id, domain.name, domain.tags, domain.region
         region: Optional AWS region override (uses target_config.domain.region if not provided)
 
     Returns:
@@ -200,25 +218,34 @@ def get_domain_from_target_config(
     Raises:
         Exception: If domain cannot be resolved
     """
+    domain_id = target_config.domain.id
     domain_name = target_config.domain.name
     region = region or target_config.domain.region
 
-    if domain_name:
+    if domain_id:
+        # Domain ID provided directly — resolve name from API
+        resolved_name = get_domain_name_by_id(domain_id, region)
+        if not resolved_name:
+            raise Exception(
+                f"Domain with id '{domain_id}' not found in region {region}"
+            )
+        return domain_id, resolved_name
+    elif domain_name:
         # Domain name provided, resolve ID
-        domain_id = get_domain_id_by_name(domain_name, region)
-        if not domain_id:
+        resolved_id = get_domain_id_by_name(domain_name, region)
+        if not resolved_id:
             raise Exception(f"Domain '{domain_name}' not found in region {region}")
-        return domain_id, domain_name
+        return resolved_id, domain_name
     else:
         # Domain name not provided, use tags to resolve both ID and name
-        domain_id, domain_name = resolve_domain_id(
+        resolved_id, resolved_name = resolve_domain_id(
             domain_name=None, domain_tags=target_config.domain.tags, region=region
         )
-        if not domain_id or not domain_name:
+        if not resolved_id or not resolved_name:
             raise Exception(
                 f"Could not resolve domain from tags {target_config.domain.tags} in region {region}"
             )
-        return domain_id, domain_name
+        return resolved_id, resolved_name
 
 
 def get_default_project_profile(domain_id, region):

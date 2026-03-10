@@ -24,6 +24,8 @@ def build_domain_config(target_config) -> Dict[str, Any]:
     config["domain"] = {
         "region": target_config.domain.region,
     }
+    if target_config.domain.id:
+        config["domain"]["id"] = target_config.domain.id
     if target_config.domain.name:
         config["domain"]["name"] = target_config.domain.name
         config["domain_name"] = target_config.domain.name
@@ -413,15 +415,20 @@ def _resolve_domain_id(config: Dict[str, Any], region: str) -> Optional[str]:
     logger.debug(f"domain_id from CloudFormation: {domain_id}")
 
     if not domain_id:
-        # Try to resolve domain by name or tags
+        # Try to resolve domain by id, name, or tags
         domain_config = config.get("domain", {})
+        domain_direct_id = domain_config.get("id")
         domain_name = domain_config.get("name")
         domain_tags = domain_config.get("tags")
 
+        logger.debug(f"domain_direct_id: {domain_direct_id}")
         logger.debug(f"domain_name: {domain_name}")
         logger.debug(f"domain_tags: {domain_tags}")
 
-        if domain_name or domain_tags:
+        if domain_direct_id:
+            domain_id = domain_direct_id
+            logger.debug(f"Using domain id directly: {domain_id}")
+        elif domain_name or domain_tags:
             try:
                 logger.debug(
                     f"Calling datazone.resolve_domain_id with name={domain_name}, tags={domain_tags}, region={region}"

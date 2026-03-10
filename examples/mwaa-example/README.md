@@ -17,6 +17,11 @@ Traditional Amazon Managed Workflows for Apache Airflow (MWAA) pipeline example.
 
 ## Usage
 
+### Prerequisites
+
+- SMUS domain and project created manually in the console — the CLI cannot create these
+- AWS credentials configured
+
 ### Quick Example
 ```bash
 ./run-mwaa-example.sh

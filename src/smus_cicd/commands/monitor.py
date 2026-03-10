@@ -220,7 +220,7 @@ def _monitor_once(
             if output.upper() != "JSON":
                 typer.echo(f"\n📋 Target: {stage_name} (Project: {project_name})")
                 typer.echo(
-                    f"   Domain: {target_config.domain.name} ({target_config.domain.region})"
+                    f"   Domain: {target_config.domain.name or target_config.domain.id} ({target_config.domain.region})"
                 )
 
             # Check if this target uses serverless Airflow
@@ -282,6 +282,7 @@ def _monitor_once(
                 "project": {"name": target_config.project.name},
                 "domain": {
                     "name": target_config.domain.name,
+                    "id": target_config.domain.id,
                     "region": target_config.domain.region,
                 },
                 "status": "unknown",

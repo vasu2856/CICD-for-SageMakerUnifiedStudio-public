@@ -12,7 +12,8 @@
 
 - ✅ Python 3.8+ installed
 - ✅ AWS CLI configured with credentials
-- ✅ SageMaker Unified Studio domain and project created
+- ✅ SageMaker Unified Studio domain and project created manually in the console (the CLI cannot create these)
+- ✅ SMUS domain must use IAM-based authentication — IdC-based domains are not yet supported
 - ✅ Basic understanding of Jupyter notebooks
 
 ---
@@ -68,36 +69,47 @@ stages:
 ```
 
 **What to change:**
-- `applicationName`: Your application name
+- `applicationName`: A logical name for this CI/CD manifest environment — not a SMUS resource. This name can be anything.
 - `domain.region`: Your AWS region
+- Domain identifier — use one of:
+  - `domain.id`: Your domain ID (visible in the SMUS portal)
+  - `domain.name`: Your domain name
+  - `domain.tags`: Tag key-value pairs to look up the domain
 - `project.name`: Your SageMaker Unified Studio project name
 
 ---
 
 ## Step 4: Deploy
 
-Deploy to your dev environment:
+The data-notebooks example has two stages with different purposes:
+
+- `dev` — uploads notebooks and workflow files to S3 only (no workflow setup)
+- `test` — deploys files to the project, creates the Airflow workflow, and runs it
+
+To actually create and run the workflow, deploy to the **test** stage:
 
 ```bash
-smus-cli deploy --targets dev --manifest manifest.yaml
+smus-cli deploy --targets test --manifest manifest.yaml
 ```
 
+> No bundling needed — the CLI uploads files directly from your local directory.
+
 **What happens:**
-1. ✅ Uploads notebooks to S3
-2. ✅ Deploys Airflow workflow
-3. ✅ Configures project connections
+1. ✅ Uploads notebooks and workflows to S3 from local files
+2. ✅ Creates the `notebooks_workflow` Airflow workflow in your project
+3. ✅ Runs the workflow and streams logs
 4. ✅ Ready to run!
 
 ---
 
 ## Step 5: Verify Deployment
 
-Check your deployment in SageMaker Unified Studio console:
+Check your deployment in SageMaker Unified Studio portal:
 
-1. Navigate to your project
+1. Navigate to your **test** project
 2. Go to **Workflows** section
-3. Find `parallel_notebooks_execution` workflow
-4. Click **Run** to execute
+3. Find `notebooks_workflow` workflow
+4. The workflow will have been triggered automatically — check its run status
 
 ---
 

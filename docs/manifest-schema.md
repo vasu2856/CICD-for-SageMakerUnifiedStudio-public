@@ -9,7 +9,7 @@ This document defines the schema for SMUS CI/CD application manifests. For detai
 The manifest defines your application structure with these main sections:
 
 ### Required Fields
-- **`applicationName`** - Unique application identifier
+- **`applicationName`** - A logical name for this CI/CD manifest environment — not a SMUS resource. This name can be anything.
 - **`stages`** - Deployment environments (dev, test, prod, etc.)
 
 ### Optional Fields
@@ -19,7 +19,19 @@ The manifest defines your application structure with these main sections:
 
 ### Application Identity
 ```yaml
-applicationName: MyDataApp    # Required: Unique application name
+applicationName: MyDataApp    # Required: CI/CD manifest environment name (not a SMUS resource — this name can be anything)
+```
+
+### Domain Configuration
+```yaml
+stages:
+  dev:
+    domain:
+      region: us-east-1          # Required: AWS region
+      id: dzd_xxxxxxxxxxxx       # Option 1: Domain ID (visible in the SMUS portal)
+      name: my-domain            # Option 2: Domain name
+      tags:                      # Option 3: Tag-based lookup
+        purpose: my-domain-tag
 ```
 
 ### Content Configuration
