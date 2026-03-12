@@ -967,7 +967,7 @@ All commands support:
 ### Bundle Manifest
 - Default location: `manifest.yaml` (current directory)
 - Override with `--manifest` option
-- See [Bundle Manifest Reference](bundle-manifest.md) for format
+- See [Manifest Reference](manifest.md) for format
 - **Error handling**: CLI will error if the default file doesn't exist and no alternative is specified
 
 ### AWS Configuration

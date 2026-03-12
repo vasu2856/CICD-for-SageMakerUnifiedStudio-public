@@ -247,7 +247,7 @@ stages:
   properties: {}
 ```
 
-**See more:** [Bundle Manifest Reference - Connections](../bundle-manifest.md#connections)
+**See more:** [Manifest Reference - Connections](../manifest.md#connections)
 
 ### Create Connections Manually (Console)
 
@@ -660,7 +660,7 @@ Multiple data applications can deploy to the same project.
 - **[Data Team Quick Start](quickstart.md)** - Guide for building and deploying applications
 
 ### Advanced Configuration
-- **[Bundle Manifest Reference](../bundle-manifest.md)** - Complete YAML specification
+- **[Manifest Reference](../manifest.md)** - Complete YAML specification
 - **[CLI Commands Reference](../cli-commands.md)** - All available commands
 - **[Monitoring and Metrics](../monitoring-and-metrics.md)** - Detailed monitoring setup
 

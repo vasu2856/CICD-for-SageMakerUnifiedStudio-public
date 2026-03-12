@@ -20,6 +20,8 @@
 
 ## Step 1: Install the CLI
 
+Clone the repo from Github
+
 ```bash
 pip install aws-smus-cicd-cli
 ```
@@ -48,12 +50,22 @@ This example includes:
 
 ---
 
-## Step 3: Customize the Manifest
+## Step 3: Set Up Your SageMaker Unified Studio Domain and Project
+
+Before deploying, you need a SageMaker Unified Studio IAM domain and project. You can create these manually in the AWS console:
+
+1. Open the [SageMaker Unified Studio console](https://console.aws.amazon.com/datazone)
+2. Click **Get started** and follow the setup wizard
+3. Once the domain is active, you can use it and the admin project created by default or create a new project.
+
+---
+
+## Step 4: Customize the Manifest
 
 Edit `manifest.yaml` to match your environment:
 
 ```yaml
-applicationName: MyNotebookApp  # Change this
+applicationName: MyNotebookApp
 
 content:
   storage:
@@ -65,30 +77,31 @@ content:
       connectionName: default.workflow_serverless
 
 stages:
-  dev:
+  test:
+    stage: TEST
     domain:
-      region: us-east-1  # Your AWS region
+      tags:                                     # Change domain identifier
+        purpose: smus-cicd-testing
+      region: ${TEST_DOMAIN_REGION}   # Change domain region
     project:
-      name: my-dev-project  # Your project name
+      name: test-marketing                      # Change project name
 ```
 
 **What to change:**
 - `applicationName`: A logical name for this CI/CD manifest environment — not a SMUS resource. This name can be anything.
-- `domain.region`: Your AWS region
-- Domain identifier — use one of:
+- `domain.region`: Your AWS region, change in the manifest or export that region variable.
+- Domain identifier — use one of (omit entirely if you only have 1 domain in your account):
   - `domain.id`: Your domain ID (visible in the SMUS portal)
   - `domain.name`: Your domain name
   - `domain.tags`: Tag key-value pairs to look up the domain
 - `project.name`: Your SageMaker Unified Studio project name
 
+Note: in order to change domain name or tags, you will need to use `aws datazone` CLI because they are not exposed in SMUS portal. Check [this](../../examples/analytic-workflow/dashboard-glue-quick/README.md#4-deploy-to-test-environment) for help with tagging.
 ---
 
-## Step 4: Deploy
+## Step 5: Deploy
 
-The data-notebooks example has two stages with different purposes:
-
-- `dev` — uploads notebooks and workflow files to S3 only (no workflow setup)
-- `test` — deploys files to the project, creates the Airflow workflow, and runs it
+Make sure you are authenticated in your target deployment account with the role that allows creation of SageMaker notebook and Workflow. For simple testing - use Admin role.
 
 To actually create and run the workflow, deploy to the **test** stage:
 
@@ -392,7 +405,7 @@ aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml
 
 The CLI will automatically request subscriptions to catalog assets for your project.
 
-**See more:** [Bundle Manifest Reference - Catalog Assets](../bundle-manifest.md#catalog-assets)
+**See more:** [Manifest Reference - Catalog Assets](../manifest.md#catalog-assets)
 
 ---
 
@@ -510,7 +523,7 @@ Each data application is self-contained with its own bundle manifest and can be 
 ## Next Steps
 
 ### Learn More
-- **[Bundle Manifest Reference](../bundle-manifest.md)** - Complete YAML guide
+- **[Manifest Reference](../manifest.md)** - Complete YAML guide
 - **[Variable Substitution](../substitutions-and-variables.md)** - Dynamic configuration
 - **[CLI Commands](../cli-commands.md)** - All available commands
 - **[GitHub Actions Integration](../github-actions-integration.md)** - CI/CD automation

@@ -151,19 +151,18 @@ def get_project_user_role_arn(project_name: str, domain_name: str, region: str) 
 
         # Find tooling environment
         for env in environments_response.get("items", []):
-            if "tooling" in env.get("name", "").lower():
-                typer.echo(f"🔍 DEBUG: Found tooling environment: {env.get('name')}")
-                # Get environment details
-                env_detail = datazone_client.get_environment(
-                    domainIdentifier=domain_id, identifier=env.get("id")
-                )
+            typer.echo(f"🔍 DEBUG: Found tooling environment: {env.get('name')}")
+            # Get environment details
+            env_detail = datazone_client.get_environment(
+                domainIdentifier=domain_id, identifier=env.get("id")
+            )
 
-                # Look for userRoleArn in provisioned resources
-                for resource in env_detail.get("provisionedResources", []):
-                    if resource.get("name") == "userRoleArn":
-                        role_arn = resource.get("value")
-                        typer.echo(f"✅ DEBUG: Found userRoleArn={role_arn}")
-                        return role_arn
+            # Look for userRoleArn in provisioned resources
+            for resource in env_detail.get("provisionedResources", []):
+                if resource.get("name") == "userRoleArn":
+                    role_arn = resource.get("value")
+                    typer.echo(f"✅ DEBUG: Found userRoleArn={role_arn}")
+                    return role_arn
 
         raise ValueError(
             f"Project '{project_name}' does not have a Tooling Environment configured. "

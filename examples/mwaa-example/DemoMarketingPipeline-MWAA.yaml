@@ -69,7 +69,7 @@ stages:
   prod:
     domain:
       name: cicd-test-domain
-      region: ${PROD_DOMAIN_REGION:us-east-1}
+      region: ${PROD_DOMAIN_REGION}
     stage: PROD
     project:
       name: prod-marketing

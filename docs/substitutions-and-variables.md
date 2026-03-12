@@ -1,6 +1,6 @@
 # Substitutions and Variables
 
-← [Back to Main README](../README.md) | [Bundle Manifest Reference](bundle-manifest.md)
+← [Back to Main README](../README.md) | [Manifest Reference](manifest.md)
 
 Dynamic variable substitution for workflow YAMLs that resolves project-specific values at deployment time.
 
