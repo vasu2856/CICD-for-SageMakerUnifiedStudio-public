@@ -66,16 +66,16 @@ pip install -e .
 
 ```bash
 # Validate configuration
-smus-cli describe --manifest manifest.yaml --connect
+smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # Create deployment bundle (optional)
-smus-cli bundle --manifest manifest.yaml
+smus-cicd-cli bundle --manifest manifest.yaml
 
 # Deploy to test environment
-smus-cli deploy --targets test --manifest manifest.yaml
+smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run validation tests
-smus-cli test --manifest manifest.yaml --targets test
+smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 </div>
@@ -129,7 +129,7 @@ bootstrap:
 → **[מדריך למנהל](docs/getting-started/admin-quickstart.md)** - הגדירו תשתית וצינורות תוך 15 דקות  
 → **[תבניות זרימת עבודה של GitHub](git-templates/)** - תבניות זרימת עבודה גנריות, לשימוש חוזר עבור פריסה אוטומטית
 
-"**The CLI is your abstraction layer:** You just call `smus-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.) and executes bootstrap actions (workflow runs, log streaming, QuickSight refreshes, EventBridge events). Your workflows stay simple and generic."
+"**The CLI is your abstraction layer:** You just call `smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.) and executes bootstrap actions (workflow runs, log streaming, QuickSight refreshes, EventBridge events). Your workflows stay simple and generic."
 
 ---
 
@@ -166,7 +166,7 @@ bootstrap:
 "QuickSight Dataset Refresh - Automatically refresh dashboards after ETL deployment with quicksight.refresh_dataset" (רענון סט נתונים ב-QuickSight - רענון אוטומטי של לוחות מחוונים לאחר פריסת ETL)
 "EventBridge Integration - Emit custom events for downstream automation and CI/CD orchestration with eventbridge.put_events" (אינטגרציית EventBridge - שליחת אירועים מותאמים אישית לאוטומציה ותזמור CI/CD)
 "DataZone Connections - Provision MLflow and other service connections during deployment" (חיבורי DataZone - הקצאת חיבורי MLflow ושירותים אחרים במהלך הפריסה)
-"Sequential Execution - Actions run in order during smus-cli deploy for reliable initialization and validation" (הרצה רציפה - פעולות מבוצעות בסדר במהלך smus-cli deploy לאתחול ותיקוף אמינים)
+"Sequential Execution - Actions run in order during smus-cicd-cli deploy for reliable initialization and validation" (הרצה רציפה - פעולות מבוצעות בסדר במהלך smus-cicd-cli deploy לאתחול ותיקוף אמינים)
 
 ### 📊 אינטגרציית קטלוג
 "Asset Discovery - Automatically find required catalog assets (Glue, Lake Formation, DataZone)" (גילוי נכסים - מציאה אוטומטית של נכסי קטלוג נדרשים)
@@ -238,15 +238,15 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 "The Problem: Traditional deployment approaches force DevOps teams to learn AWS analytics services (Glue, Athena, DataZone, SageMaker, MWAA, etc.) and understand SMUS project structures, or force data teams to become CI/CD experts."
 (הבעיה: גישות פריסה מסורתיות מאלצות צוותי DevOps ללמוד שירותי אנליטיקה של AWS או מאלצות צוותי נתונים להפוך למומחי CI/CD)
 
-"The Solution: SMUS CLI is the abstraction layer that encapsulates all AWS and SMUS complexity:"
-(הפתרון: SMUS CLI הוא שכבת ההפשטה שמכילה את כל המורכבות של AWS ו-SMUS)
+"The Solution: SMUS CI/CD CLI is the abstraction layer that encapsulates all AWS and SMUS complexity:"
+(הפתרון: SMUS CI/CD CLI הוא שכבת ההפשטה שמכילה את כל המורכבות של AWS ו-SMUS)
 
 <div dir="ltr">
 
 ```
-Data Teams                    SMUS CLI                         DevOps Teams
+Data Teams                    SMUS CI/CD CLI                         DevOps Teams
     ↓                            ↓                                  ↓
-manifest.yaml          smus-cli deploy                    GitHub Actions
+manifest.yaml          smus-cicd-cli deploy                    GitHub Actions
 (WHAT & WHERE)         (AWS ABSTRACTION)                  (HOW & WHEN)
 ```
 
@@ -258,8 +258,8 @@ manifest.yaml          smus-cli deploy                    GitHub Actions
 - תצורות סביבה
 - לוגיקה עסקית
 
-"SMUS CLI handles ALL AWS complexity:"
-(SMUS CLI מטפל בכל המורכבות של AWS)
+"SMUS CI/CD CLI handles ALL AWS complexity:"
+(SMUS CI/CD CLI מטפל בכל המורכבות של AWS)
 - ניהול דומיין ופרויקט ב-DataZone
 - "AWS Glue, Athena, SageMaker, MWAA APIs"
 - ניהול אחסון וארטיפקטים ב-S3
@@ -278,7 +278,7 @@ manifest.yaml          smus-cli deploy                    GitHub Actions
 
 **תוצאה:**
 - צוותי נתונים לא נוגעים בתצורות CI/CD
-- "DevOps teams never call AWS APIs directly - they just call `smus-cli deploy`"
+- "DevOps teams never call AWS APIs directly - they just call `smus-cicd-cli deploy`"
 - "CI/CD workflows are generic - same workflow works for Glue apps, SageMaker apps, or Bedrock apps"
 - כל צוות עובד באופן עצמאי תוך שימוש במומחיותו
 

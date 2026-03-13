@@ -1,1 +1,1 @@
-"""Commands module for SMUS CLI."""
+"""Commands module for SMUS CI/CD CLI."""

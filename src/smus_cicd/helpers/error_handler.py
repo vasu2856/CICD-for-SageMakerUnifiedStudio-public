@@ -1,4 +1,4 @@
-"""Error handling utilities for SMUS CLI."""
+"""Error handling utilities for SMUS CI/CD CLI."""
 
 import typer
 

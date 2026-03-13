@@ -103,8 +103,8 @@ def main():
     
     print("✅ Cleanup complete! Ready for new test run.")
     print("\nNext steps:")
-    print("  1. Run: smus-cli bundle --targets dev")
-    print("  2. Run: smus-cli deploy --targets test")
+    print("  1. Run: smus-cicd-cli bundle --targets dev")
+    print("  2. Run: smus-cicd-cli deploy --targets test")
 
 
 if __name__ == "__main__":

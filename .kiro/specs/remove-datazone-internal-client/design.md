@@ -49,7 +49,7 @@ The target architecture uses only the public DataZone client:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     SMUS CLI Application                     │
+│                     SMUS CI/CD CLI Application                     │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │

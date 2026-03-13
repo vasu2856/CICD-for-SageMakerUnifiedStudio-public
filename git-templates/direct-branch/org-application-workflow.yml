@@ -39,7 +39,7 @@ jobs:
       # Path to your application manifest
       manifest_path: 'manifest.yaml'
       
-      # Path to SMUS CLI (if different from default)
+      # Path to SMUS CI/CD CLI (if different from default)
       smus_cli_path: '.'
       
       # ========================================================================

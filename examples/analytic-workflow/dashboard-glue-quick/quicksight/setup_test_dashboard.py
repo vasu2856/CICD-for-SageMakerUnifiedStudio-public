@@ -84,9 +84,9 @@ def setup_test_dashboard():
     
     print(f"\n✅ Test dashboard setup complete!")
     print(f"\nNext steps:")
-    print(f"  1. Run: smus-cli bundle --targets dev")
+    print(f"  1. Run: smus-cicd-cli bundle --targets dev")
     print(f"     → Will export '{dashboard_name}' by name lookup")
-    print(f"  2. Run: smus-cli deploy --targets test")
+    print(f"  2. Run: smus-cicd-cli deploy --targets test")
     print(f"     → Will import as 'deployed-test-{dashboard_name}' in us-east-1")
 
 

@@ -6,7 +6,7 @@ import pytest
 
 def test_environment_variables_available():
     """Test that required environment variables are available during test execution."""
-    # These environment variables are set by the SMUS CLI test command
+    # These environment variables are set by the SMUS CI/CD CLI test command
     # when running tests in the context of a deployed project
     
     # Check for domain context

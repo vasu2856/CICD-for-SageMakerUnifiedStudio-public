@@ -1,11 +1,11 @@
-"""Integration commands for SMUS CLI."""
+"""Integration commands for SMUS CI/CD CLI."""
 
 import subprocess
 from pathlib import Path
 
 
 def integrate_qcli(status=False, uninstall=False, configure=None):
-    """Integrate SMUS CLI with Amazon Q CLI."""
+    """Integrate SMUS CI/CD CLI with Amazon Q CLI."""
 
     if status:
         return show_status()
@@ -30,7 +30,7 @@ def setup_integration(configure=None):
 
     print("✅ Q CLI found")
 
-    # 2. Find SMUS CLI path
+    # 2. Find SMUS CI/CD CLI path
     smus_path = Path(__file__).parent.parent.parent.parent
     wrapper_script = smus_path / "tests" / "scripts" / "run_mcp_server.sh"
 
@@ -38,7 +38,7 @@ def setup_integration(configure=None):
         print(f"❌ MCP server wrapper not found: {wrapper_script}")
         return 1
 
-    print(f"✅ SMUS CLI found: {smus_path}")
+    print(f"✅ SMUS CI/CD CLI found: {smus_path}")
 
     # 3. Validate custom config if provided
     if configure:
@@ -140,7 +140,7 @@ def show_status():
 
     else:
         print("❌ MCP Server: Not registered")
-        print("   Run: smus-cli integrate qcli")
+        print("   Run: smus-cicd-cli integrate qcli")
 
     return 0
 
@@ -158,7 +158,7 @@ def uninstall_integration():
         return 1
 
     print("✅ MCP server removed")
-    print("\nTo reinstall: smus-cli integrate qcli")
+    print("\nTo reinstall: smus-cicd-cli integrate qcli")
 
     return 0
 

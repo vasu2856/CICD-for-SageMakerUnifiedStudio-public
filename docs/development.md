@@ -29,10 +29,10 @@ For detailed information about integration tests and example pipelines, see [Exa
 
 ### Local Development
 1. **Update code** in dev environment S3 location
-2. **Create bundle**: `smus-cli bundle` (downloads latest from dev)
-3. **Deploy to test**: `smus-cli deploy --targets test` (deploys and triggers workflows)
+2. **Create bundle**: `smus-cicd-cli bundle` (downloads latest from dev)
+3. **Deploy to test**: `smus-cicd-cli deploy --targets test` (deploys and triggers workflows)
 4. **Verify execution**: Check workflow runs in SageMaker Unified Studio console
-5. **Deploy to prod**: `smus-cli deploy --stages prod` (when ready)
+5. **Deploy to prod**: `smus-cicd-cli deploy --stages prod` (when ready)
 
 ### GitHub Actions Integration
 The repository includes automated workflows for development:
@@ -48,7 +48,7 @@ The repository includes automated workflows for development:
 - **Coverage**: 158 unit tests with Codecov integration
 
 **PR Integration Tests (`.github/workflows/pr-tests.yml`)**:
-- **Triggers**: Pull requests affecting SMUS CLI code
+- **Triggers**: Pull requests affecting SMUS CI/CD CLI code
 - **Features**: Integration tests with real AWS resources using OIDC authentication
 - **Purpose**: Validate CLI functionality against live AWS services
 - **Duration**: Extended 12-hour sessions for long-running MWAA operations
@@ -56,7 +56,7 @@ The repository includes automated workflows for development:
 **Full Pipeline Lifecycle Demo (`.github/workflows/full-pipeline-lifecycle.yml`)**:
 - **Triggers**: Manual workflow dispatch
 - **Features**: Complete 7-step pipeline demonstration with customizable inputs
-- **Purpose**: End-to-end showcase of SMUS CLI capabilities
+- **Purpose**: End-to-end showcase of SMUS CI/CD CLI capabilities
 - **Note**: Cleanup step is commented out to prevent resource conflicts
 
 ### Development Setup Requirements

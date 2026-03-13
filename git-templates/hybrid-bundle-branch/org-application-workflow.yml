@@ -48,7 +48,7 @@ jobs:
       # S3 bucket for storing bundles
       artifact_repository: 's3://your-org-smus-artifacts'
       
-      # Path to SMUS CLI (if different from default)
+      # Path to SMUS CI/CD CLI (if different from default)
       smus_cli_path: '.'
       
       # ========================================================================

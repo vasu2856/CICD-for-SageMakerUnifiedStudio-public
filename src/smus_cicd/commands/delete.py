@@ -36,7 +36,7 @@ def delete_command(
     """
     Delete projects and environments that were deployed during initialize.
 
-    Example: smus-cli delete --targets test --force
+    Example: smus-cicd-cli delete --targets test --force
     """
     try:
         # Parse manifest

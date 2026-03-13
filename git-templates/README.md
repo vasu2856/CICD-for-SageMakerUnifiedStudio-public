@@ -1,7 +1,7 @@
 # Generic SMUS CI/CD Workflows
 
 These workflows follow the **separation of concerns** principle where:
-- **SMUS CLI** handles all AWS complexity
+- **SMUS CI/CD CLI** handles all AWS complexity
 - **Workflows** enforce CI/CD best practices
 - **Application teams** only configure parameters
 
@@ -106,7 +106,7 @@ jobs:
 ### ✅ Application-Agnostic
 - Works for Glue, SageMaker, Bedrock, or any AWS service
 - No AWS API calls in workflow
-- SMUS CLI handles all complexity
+- SMUS CI/CD CLI handles all complexity
 
 ### ✅ Reusable
 - One workflow serves all applications
@@ -201,16 +201,16 @@ jobs:
 ### Tests failing
 - Check application code and manifest
 - Review test logs in workflow output
-- Run `smus-cli test` locally to debug
+- Run `smus-cicd-cli test` locally to debug
 
 ## Migration from Old Workflows
 
 If you have existing workflows that directly call AWS APIs:
 
 1. **Identify AWS API calls** in your workflow
-2. **Replace with SMUS CLI commands**:
-   - AWS API → `smus-cli deploy`
-   - Custom scripts → `smus-cli test`
+2. **Replace with SMUS CI/CD CLI commands**:
+   - AWS API → `smus-cicd-cli deploy`
+   - Custom scripts → `smus-cicd-cli test`
 3. **Use reusable workflow** instead of custom logic
 4. **Configure parameters** for your application
 

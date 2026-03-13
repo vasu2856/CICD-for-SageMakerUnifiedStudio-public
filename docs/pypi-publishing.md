@@ -61,7 +61,7 @@ Update version in both:
 ## Package Structure
 
 The package includes:
-- **CLI tool**: `smus-cli` command
+- **CLI tool**: `smus-cicd-cli` command
 - **Python package**: `smus_cicd` module
 - **Dependencies**: Automatically installed
 - **Documentation**: README and docs included
@@ -78,7 +78,7 @@ python -m build
 pip install dist/smus_cicd_cli-*.whl
 
 # Test CLI
-smus-cli --help
+smus-cicd-cli --help
 ```
 
 ## Workflow Details

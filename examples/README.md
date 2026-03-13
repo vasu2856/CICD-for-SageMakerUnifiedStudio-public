@@ -236,7 +236,7 @@ Tests deployment without Airflow Serverless (notebooks only).
    - IAM role creation
    - S3, Glue, Athena, SageMaker
 
-2. **SMUS CLI** installed:
+2. **SMUS CI/CD CLI** installed:
    ```bash
    pip install -e .
    ```
@@ -452,8 +452,8 @@ Minimal pipeline for testing basic functionality:
 - S3 storage bundle
 
 ```bash
-smus-cli describe --manifest examples/TestPipeline.yaml
-smus-cli deploy dev --manifest examples/TestPipeline.yaml
+smus-cicd-cli describe --manifest examples/TestPipeline.yaml
+smus-cicd-cli deploy dev --manifest examples/TestPipeline.yaml
 ```
 
 ---
@@ -469,8 +469,8 @@ Comprehensive demo showing all features:
 - Environment-specific parameters
 
 ```bash
-smus-cli describe --manifest examples/demo-manifest.yaml --connect
-smus-cli deploy test --manifest examples/demo-manifest.yaml
+smus-cicd-cli describe --manifest examples/demo-manifest.yaml --connect
+smus-cicd-cli deploy test --manifest examples/demo-manifest.yaml
 ```
 
 ---
@@ -488,9 +488,9 @@ Complete ETL workflow with:
 
 ```bash
 cd examples/analytic-workflow/etl
-smus-cli deploy test --manifest manifest.yaml
-smus-cli run --workflow covid_etl_pipeline --targets test --manifest manifest.yaml
-smus-cli test --targets test --manifest manifest.yaml
+smus-cicd-cli deploy test --manifest manifest.yaml
+smus-cicd-cli run --workflow covid_etl_pipeline --targets test --manifest manifest.yaml
+smus-cicd-cli test --targets test --manifest manifest.yaml
 ```
 
 #### ML Pipeline
@@ -503,7 +503,7 @@ Machine learning workflow with:
 
 ```bash
 cd examples/analytic-workflow/ml
-smus-cli deploy test --manifest manifest.yaml
+smus-cicd-cli deploy test --manifest manifest.yaml
 ```
 
 ---

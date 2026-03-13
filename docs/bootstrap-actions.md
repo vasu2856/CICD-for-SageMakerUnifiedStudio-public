@@ -22,7 +22,7 @@ Bootstrap actions allow you to execute automated tasks during deployment, includ
 
 ## Overview
 
-When you deploy your application, the SMUS CLI can automatically execute bootstrap actions. These actions can:
+When you deploy your application, the SMUS CI/CD CLI can automatically execute bootstrap actions. These actions can:
 - **Trigger workflow runs** automatically during deployment
 - **Fetch workflow logs** for validation or debugging
 - **Emit EventBridge events** to trigger downstream automation
@@ -450,7 +450,7 @@ Processing bootstrap actions...
 
 ## EventBridge Event Structure
 
-Events emitted by SMUS CLI follow this structure:
+Events emitted by SMUS CI/CD CLI follow this structure:
 
 ```json
 {
