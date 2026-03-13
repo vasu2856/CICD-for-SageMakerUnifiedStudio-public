@@ -23,7 +23,7 @@ banks==2.2.0
 beautifulsoup4==4.14.2
 bedrock-agentcore==1.0.6
 bedrock-agentcore-starter-toolkit==0.1.33
-black==25.11.0
+black==26.3.1
 blinker==1.9.0
 bokeh==3.8.2
 boto3==1.40.70
@@ -112,7 +112,7 @@ keras==3.13.2
 kiwisolver==1.4.9
 langchain==1.0.7
 langchain-core==1.2.11
-langgraph==1.0.3
+langgraph==1.0.10rc1
 langgraph-checkpoint==4.0.0
 langgraph-prebuilt==1.0.4
 langgraph-sdk==0.2.9
@@ -175,7 +175,7 @@ opentelemetry-sdk==1.38.0
 opentelemetry-semantic-conventions==0.59b0
 opt-einsum==3.4.0
 optree==0.18.0
-orjson==3.11.4
+orjson==3.11.6
 ormsgpack==1.12.0
 packaging==24.2
 pandas==2.3.3
@@ -221,7 +221,7 @@ pymssql==2.3.9
 pymysql==1.1.2
 pyopenssl==25.3.0
 pyparsing==3.2.5
-pypdf==6.7.5
+pypdf==6.8.0
 pyroaring==1.0.3
 pyspark==3.5.7
 python-dateutil==2.9.0.post0
@@ -294,7 +294,7 @@ toml==0.10.2
 tomlkit==0.13.3
 torch==2.8.0
 torchvision==0.23.0
-tornado==6.5.2
+tornado==6.5.5
 tqdm==4.67.1
 traitlets==5.14.3
 transformers==4.57.1

@@ -18,6 +18,11 @@ Modern Amazon Airflow Serverless (Overdrive) pipeline example with environment v
 
 ## Usage
 
+### Prerequisites
+
+- SMUS domain and project created manually in the console — the CLI cannot create these
+- AWS credentials configured
+
 ### Quick Example
 ```bash
 ./run-serverless-example.sh

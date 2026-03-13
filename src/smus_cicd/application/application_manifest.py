@@ -20,11 +20,16 @@ class DomainConfig:
     region: str
     name: Optional[str] = None
     tags: Optional[Dict[str, str]] = None
+    id: Optional[str] = None
 
     def get_name(self) -> Optional[str]:
-        """Get domain name, resolving from tags if needed."""
+        """Get domain name, resolving from id, tags if needed."""
         if self.name:
             return self.name
+        if self.id:
+            from ..helpers.datazone import get_domain_name_by_id
+
+            return get_domain_name_by_id(self.id, self.region)
         if self.tags:
             from ..helpers.datazone import resolve_domain_id
 
@@ -389,6 +394,7 @@ class ApplicationManifest:
                 region=domain_data.get("region", ""),
                 name=domain_data.get("name"),
                 tags=domain_data.get("tags"),
+                id=domain_data.get("id"),
             )
 
             if not domain.region.strip():

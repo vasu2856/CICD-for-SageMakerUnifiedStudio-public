@@ -236,6 +236,8 @@ Tests deployment without Airflow Serverless (notebooks only).
    - IAM role creation
    - S3, Glue, Athena, SageMaker
 
+2. **SMUS Domain and Project** created manually in the console before running any examples — the CLI cannot create domains or projects
+
 2. **SMUS CI/CD CLI** installed:
    ```bash
    pip install -e .

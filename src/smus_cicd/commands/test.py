@@ -82,7 +82,9 @@ def test_command(
 
         if output.upper() != "JSON":
             typer.echo(f"Pipeline: {manifest.application_name}")
-            typer.echo(f"Domain: {domain_config.name} ({domain_config.region})")
+            typer.echo(
+                f"Domain: {domain_config.name or domain_config.id} ({domain_config.region})"
+            )
             typer.echo()
 
         test_results = {}
@@ -121,8 +123,10 @@ def test_command(
 
             # Load AWS config
             config = load_config()
-            # Build domain config with name and tags for proper resolution
+            # Build domain config with id, name and tags for proper resolution
             domain_dict = {"region": target_config.domain.region}
+            if target_config.domain.id:
+                domain_dict["id"] = target_config.domain.id
             if target_config.domain.name:
                 domain_dict["name"] = target_config.domain.name
             if target_config.domain.tags:
@@ -311,7 +315,7 @@ def smus_config():
         if output.upper() == "JSON":
             result_data = {
                 "bundle": manifest.application_name,
-                "domain": domain_config.name,
+                "domain": domain_config.name or domain_config.id,
                 "region": domain_config.region,
                 "targets": test_results,
                 "overall_success": overall_success,

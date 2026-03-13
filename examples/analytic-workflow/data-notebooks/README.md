@@ -22,6 +22,11 @@ This example demonstrates parallel execution of multiple notebooks using SageMak
 
 ## Usage
 
+### Prerequisites
+
+- SMUS domain and project created manually in the console — the CLI cannot create these
+- AWS credentials configured
+
 ### Deploy Pipeline
 
 ```bash

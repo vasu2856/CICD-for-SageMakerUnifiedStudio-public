@@ -420,9 +420,37 @@ stages:
 
 **Required Properties:**
 - `stage` (required): Deployment stage name (`DEV`, `TEST`, `PROD`)
-- `domain.name` (required): SageMaker Unified Studio domain name
 - `domain.region` (required): AWS region where domain exists
 - `project.name` (required): Project name in the domain
+
+**Domain Identification (one of the following):**
+- `domain.id`: Domain ID as shown in the SMUS portal — the easiest option for customers
+- `domain.name`: Domain name
+- `domain.tags`: Tag key-value pairs to look up the domain (all tags must match)
+
+```yaml
+# Option 1: domain ID (visible in the SMUS portal)
+stages:
+  dev:
+    domain:
+      id: dzd_xxxxxxxxxxxx
+      region: us-east-1
+
+# Option 2: domain name
+stages:
+  dev:
+    domain:
+      name: my-studio-domain
+      region: us-east-1
+
+# Option 3: tags
+stages:
+  dev:
+    domain:
+      tags:
+        purpose: my-domain-tag
+      region: us-east-1
+```
 
 ### Bootstrap Actions
 
@@ -983,7 +1011,7 @@ etl_dag:
 ## Validation Rules
 
 ### Required Fields
-- `applicationName`
+- `applicationName` - A logical name for this CI/CD manifest environment — not a SMUS resource. This name can be anything.
 - `content` with at least `workflows` defined
 - `stages` (at least one stage)
 - Each stage must have: `stage`, `domain.name`, `domain.region`, `project.name`

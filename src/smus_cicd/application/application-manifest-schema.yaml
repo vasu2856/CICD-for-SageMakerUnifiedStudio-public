@@ -361,10 +361,16 @@ definitions:
         default: false
       domain:
         type: object
-        description: "DataZone domain configuration"
+        description: "DataZone domain configuration. Exactly one of 'id', 'name', or 'tags' must be provided to identify the domain."
         required: 
           - region
         properties:
+          id:
+            type: string
+            description: "DataZone domain ID (e.g. dzd-xxxxxxxxxxxx)"
+            pattern: "^dzd-[a-z0-9]+$"
+            examples:
+              - "dzd-brj5xoubt4qxrb"
           name:
             type: string
             description: "DataZone domain name"
@@ -372,7 +378,7 @@ definitions:
             maxLength: 64
           tags:
             type: object
-            description: "Tags to identify the domain (alternative to name)"
+            description: "Tags to identify the domain (alternative to id or name)"
             additionalProperties:
               type: string
           region:
@@ -383,6 +389,27 @@ definitions:
               - "us-east-1"
               - "us-west-2"
               - "${DEV_DOMAIN_REGION:us-east-1}"
+        oneOf:
+          - required: [id]
+            not:
+              anyOf:
+                - required: [name]
+                - required: [tags]
+          - required: [name]
+            not:
+              anyOf:
+                - required: [id]
+                - required: [tags]
+          - required: [tags]
+            not:
+              anyOf:
+                - required: [id]
+                - required: [name]
+          - not:
+              anyOf:
+                - required: [id]
+                - required: [name]
+                - required: [tags]
         additionalProperties: false
       project:
         type: object
