@@ -6,9 +6,9 @@ content:
     include:
     - ml/bundle/deployment-code
   - name: deployment-workflows
-    connectionName: default.s3_shared
     include:
-    - ml/bundle/deployment-workflows
+    - workflows/ml_deployment_workflow.yaml
+    - workflows/ml_deployment_notebook.ipynb
   - name: model-artifacts
     connectionName: default.s3_shared
     include:
