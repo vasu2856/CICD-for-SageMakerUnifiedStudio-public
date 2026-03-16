@@ -174,6 +174,12 @@ class ContextResolver:
                     conn_dict = value["connection"]
                     remaining = path[11:]  # Remove "connection."
 
+                    print(
+                        f"🔍 DEBUG resolver: resolving '{{{namespace}.{path}}}', "
+                        f"remaining='{remaining}', "
+                        f"available connections={list(conn_dict.keys())}"
+                    )
+
                     # Try to match connection names (they can have dots)
                     for conn_name in conn_dict.keys():
                         if remaining.startswith(conn_name + "."):
@@ -189,8 +195,17 @@ class ContextResolver:
                                 s3_uri = conn_dict[conn_name]["s3Uri"]
                                 # Extract bucket from s3://bucket-name/path/
                                 bucket = s3_uri.replace("s3://", "").split("/")[0]
+                                print(
+                                    f"🔍 DEBUG resolver: bucket replacing with='{bucket}', "
+                                    f"S3 URI='{s3_uri}'"
+                                )
                                 return bucket
                             else:
+                                print(
+                                    f"⚠️  DEBUG resolver: connection '{conn_name}' matched "
+                                    f"but property '{property_name}' not found. "
+                                    f"Available properties={list(conn_dict[conn_name].keys())}"
+                                )
                                 unresolved.append(f"{{{namespace}.{path}}}")
                                 return match.group(0)
                         elif remaining == conn_name:
@@ -198,6 +213,10 @@ class ContextResolver:
                             return str(conn_dict[conn_name])
 
                     # Connection not found
+                    print(
+                        f"⚠️  DEBUG resolver: no connection matched '{remaining}' "
+                        f"in connections={list(conn_dict.keys())}"
+                    )
                     unresolved.append(f"{{{namespace}.{path}}}")
                     return match.group(0)
                 else:
