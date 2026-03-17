@@ -2,29 +2,29 @@
 
 ## Overview
 
-Implement catalog resource export during `bundle` and import during `deploy` by adding new helper modules, extending the manifest schema, and wiring into existing command flows. The simplified approach exports ALL catalog resources when enabled via a boolean flag, uses externalIdentifier (with normalization) or name for mapping, and supports full synchronization including deletion of resources missing from the bundle. The manifest `content.catalog` section only supports `enabled` (boolean), `publish` (boolean), and `assets.access` (array for subscription requests) — no filter options of any kind. The `--updated-after` timestamp is purely a CLI flag on the bundle command that filters ALL resource types uniformly.
+Implement catalog resource export during `bundle` and import during `deploy` by adding new helper modules, extending the manifest schema, and wiring into existing command flows. The simplified approach exports ALL catalog resources when enabled via a boolean flag, uses externalIdentifier (with normalization) or name for mapping, and supports full synchronization including deletion of resources missing from the bundle. The manifest `content.catalog` section only supports `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array for subscription requests) — no filter options of any kind. Publishing is source-state-based: assets and data products are published only if they were published (listingStatus == "LISTED") in the source project, unless `skipPublish` is set to true. The `--updated-after` timestamp is purely a CLI flag on the bundle command that filters ALL resource types uniformly.
 
 ## Tasks
 
 - [x] 1. Extend manifest schema and data model for simplified catalog export
-  - Update manifest schema to support simple `content.catalog.enabled` boolean flag and optional `publish` boolean. The manifest `content.catalog` section ONLY supports: `enabled`, `publish`, and `assets.access` — no filter options (`include`, `names`, `assetTypes`, `updatedAfter`, etc.) whatsoever.
+  - Update manifest schema to support simple `content.catalog.enabled` boolean flag and optional `skipPublish` boolean. The manifest `content.catalog` section ONLY supports: `enabled`, `skipPublish`, and `assets.access` — no filter options (`include`, `names`, `assetTypes`, `updatedAfter`, etc.) whatsoever.
   - [x] 1.1 Update `CatalogConfig` dataclass in `application_manifest.py`
     - Remove all filter-related classes (`CatalogAssetsConfig`, `CatalogGlossariesConfig`, `CatalogDataProductsConfig`, `CatalogMetadataFormsConfig`) and any filter fields (`include`, `names`, `assetTypes`, `updatedAfter`)
-    - Update `CatalogConfig` to have ONLY: `enabled: bool = False`, `publish: bool = False`, `connectionName: Optional[str] = None`, and `assets: Optional[CatalogAssetsConfig] = None` (for subscription requests only)
+    - Update `CatalogConfig` to have ONLY: `enabled: bool = False`, `skipPublish: bool = False`, `connectionName: Optional[str] = None`, and `assets: Optional[CatalogAssetsConfig] = None` (for subscription requests only)
     - No `updatedAfter` field in the manifest — that is purely a CLI flag (`--updated-after`) on the bundle command
     - Update `from_dict` parsing to handle simplified structure
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
   - [x] 1.2 Update `application-manifest-schema.yaml` with simplified catalog section
     - Replace complex filter configuration with simple `enabled: boolean` field
-    - Add `publish: boolean` field (default: false) for automatic asset/data product publishing
+    - Add `skipPublish: boolean` field (default: false) to skip source-state-based publishing
     - Keep `assets.access` array for subscription requests (unchanged)
     - Remove ALL filter fields: `assets.include`, `assets.updatedAfter`, `glossaries.include`, `glossaries.updatedAfter`, `dataProducts.names`, `dataProducts.updatedAfter`, `metadataForms.include`, `metadataForms.updatedAfter`, and any other filter-related fields
-    - Ensure the `content.catalog` section ONLY supports: `enabled` (boolean), `publish` (boolean), and `assets.access` (array for subscription requests)
+    - Ensure the `content.catalog` section ONLY supports: `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array for subscription requests)
     - _Requirements: 1.1, 1.4, 1.5, 1.6_
   - [x] 1.3 Write unit tests for manifest parsing of simplified catalog config
     - Test parsing with `enabled: true`
     - Test parsing with `enabled: false` or omitted
-    - Test parsing with `publish: true` and `publish: false`
+    - Test parsing with `skipPublish: true` and `skipPublish: false`
     - Test parsing with `assets.access` array (subscription requests)
     - Test that no filter fields (`include`, `names`, `assetTypes`, `updatedAfter`) are accepted in the manifest
     - Verify backward compatibility
@@ -123,7 +123,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - Implement `_identify_resources_to_delete(client, domain_id, project_id, catalog_data)` to find resources in target not in bundle
     - Implement `_delete_resource(client, domain_id, project_id, resource_id, resource_type)` to call delete API
     - Implement `_publish_resource(client, domain_id, resource_id, resource_type)` to call publish API for assets and data products
-    - Implement `import_catalog(domain_id, project_id, catalog_data, region, publish=False)` orchestrating validation, mapping, creation, update, deletion, and optional publishing
+    - Implement `import_catalog(domain_id, project_id, catalog_data, region, publish=True)` orchestrating validation, mapping, creation, update, deletion, and optional publishing
     - Creation order: Glossaries → GlossaryTerms → FormTypes → AssetTypes → Assets → Data Products
     - Deletion order (reverse): Data Products → Assets → AssetTypes → FormTypes → GlossaryTerms → Glossaries
     - When publish=True, publish assets and data products after creation/update
@@ -179,8 +179,8 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - Skip silently if file not present (backward compatible)
     - Check `deployment_configuration.catalog.disable` — skip if true
     - Validate JSON
-    - Get `publish` flag from `manifest.content.catalog.publish` (default: false)
-    - Call `import_catalog()` with publish flag
+    - Get `skipPublish` flag from `manifest.content.catalog.skipPublish` (default: false)
+    - Call `import_catalog()` with skip_publish flag
     - Report summary counts including deletions and publishes
     - Return False if all imports fail
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 5.13_
@@ -252,9 +252,9 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - Verify resource D is deleted
     - Verify deletion happens in reverse dependency order
     - _Requirements: 5.4, 5.5, 5.12_
-  - [x] 8.4 Write integration test: automatic publishing when enabled
-    - Deploy with `content.catalog.publish: true` in manifest
-    - Verify assets and data products are automatically published after creation
+  - [x] 8.4 Write integration test: source-state-based publishing
+    - Deploy with `skipPublish: false` (default) in manifest
+    - Verify only assets and data products with listingStatus == "LISTED" in source are published
     - Verify publish API is called for each asset and data product
     - Verify published count is reported in deploy output
     - _Requirements: 5.13, 5.14, 6.3_
@@ -265,7 +265,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - Verify published count is 0 in deploy output
     - _Requirements: 5.13_
   - [x] 8.6 Write integration test: publish failures are logged but don't block
-    - Deploy with `content.catalog.publish: true`
+    - Deploy with `skipPublish: false` (default)
     - Mock publish API to fail for one resource
     - Verify other resources continue to be processed
     - Verify failure is logged
@@ -296,7 +296,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - _Requirements: 2.1, 2.2, 4.1, 4.2, 4.3, 4.6, 5.1, 5.6_
   - [x] 9.2 Write integration test: round-trip with automatic publishing
     - Bundle from source project with assets and data products
-    - Deploy to target project with `content.catalog.publish: true`
+    - Deploy to target project with `skipPublish: false` (default)
     - Verify all assets and data products are automatically published
     - Query target project to verify publish status
     - Verify published count matches number of assets + data products
@@ -320,8 +320,8 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
   - Provide example application demonstrating simplified catalog import/export with automatic publishing.
   - [x] 10.1 Create example directory `examples/catalog-import-export/` with manifest
     - Create `examples/catalog-import-export/manifest.yaml` with `content.catalog.enabled: true`
-    - Set `content.catalog.publish: true` to demonstrate automatic publishing
-    - Ensure manifest contains NO filter fields — only `enabled`, `publish`, and `assets.access` are valid
+    - Default `skipPublish: false` preserves source publish state
+    - Ensure manifest contains NO filter fields — only `enabled`, `skipPublish`, and `assets.access` are valid
     - Include dev, test, and prod stages
     - Include `deployment_configuration.catalog` in each target stage
     - Add `README.md` explaining the example, publish feature, and `--updated-after` CLI flag usage
@@ -364,7 +364,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
 
 ## Key Changes from Original Plan
 
-1. **Simplified manifest with NO filter options**: The `content.catalog` section ONLY supports three fields: `enabled` (boolean), `publish` (boolean), and `assets.access` (array for subscription requests). No `include`, `names`, `assetTypes`, `updatedAfter`, or any other filter fields exist in the manifest.
+1. **Simplified manifest with NO filter options**: The `content.catalog` section ONLY supports three fields: `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array for subscription requests). No `include`, `names`, `assetTypes`, `updatedAfter`, or any other filter fields exist in the manifest.
 
 2. **Export all resources**: When `enabled: true`, export ALL catalog resources from the source project without any manifest-based filtering.
 
@@ -372,7 +372,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
 
 4. **CLI-only `--updated-after` filter**: The `--updated-after` flag is purely a CLI option on the bundle command (not a manifest field). It accepts an ISO 8601 timestamp and filters ALL resource types uniformly by modification timestamp.
 
-5. **Automatic publishing**: The `content.catalog.publish` boolean field in the manifest (default: false) controls whether the deploy command automatically publishes all imported assets and data products after creation or update.
+5. **Automatic publishing**: The `content.catalog.publish` boolean field in the manifest (default: true) controls whether the deploy command automatically publishes all imported assets and data products after creation or update.
 
 6. **Enhanced identifier mapping**: Use `externalIdentifier` (with normalization to remove AWS account/region) as primary mapping key, fallback to `name` when externalIdentifier doesn't exist.
 

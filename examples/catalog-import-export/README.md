@@ -6,9 +6,11 @@ This example demonstrates how to use the SMUS CI/CD CLI to export and import Dat
 
 When `content.catalog.enabled` is set to `true` in the manifest, the `bundle` command exports **all** catalog resources owned by the source project. During `deploy`, those resources are imported into the target project using identifier mapping (via `externalIdentifier` or `name` fallback).
 
-### Automatic Publishing
+> ⚠️ **IMPORTANT**: This feature assumes that the underlying physical resources (e.g., Glue Tables, Glue Databases, S3 buckets) have the **same name** in both source and target environments. If physical resource names differ between stages, asset matching will fail and resources will be created as new instead of updated.
 
-Setting `content.catalog.publish: true` in the manifest causes the deploy command to automatically publish all imported assets and data products after creation or update. This is useful for making catalog resources immediately discoverable in the target environment.
+### Source-State-Based Publishing
+
+By default, the deploy command publishes imported assets and data products only if they were published (`listingStatus == "LISTED"`) in the source project. This preserves the source publish state across environments. To skip all publishing regardless of source state, set `skipPublish: true` in the manifest.
 
 ### Manifest Configuration
 
@@ -17,7 +19,7 @@ The `content.catalog` section supports only three fields:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `enabled` | boolean | `false` | Enable/disable catalog export during bundle |
-| `publish` | boolean | `false` | Automatically publish assets and data products during deploy |
+| `skipPublish` | boolean | `false` | When true, skip all publishing regardless of source state |
 | `assets.access` | array | `[]` | Subscription access requests (unchanged from existing behavior) |
 
 No filter options (`include`, `names`, `assetTypes`, `updatedAfter`, etc.) exist in the manifest.
@@ -89,7 +91,7 @@ deployment_configuration:
 
 1. **Bundle**: Exports all project-owned catalog resources to `catalog/catalog_export.json` in the bundle ZIP
 2. **Deploy**: Reads the exported JSON, maps source identifiers to target identifiers, and creates/updates/deletes resources in dependency order (Glossaries → GlossaryTerms → FormTypes → AssetTypes → Assets → Data Products)
-3. **Publish** (when enabled): Automatically publishes assets and data products after import
+3. **Publish** (default): Publishes assets and data products that were published in the source project (skip with `skipPublish: true`)
 4. **Delete**: Resources in the target project that are not in the bundle are deleted (reverse dependency order: Data Products → Assets → AssetTypes → FormTypes → GlossaryTerms → Glossaries)
 
 ## Resource Types

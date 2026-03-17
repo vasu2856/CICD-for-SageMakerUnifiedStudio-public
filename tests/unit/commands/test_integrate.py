@@ -44,9 +44,6 @@ class TestSetupIntegration:
         captured = capsys.readouterr()
         assert "❌ Amazon Q CLI not found" in captured.out
 
-    @pytest.mark.xfail(reason="Complex Path mocking - covered by successful_registration test")
-
-
     @patch("subprocess.run")
     @patch("smus_cicd.commands.integrate.check_qcli_installed")
     @patch("smus_cicd.commands.integrate.Path")

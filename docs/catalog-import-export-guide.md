@@ -23,6 +23,10 @@ The catalog import/export feature supports the following DataZone resource types
 | **Assets** | Catalog assets representing data resources with metadata and forms |
 | **Data Products** | Data products that bundle one or more data assets for publishing and sharing |
 
+## Key Assumption: Physical Resources Must Have the Same Name
+
+> ⚠️ **IMPORTANT**: Catalog import/export assumes that the underlying physical resources (e.g., Glue Tables, Glue Databases, S3 buckets) referenced by your catalog assets **have the same name in both source and target environments**. The import process matches assets across environments using normalized `externalIdentifier` values or resource names. If the physical resource names differ between environments (e.g., `my-table-dev` vs `my-table-prod`), the matching will fail and resources will be created as new rather than updated. Ensure your infrastructure provisioning uses consistent resource names across stages, or that your naming conventions allow the normalization logic (which strips AWS account IDs and region strings) to produce matching identifiers.
+
 ## How It Works
 
 ### Export During Bundle
@@ -42,7 +46,7 @@ When you run the `deploy` command, the CLI:
 2. Builds an identifier mapping between source and target projects using `externalIdentifier` (with normalization) or name as fallback
 3. Creates, updates, or deletes resources in the target project in dependency order
 4. Resolves cross-references (e.g., GlossaryTerm → Glossary, Asset → AssetType)
-5. Optionally publishes assets and data products when `publish: true` is configured
+5. Publishes assets and data products that were published in the source project (unless `skipPublish: true` is configured)
 6. Reports a summary of created, updated, deleted, and failed resources
 
 ## Configuration
@@ -52,25 +56,27 @@ When you run the `deploy` command, the CLI:
 The manifest `content.catalog` section is intentionally simple — it only supports three fields:
 
 - `enabled` — boolean to turn catalog export on/off
-- `publish` — boolean to enable automatic publishing during deploy
+- `skipPublish` — boolean to skip all publishing regardless of source state (default: false)
 - `assets.access` — array for subscription requests (existing functionality)
 
 No filter options (`include`, `names`, `assetTypes`, `updatedAfter`, etc.) exist in the manifest. When enabled, ALL project-owned catalog resources are exported. To filter by date, use the `--updated-after` CLI flag on the bundle command.
 
+Publishing behavior: By default, assets and data products are published during import only if they were published (`listingStatus == "LISTED"`) in the source project. This preserves the source publish state across environments. Set `skipPublish: true` to skip all publishing.
+
 ```yaml
 content:
   catalog:
-    enabled: true    # Export ALL project-owned catalog resources
-    publish: false   # Automatically publish assets and data products during deploy (default: false)
+    enabled: true         # Export ALL project-owned catalog resources
+    # skipPublish: false  # Default: publish assets/data products that were published in source
 ```
 
-#### With automatic publishing
+#### With publishing skipped (override)
 
 ```yaml
 content:
   catalog:
     enabled: true
-    publish: true    # Publish assets and data products after import
+    skipPublish: true   # Skip all publishing regardless of source state
 ```
 
 #### With asset subscription requests (existing functionality)
@@ -79,7 +85,7 @@ content:
 content:
   catalog:
     enabled: true
-    publish: false
+    skipPublish: true
     assets:
       access:
         - selector:
@@ -143,14 +149,14 @@ The `--updated-after` flag:
 - Is optional — when omitted, all project-owned resources are exported
 - Is a CLI-only option, not a manifest field
 
-### Example: Deploy with Automatic Publishing
+### Example: Deploy with Publishing Skipped
 
 ```yaml
 # manifest.yaml
 content:
   catalog:
     enabled: true
-    publish: true   # Automatically publish assets and data products
+    skipPublish: true   # Skip all publishing regardless of source state
 ```
 
 ```bash
@@ -168,6 +174,8 @@ The import process uses `externalIdentifier` (with normalization) as the primary
 - **name**: Used as fallback when `externalIdentifier` is not present
 
 When a matching resource exists in the target project, it is updated. When no match is found, a new resource is created.
+
+> ⚠️ **IMPORTANT**: This mapping assumes that the underlying physical resources (e.g., Glue Tables, S3 buckets) have the **same name** across environments. For example, if a Glue Table is named `analytics_db.customers` in your dev environment, it must also be named `analytics_db.customers` in your test and prod environments for the asset to be correctly matched and updated rather than duplicated.
 
 ### Dependency Order
 
@@ -343,9 +351,11 @@ targets:
         disable: true
 ```
 
-### 5. Maintain Unique Resource Names
+### 5. Maintain Consistent Physical Resource Names Across Environments
 
-Ensure resource names are unique within each type to avoid mapping conflicts. The import process uses `externalIdentifier` (with normalization) or names to match resources between environments.
+> ⚠️ **IMPORTANT**: The underlying physical resources (Glue Tables, Glue Databases, S3 buckets, etc.) referenced by catalog assets **must have the same name** in all environments. The import process relies on normalized `externalIdentifier` or resource name matching. If physical resource names differ between stages, assets will not be matched correctly.
+
+Ensure resource names are unique within each type to avoid mapping conflicts.
 
 ### 6. Review Import Summaries
 
@@ -411,6 +421,82 @@ Catalog import summary:
 - Ensure catalog export is enabled (all resource types are exported automatically)
 - Check the import summary for failures
 - Verify dependency resources exist in the target project
+
+### Problem: Import fails because a dependency resource doesn't exist
+
+**Cause**: Resources are imported in dependency order (Glossaries → Glossary Terms → Form Types → Asset Types → Assets → Data Products). If a parent resource fails to import, child resources that depend on it will also fail. For example:
+- A Glossary Term references a `glossaryId` that doesn't exist in the target project
+- An Asset references a `typeIdentifier` (Asset Type) that wasn't exported or failed to import
+- A Data Product references items that don't exist in the target
+
+**Error messages** (visible in logs with `--verbose` or `SMUS_LOG_LEVEL=DEBUG`):
+```
+Failed to import glossaryTerms MyTerm: An error occurred (ValidationException) ...
+Failed to import assets MyAsset: An error occurred (ResourceNotFoundException) ...
+Failed to import dataProducts MyProduct: An error occurred (ValidationException) ...
+```
+
+**Solution**:
+- Ensure all resource types are exported — catalog export captures all types automatically when `content.catalog.enabled: true`
+- Verify the source project actually owns the dependency resources (only project-owned resources are exported)
+- Check the import summary for failures in parent resource types (e.g., if Glossaries show failures, Glossary Terms will likely fail too)
+- Re-run the full `bundle` + `deploy` cycle to ensure a consistent export
+
+### Problem: Export returns empty results for a resource type
+
+**Cause**: The DataZone Search or SearchTypes API could not find resources of that type in the source project. Common reasons:
+- The resources are not owned by the project (they may be shared from another project)
+- The resources were deleted after the last successful export
+- The `--updated-after` timestamp is more recent than the resource's last update
+
+**Error messages** (visible in logs):
+```
+No catalog resources found for project <project_id> in domain <domain_id>
+Failed to search target glossaries: An error occurred (AccessDeniedException) ...
+Failed to search target assets: An error occurred (ResourceNotFoundException) ...
+```
+
+**Solution**:
+- Verify resources exist in the DataZone console and are owned by the source project
+- Remove the `--updated-after` flag to export all resources regardless of update time
+- Check IAM permissions for `datazone:Search` and `datazone:SearchTypes`
+
+### Problem: Partial import success (some resources created, others failed)
+
+**Cause**: The import process is designed to be resilient — it continues importing remaining resources even when individual resources fail. The deploy summary will show a mix of created/updated and failed counts:
+```
+✅ Catalog import completed:
+   Created: 8
+   Updated: 2
+   Deleted: 0
+   Failed: 3
+   Published: 7
+```
+
+A `Failed` count greater than zero indicates some resources could not be imported. The import only returns a hard failure (`❌ All catalog imports failed`) when every single resource fails.
+
+**Common causes of partial failures**:
+- A dependency resource (Glossary, Asset Type) failed, causing its children (Glossary Terms, Assets) to also fail
+- A resource name conflicts with an existing resource owned by a different project
+- Transient API throttling or service errors for specific resources
+- The target project lacks permissions for certain resource types
+
+**How to debug**:
+1. Re-run the deploy with verbose logging enabled:
+   ```bash
+   SMUS_LOG_LEVEL=DEBUG smus-cicd deploy --target <target-name>
+   ```
+2. Look for `Failed to import <resourceType> <name>:` lines in the output — these show the exact API error for each failed resource
+3. Check if failures cascade from a parent type:
+   - If `glossaries` has failures → expect `glossaryTerms` failures too
+   - If `formTypes` or `assetTypes` have failures → expect `assets` failures
+   - If `assets` have failures → expect `dataProducts` failures (if they reference those assets)
+4. Verify the failed resources exist in the source project by checking the `catalog_export.json` in the bundle:
+   ```bash
+   unzip -p <bundle>.zip catalog/catalog_export.json | python -m json.tool | grep -A5 '"name"'
+   ```
+5. Check the target project in the DataZone console to see if conflicting resources exist under a different owner
+6. If failures are transient (throttling), re-run the deploy — the import is idempotent and will skip already-created resources
 
 ### Problem: Permission denied during export or import
 

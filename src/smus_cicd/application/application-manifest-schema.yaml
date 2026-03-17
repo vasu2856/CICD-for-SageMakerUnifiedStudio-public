@@ -56,57 +56,70 @@ properties:
           additionalProperties: false
       catalog:
         type: object
-        description: "Catalog assets configuration for DataZone access"
+        description: "Catalog configuration for DataZone export and access. Only supports enabled, skipPublish, and assets.access — no filter options."
         properties:
+          enabled:
+            type: boolean
+            description: "Enable or disable catalog resource export. When true, ALL project-owned catalog resources are exported during bundle."
+            default: false
+          skipPublish:
+            type: boolean
+            description: "Skip publishing assets and data products during deployment. When false (default), resources are published only if they were published in the source project."
+            default: false
           connectionName:
             type: string
             description: "Connection name for catalog access"
             examples:
               - "default.domain"
           assets:
-            type: array
-            description: "List of catalog assets to request access to"
-            items:
-              type: object
-              required:
-                - selector
-              properties:
-                selector:
+            type: object
+            description: "Asset configuration for subscription/access requests only"
+            properties:
+              access:
+                type: array
+                description: "List of catalog assets to request access to"
+                items:
                   type: object
-                  description: "Asset selector configuration"
+                  required:
+                    - selector
                   properties:
-                    assetId:
-                      type: string
-                      description: "Direct asset ID"
-                    search:
+                    selector:
                       type: object
-                      description: "Search configuration for finding assets"
+                      description: "Asset selector configuration"
                       properties:
-                        assetType:
+                        assetId:
                           type: string
-                          description: "Type of asset to search for"
-                          examples:
-                            - "GlueTable"
-                        identifier:
-                          type: string
-                          description: "Asset identifier (e.g., database.table)"
-                          examples:
-                            - "covid19_db.countries_aggregated"
+                          description: "Direct asset ID"
+                        search:
+                          type: object
+                          description: "Search configuration for finding assets"
+                          properties:
+                            assetType:
+                              type: string
+                              description: "Type of asset to search for"
+                              examples:
+                                - "GlueTable"
+                            identifier:
+                              type: string
+                              description: "Asset identifier (e.g., database.table)"
+                              examples:
+                                - "covid19_db.countries_aggregated"
+                          additionalProperties: false
                       additionalProperties: false
+                    permission:
+                      type: string
+                      description: "Permission level requested"
+                      enum:
+                        - "READ"
+                        - "WRITE"
+                      default: "READ"
+                    requestReason:
+                      type: string
+                      description: "Reason for requesting access"
+                      examples:
+                        - "Required access for application deployment"
                   additionalProperties: false
-                permission:
-                  type: string
-                  description: "Permission level requested"
-                  enum:
-                    - "READ"
-                    - "WRITE"
-                  default: "READ"
-                requestReason:
-                  type: string
-                  description: "Reason for requesting access"
-                  examples:
-                    - "Required access for application deployment"
-              additionalProperties: false
+            additionalProperties: false
         additionalProperties: false
       quicksight:
         type: array

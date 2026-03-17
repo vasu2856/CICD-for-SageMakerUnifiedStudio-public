@@ -2,7 +2,7 @@
 
 ## Overview
 
-This design adds catalog resource export/import capabilities to the SMUS CI/CD `bundle` and `deploy` commands. During bundling, a new `CatalogExporter` component queries the DataZone Search and SearchTypes APIs to retrieve Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products that are owned by the source project, serializing them into `catalog/catalog_export.json` within the bundle ZIP. The manifest configuration is intentionally simple: only `enabled` (boolean), `publish` (boolean), and `assets.access` (array) — no filter options of any kind exist in the manifest. An optional `--updated-after` CLI flag on the bundle command allows filtering ALL resource types uniformly by modification timestamp. During deployment, a new `CatalogImporter` component reads the exported JSON, builds an identifier mapping between source and target projects using externalIdentifier (with normalization) or name as fallback, creates or updates resources in dependency order via DataZone create/update APIs, and optionally publishes assets and data products when configured.
+This design adds catalog resource export/import capabilities to the SMUS CI/CD `bundle` and `deploy` commands. During bundling, a new `CatalogExporter` component queries the DataZone Search and SearchTypes APIs to retrieve Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products that are owned by the source project, serializing them into `catalog/catalog_export.json` within the bundle ZIP. The export captures each asset's and data product's `listingStatus` to preserve the source publish state. The manifest configuration is intentionally simple: only `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array) — no filter options of any kind exist in the manifest. An optional `--updated-after` CLI flag on the bundle command allows filtering ALL resource types uniformly by modification timestamp. During deployment, a new `CatalogImporter` component reads the exported JSON, builds an identifier mapping between source and target projects using externalIdentifier (with normalization) or name as fallback, creates or updates resources in dependency order via DataZone create/update APIs, and publishes assets and data products that were published (listingStatus == "LISTED") in the source project unless `skipPublish` is set to true.
 
 The design follows existing patterns in the codebase: helpers live in `src/smus_cicd/helpers/`, manifest configuration extends the existing schema, and the deploy command orchestrates import after storage and QuickSight deployments.
 
@@ -36,16 +36,18 @@ flowchart TD
 
 ### 1. Manifest Schema Extension
 
-Extend `content.catalog` in `application-manifest-schema.yaml` with a simple `enabled` boolean, optional `publish` boolean, and preserve the existing `assets.access` array for subscription requests. The manifest contains NO filter options — no `include`, `names`, `assetTypes`, `updatedAfter`, or any other filter fields. The `--updated-after` timestamp is purely a CLI flag on the bundle command, not a manifest field.
+Extend `content.catalog` in `application-manifest-schema.yaml` with a simple `enabled` boolean, optional `skipPublish` boolean, and preserve the existing `assets.access` array for subscription requests. The manifest contains NO filter options — no `include`, `names`, `assetTypes`, `updatedAfter`, or any other filter fields. The `--updated-after` timestamp is purely a CLI flag on the bundle command, not a manifest field.
+
+Publishing behavior: By default, assets and data products are published during import only if they were published (`listingStatus == "LISTED"`) in the source project. This preserves the source publish state across environments. Set `skipPublish: true` to skip all publishing regardless of source state.
 
 ```yaml
 content:
   catalog:
     # ONLY these fields are supported — no filter options whatsoever
-    enabled: true   # Export ALL project-owned catalog resources when true
-    publish: false  # Automatically publish assets and data products during deploy (default: false)
+    enabled: true        # Export ALL project-owned catalog resources when true
+    skipPublish: false   # When true, skip all publishing regardless of source state (default: false)
     assets:
-      access:       # Existing subscription request functionality (unchanged)
+      access:            # Existing subscription request functionality (unchanged)
         - selector:
             search:
               assetType: GlueTable
@@ -69,8 +71,8 @@ class CatalogAssetsConfig:
 
 @dataclass
 class CatalogConfig:
-    enabled: bool = False   # Simple boolean to enable/disable catalog export
-    publish: bool = False   # Automatically publish assets and data products during deploy
+    enabled: bool = False        # Simple boolean to enable/disable catalog export
+    skipPublish: bool = False    # When true, skip all publishing regardless of source state
     connectionName: Optional[str] = None
     assets: Optional[CatalogAssetsConfig] = None  # For asset subscription requests only
     # NOTE: No filter fields (include, names, assetTypes, updatedAfter, etc.)
@@ -143,17 +145,21 @@ def import_catalog(
     project_id: str,
     catalog_data: Dict[str, Any],
     region: str,
-    publish: bool = False,
+    skip_publish: bool = False,
 ) -> Dict[str, int]:
     """
     Import catalog resources into a target DataZone project.
+
+    Publishing behavior: By default, assets and data products are published only
+    if they were published (listingStatus == "LISTED") in the source project.
+    Set skip_publish=True to skip all publishing regardless of source state.
 
     Args:
         domain_id: DataZone domain identifier
         project_id: DataZone project identifier
         catalog_data: Exported catalog JSON data
         region: AWS region
-        publish: Whether to automatically publish assets and data products after import
+        skip_publish: When True, skip all publishing regardless of source state
 
     Returns {"created": N, "updated": N, "deleted": N, "failed": N, "published": N}.
     Logs errors per resource but continues processing.
@@ -170,7 +176,7 @@ Internal helpers:
 | `_import_resource(client, domain_id, project_id, resource, resource_type, id_map)` | Call create or update API; handle ConflictException for idempotency |
 | `_delete_resource(client, domain_id, project_id, resource_id, resource_type)` | Call delete API for resources missing from bundle |
 | `_identify_resources_to_delete(client, domain_id, project_id, catalog_data)` | Query target project to find resources not present in bundle |
-| `_publish_resource(client, domain_id, resource_id, resource_type)` | Call publish API for assets and data products when publish flag is enabled |
+| `_publish_resource(client, domain_id, resource_id, resource_type)` | Call publish API for assets and data products that were published in the source (listingStatus == "LISTED"), unless skipPublish is set |
 | `_validate_catalog_json(catalog_data)` | Validate required top-level keys and metadata fields |
 
 ### 4. Bundle Command Integration
@@ -230,8 +236,8 @@ New function `_import_catalog_from_bundle`:
 2. If not present, skip silently (backward compatible)
 3. Check `deployment_configuration.catalog.disable` — skip if true
 4. Validate JSON structure
-5. Get `publish` flag from `manifest.content.catalog.publish` (default: false)
-6. Call `import_catalog()` with publish flag
+5. Get `skipPublish` flag from `manifest.content.catalog.skipPublish` (default: false)
+6. Call `import_catalog()` with skip_publish flag
 7. Report summary counts (created/updated/deleted/failed/published)
 8. If all fail, return False
 
@@ -400,12 +406,12 @@ For any import operation where `K` out of `N` resources fail during create/updat
 ### Property 14: Import Summary Counts
 **Validates: Requirement 5.12, 6.3**
 
-For all import operations, the `CatalogImporter` SHALL return counts `{created, updated, deleted, failed, published}` where `created + updated + deleted + failed` equals the total number of resources processed (resources in bundle + resources in target not in bundle), and `published` equals the number of assets and data products successfully published when the publish flag is enabled.
+For all import operations, the `CatalogImporter` SHALL return counts `{created, updated, deleted, failed, published}` where `created + updated + deleted + failed` equals the total number of resources processed (resources in bundle + resources in target not in bundle), and `published` equals the number of assets and data products that were published in the source (listingStatus == "LISTED") and successfully published in the target when skipPublish is false.
 
-### Property 15: Automatic Publishing When Enabled
+### Property 15: Source-State-Based Publishing with skipPublish Override
 **Validates: Requirement 5.13**
 
-For all import operations where `manifest.content.catalog.publish` is true, and for all assets `A` and data products `D` that are successfully created or updated, the `CatalogImporter` SHALL invoke the corresponding publish API for each resource.
+For all import operations where `skipPublish` is false (default), the `CatalogImporter` SHALL publish only those assets `A` and data products `D` that had `listingStatus == "LISTED"` in the source project. When `skipPublish` is true, no publish API calls SHALL be made regardless of source state.
 
 ### Property 16: Export Error Propagation
 **Validates: Requirement 7.1**
@@ -455,7 +461,8 @@ Located in `tests/unit/helpers/`:
   - Verify cross-reference resolution
   - Verify dependency-ordered creation
   - Verify dependency-ordered deletion (reverse order)
-  - Verify automatic publishing when publish flag is enabled
+  - Verify source-state-based publishing (only LISTED resources published)
+  - Verify skipPublish override skips all publishing
   - Verify error resilience (partial failures including publish failures)
   - Verify ConflictException handling
   - Verify validation of malformed JSON
@@ -476,7 +483,7 @@ Located in `tests/unit/helpers/test_catalog_properties.py`:
 - Test dependency ordering invariant for creation (Property 11)
 - Test dependency ordering invariant for deletion (Property 12)
 - Test summary count arithmetic including deletions and publishes (Property 14)
-- Test automatic publishing when enabled (Property 15)
+- Test source-state-based publishing and skipPublish override (Property 15)
 - Test JSON validation rejects all malformed inputs (Property 17)
 
 ### Integration Tests
@@ -493,7 +500,8 @@ Located in `tests/integration/catalog-import-export/`:
   - Verify resources are created/updated using externalIdentifier mapping
   - Verify resources are deleted when missing from bundle
   - Verify deletion happens in reverse dependency order
-  - Verify automatic publishing when publish flag is enabled
+  - Verify source-state-based publishing (only LISTED resources published)
+  - Verify skipPublish override skips all publishing
   - Verify published assets and data products are accessible
   
 - `test_catalog_round_trip.py` — Export from source, import to target, verify resources exist

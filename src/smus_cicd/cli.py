@@ -158,6 +158,11 @@ def bundle(
         "--local",
         help="Bundle from local filesystem instead of dev target",
     ),
+    updated_after: str = typer.Option(
+        None,
+        "--updated-after",
+        help="ISO 8601 timestamp to filter ALL catalog resources uniformly by updatedAt (e.g., 2024-01-01T00:00:00Z). This is a CLI-only option, not a manifest field.",
+    ),
     target_positional: str = typer.Argument(
         None, help="Target name (positional argument for backward compatibility)"
     ),
@@ -169,6 +174,26 @@ def bundle(
     """Create bundle zip files. By default bundles FROM dev target for deployment to specified target."""
     configure_logging(output, LOG_LEVEL)
 
+    # Validate --updated-after timestamp format if provided
+    if updated_after is not None:
+        from datetime import datetime
+
+        try:
+            # Try parsing ISO 8601 formats
+            ts = updated_after.rstrip("Z")
+            if "+" in ts or (ts.count("-") > 2):
+                # Has timezone offset
+                datetime.fromisoformat(updated_after.replace("Z", "+00:00"))
+            else:
+                datetime.fromisoformat(ts)
+        except (ValueError, TypeError):
+            console.print(
+                f"Error: Invalid --updated-after timestamp format: '{updated_after}'. "
+                "Expected ISO 8601 format (e.g., 2024-01-01T00:00:00Z).",
+                style="red",
+            )
+            raise typer.Exit(1)
+
     # Determine bundle source
     if local:
         bundle_source = final_targets or "default"
@@ -178,7 +203,7 @@ def bundle(
         console.print(f"🔍 Bundle source: {bundle_source} target")
         console.print(f"📦 Bundle destination: {final_targets or 'default'}")
 
-    bundle_command(bundle_source, manifest_file, output_dir, output)
+    bundle_command(bundle_source, manifest_file, output_dir, output, updated_after=updated_after)
 
 
 @app.command(

@@ -9,11 +9,11 @@ Add to your `manifest.yaml`:
 ```yaml
 content:
   catalog:
-    enabled: true    # Export ALL project-owned catalog resources
-    publish: false   # Optional: auto-publish assets and data products during deploy
+    enabled: true         # Export ALL project-owned catalog resources
+    # skipPublish: false  # Default: publish assets/data products that were published in source
 ```
 
-That's it — no filter options in the manifest. When enabled, all project-owned resources are exported.
+That's it — no filter options in the manifest. When enabled, all project-owned resources are exported. Assets and data products are published during import only if they were published in the source project.
 
 ### 2. Bundle and Deploy
 
@@ -24,6 +24,8 @@ smus-cli bundle --manifest manifest.yaml
 # Deploy to target
 smus-cli deploy --bundle bundle.zip --targets test
 ```
+
+> ⚠️ **IMPORTANT**: Catalog import/export assumes that physical resources (e.g., Glue Tables, S3 buckets) have the **same name** across all environments. If resource names differ between stages, asset matching will fail and resources will be duplicated instead of updated.
 
 ## Supported Resources
 
@@ -43,7 +45,7 @@ The `content.catalog` section only supports these fields:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `enabled` | boolean | `false` | Enable/disable catalog export |
-| `publish` | boolean | `false` | Auto-publish assets and data products during deploy |
+| `skipPublish` | boolean | `false` | When true, skip all publishing regardless of source state |
 | `assets.access` | array | — | Subscription requests (existing functionality) |
 
 No filter options (`include`, `names`, `assetTypes`, `updatedAfter`) exist in the manifest.
@@ -56,13 +58,13 @@ content:
     enabled: true
 ```
 
-### Enable export with auto-publishing
+### Enable export with publishing skipped
 
 ```yaml
 content:
   catalog:
     enabled: true
-    publish: true
+    skipPublish: true
 ```
 
 ### With subscription requests
@@ -188,7 +190,7 @@ smus-cli deploy --bundle bundle.zip --targets dev,test,prod
 
 1. ✅ Test in dev/test before prod
 2. ✅ Use `--updated-after` CLI flag for incremental exports of large catalogs
-3. ✅ Maintain unique resource names
+3. ✅ Ensure physical resources (Glue Tables, etc.) have the **same name** across environments
 4. ✅ Review import summaries
 5. ✅ Version control your manifest
 6. ✅ Disable import when not needed

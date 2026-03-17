@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This feature adds support for importing and exporting DataZone catalog assets (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products) as part of the SMUS CI/CD `bundle` and `deploy` commands. During bundling, the CLI exports all catalog resources from a source project using the DataZone Search and SearchTypes APIs and serializes them to JSON. An optional `--updated-after` CLI flag on the bundle command allows filtering resources by modification timestamp. The manifest configuration is intentionally simple: a boolean `enabled` flag to turn catalog export on/off, and an optional `publish` flag for automatic publishing during deployment. No filter options (include lists, name filters, asset type filters, or date filters) exist in the manifest. During deployment, the CLI reads the exported JSON, maps source identifiers to target project identifiers using externalIdentifier (when present) or name as fallback, and creates or updates the resources in the target project via DataZone create/update APIs.
+This feature adds support for importing and exporting DataZone catalog assets (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products) as part of the SMUS CI/CD `bundle` and `deploy` commands. During bundling, the CLI exports all catalog resources from a source project using the DataZone Search and SearchTypes APIs and serializes them to JSON, including each asset's and data product's `listingStatus` to preserve the source publish state. An optional `--updated-after` CLI flag on the bundle command allows filtering resources by modification timestamp. The manifest configuration is intentionally simple: a boolean `enabled` flag to turn catalog export on/off, and an optional `skipPublish` flag to override the default source-state-based publishing behavior. No filter options (include lists, name filters, asset type filters, or date filters) exist in the manifest. During deployment, the CLI reads the exported JSON, maps source identifiers to target project identifiers using externalIdentifier (when present) or name as fallback, creates or updates the resources in the target project via DataZone create/update APIs, and publishes assets and data products that were published in the source project unless `skipPublish` is set to true.
 
 ## Glossary
 
@@ -40,9 +40,9 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 1. THE Manifest SHALL support a `content.catalog.enabled` boolean field to enable or disable catalog export (default: false)
 2. WHEN `content.catalog.enabled` is set to true, THE Bundle_Command SHALL export ALL catalog resource types owned by the source project (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products)
 3. WHEN `content.catalog.enabled` is set to false or omitted, THE Bundle_Command SHALL NOT export any catalog resources
-4. THE Manifest SHALL support an optional `content.catalog.publish` boolean field to enable automatic publishing of assets and data products during deployment (default: false)
+4. THE Manifest SHALL support an optional `content.catalog.skipPublish` boolean field to override the default source-state-based publishing behavior (default: false). When false, assets and data products are published only if they were published (listingStatus == "LISTED") in the source project. When true, all publishing is skipped regardless of source state.
 5. THE Manifest SHALL NOT contain any filter options for catalog resources (no `include`, `names`, `assetTypes`, `updatedAfter`, or any other filter fields within the `content.catalog` section or its subsections)
-6. THE Manifest `content.catalog` section SHALL only support the following fields: `enabled` (boolean), `publish` (boolean), and `assets.access` (array for subscription requests)
+6. THE Manifest `content.catalog` section SHALL only support the following fields: `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array for subscription requests)
 7. THE Catalog_Exporter SHALL export the `inputForms` field as part of asset serialization
 8. THE Catalog_Exporter SHALL export the `termRelations` field as part of glossary term serialization
 
@@ -110,7 +110,7 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 10. IF a DataZone API call fails during import, THEN THE Catalog_Importer SHALL log the error, continue processing remaining resources, and report a summary of failures at the end
 11. THE Catalog_Importer SHALL produce a Catalog_Import_JSON file with the remapped identifiers before making API calls, for auditability
 12. THE Catalog_Importer SHALL report counts of created, updated, deleted, and failed resources in the import summary
-13. WHEN `content.catalog.publish` is set to true in the manifest, THE Catalog_Importer SHALL automatically publish all imported assets and data products after creation or update
+13. WHEN `content.catalog.skipPublish` is false (default) in the manifest, THE Catalog_Importer SHALL automatically publish imported assets and data products only if they were published (listingStatus == "LISTED") in the source project. WHEN `content.catalog.skipPublish` is true, THE Catalog_Importer SHALL skip all publishing regardless of source state.
 14. WHEN publishing assets or data products, IF the publish API call fails, THEN THE Catalog_Importer SHALL log the error and continue processing remaining resources
 
 ### Requirement 6: Deploy Command Integration

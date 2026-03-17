@@ -116,7 +116,7 @@ smus-cli test --manifest manifest.yaml --targets test
 **💾 Data & Storage**
 - S3 data files
 - Git repositories
-- Data catalogs (future)
+- DataZone catalog resources (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, Data Products, Metadata Forms)
 
 ---
 
@@ -1124,6 +1124,8 @@ genai_dev_workflow:
 - **[Connections Guide](docs/connections.md)** - Configure AWS service integrations
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - CI/CD automation setup
 - **[Deployment Metrics](docs/pipeline-deployment-metrics.md)** - Monitoring with EventBridge
+- **[Catalog Import/Export Guide](docs/catalog-import-export-guide.md)** - Promote DataZone catalog resources across environments
+- **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - Quick reference for catalog deployment
 
 ### Reference
 - **[Manifest Schema](docs/manifest-schema.md)** - YAML schema validation and structure

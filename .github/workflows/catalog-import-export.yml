@@ -1,0 +1,43 @@
+name: Deploy Catalog Import Export
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'examples/catalog-import-export/**'
+      - 'src/**'
+      - '.github/workflows/smus-bundle-deploy.yml'
+      - '.github/workflows/catalog-import-export.yml'
+  workflow_dispatch:
+
+# To filter exported catalog resources by modification date, use the --updated-after
+# CLI flag on the bundle command. This is the ONLY way to filter resources — no filter
+# options exist in the manifest. Example:
+#
+#   smus-cli bundle --manifest examples/catalog-import-export/manifest.yaml \
+#       --updated-after 2024-06-01T00:00:00Z
+#
+# The --updated-after flag accepts an ISO 8601 timestamp and filters ALL resource
+# types uniformly by their updatedAt timestamp.
+
+concurrency:
+  group: catalog-import-export-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/smus-bundle-deploy.yml
+    secrets:
+      AWS_ROLE_ARN_DEV: ${{ secrets.AWS_ROLE_ARN_DEV }}
+      AWS_ROLE_ARN_TEST: ${{ secrets.AWS_ROLE_ARN_TEST }}
+      AWS_ROLE_ARN_PROD: ${{ secrets.AWS_ROLE_ARN_PROD }}
+    with:
+      manifest_path: 'examples/catalog-import-export/manifest.yaml'
+      test_target: 'test'
+      prod_target: 'prod'
+      deploy_to_prod: ${{ github.ref == 'refs/heads/main' }}
