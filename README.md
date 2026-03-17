@@ -1,5 +1,4 @@
 # SMUS CI/CD Pipeline CLI
-<!-- Translation workflow test -->
 
 [![en](https://img.shields.io/badge/lang-en-brightgreen.svg?style=for-the-badge)](README.md)
 [![pt](https://img.shields.io/badge/lang-pt-gray.svg)](docs/langs/pt/README.md)
