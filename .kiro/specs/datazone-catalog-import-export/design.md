@@ -2,7 +2,7 @@
 
 ## Overview
 
-This design adds catalog resource export/import capabilities to the SMUS CI/CD `bundle` and `deploy` commands. During bundling, a new `CatalogExporter` component queries the DataZone Search and SearchTypes APIs to retrieve Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products that are owned by the source project, serializing them into `catalog/catalog_export.json` within the bundle ZIP. An optional `--updated-after` CLI flag allows filtering resources by modification timestamp. During deployment, a new `CatalogImporter` component reads the exported JSON, builds an identifier mapping between source and target projects using externalIdentifier (with normalization) or name as fallback, creates or updates resources in dependency order via DataZone create/update APIs, and optionally publishes assets and data products when configured.
+This design adds catalog resource export/import capabilities to the SMUS CI/CD `bundle` and `deploy` commands. During bundling, a new `CatalogExporter` component queries the DataZone Search and SearchTypes APIs to retrieve Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products that are owned by the source project, serializing them into `catalog/catalog_export.json` within the bundle ZIP. The manifest configuration is intentionally simple: only `enabled` (boolean), `publish` (boolean), and `assets.access` (array) — no filter options of any kind exist in the manifest. An optional `--updated-after` CLI flag on the bundle command allows filtering ALL resource types uniformly by modification timestamp. During deployment, a new `CatalogImporter` component reads the exported JSON, builds an identifier mapping between source and target projects using externalIdentifier (with normalization) or name as fallback, creates or updates resources in dependency order via DataZone create/update APIs, and optionally publishes assets and data products when configured.
 
 The design follows existing patterns in the codebase: helpers live in `src/smus_cicd/helpers/`, manifest configuration extends the existing schema, and the deploy command orchestrates import after storage and QuickSight deployments.
 
@@ -11,7 +11,8 @@ The design follows existing patterns in the codebase: helpers live in `src/smus_
 ```mermaid
 flowchart TD
     subgraph Bundle["bundle command"]
-        M[manifest.yaml<br/>content.catalog.enabled: true] --> CE[CatalogExporter]
+        M[manifest.yaml<br/>content.catalog.enabled: true<br/>NO filter options in manifest] --> CE[CatalogExporter]
+        CLI["--updated-after CLI flag<br/>(optional, filters ALL types uniformly)"] --> CE
         CE -->|Search API<br/>ALL resources| DZ1[(DataZone<br/>Source Project)]
         CE -->|SearchTypes API<br/>ALL resources| DZ1
         CE --> JSON[catalog/catalog_export.json<br/>ALL catalog resources]
@@ -35,11 +36,12 @@ flowchart TD
 
 ### 1. Manifest Schema Extension
 
-Extend `content.catalog` in `application-manifest-schema.yaml` with a simple `enabled` boolean, optional `publish` boolean, and preserve the existing `assets.access` array for subscription requests:
+Extend `content.catalog` in `application-manifest-schema.yaml` with a simple `enabled` boolean, optional `publish` boolean, and preserve the existing `assets.access` array for subscription requests. The manifest contains NO filter options — no `include`, `names`, `assetTypes`, `updatedAfter`, or any other filter fields. The `--updated-after` timestamp is purely a CLI flag on the bundle command, not a manifest field.
 
 ```yaml
 content:
   catalog:
+    # ONLY these fields are supported — no filter options whatsoever
     enabled: true   # Export ALL project-owned catalog resources when true
     publish: false  # Automatically publish assets and data products during deploy (default: false)
     assets:
@@ -52,7 +54,7 @@ content:
           requestReason: Required for analytics pipeline
 ```
 
-Extend `CatalogConfig` dataclass:
+Extend `CatalogConfig` dataclass (no filter-related fields):
 
 ```python
 @dataclass
@@ -71,6 +73,8 @@ class CatalogConfig:
     publish: bool = False   # Automatically publish assets and data products during deploy
     connectionName: Optional[str] = None
     assets: Optional[CatalogAssetsConfig] = None  # For asset subscription requests only
+    # NOTE: No filter fields (include, names, assetTypes, updatedAfter, etc.)
+    # The --updated-after filter is a CLI-only option on the bundle command
 ```
 
 ### 2. CatalogExporter (`src/smus_cicd/helpers/catalog_export.py`)
@@ -89,13 +93,15 @@ def export_catalog(
         domain_id: DataZone domain identifier
         project_id: DataZone project identifier
         region: AWS region
-        updated_after: Optional ISO 8601 timestamp to filter resources by updatedAt
+        updated_after: Optional ISO 8601 timestamp from --updated-after CLI flag
+                       (NOT from manifest). Filters ALL resource types uniformly by updatedAt.
 
     Returns a dict matching the catalog_export.json schema.
     Raises on API errors during search.
     
     Exports all resource types owned by the project: Glossaries, GlossaryTerms, 
-    FormTypes, AssetTypes, Assets, and Data Products.
+    FormTypes, AssetTypes, Assets, and Data Products. No manifest-based filters
+    are applied — the only optional filter is the CLI --updated-after timestamp.
     """
 ```
 
@@ -103,8 +109,8 @@ Internal helpers:
 
 | Function | Purpose |
 |---|---|
-| `_search_resources(client, domain_id, project_id, search_scope, updated_after)` | Paginated Search API call for Assets, GlossaryTerms, Glossaries with owningProjectIdentifier filter and optional updatedAfter filter |
-| `_search_type_resources(client, domain_id, project_id, type_filter, updated_after)` | Paginated SearchTypes API call for FormTypes, AssetTypes with owningProjectIdentifier filter and optional updatedAfter filter |
+| `_search_resources(client, domain_id, project_id, search_scope, updated_after)` | Paginated Search API call for Assets, GlossaryTerms, Glossaries with owningProjectIdentifier filter and optional updatedAfter filter (from CLI flag only) |
+| `_search_type_resources(client, domain_id, project_id, type_filter, updated_after)` | Paginated SearchTypes API call for FormTypes, AssetTypes with owningProjectIdentifier filter and optional updatedAfter filter (from CLI flag only) |
 | `_serialize_resource(resource, resource_type)` | Extract user-configurable fields, preserve `name`, `externalIdentifier`, and source identifier |
 | `_normalize_external_identifier(external_id)` | Remove AWS account ID and region information from externalIdentifier |
 
@@ -123,7 +129,7 @@ All queries use:
 - `owningProjectIdentifier=project_id` (CRITICAL: only export project-owned resources)
 - `sort=[{"attribute": "updatedAt", "order": "DESCENDING"}]`
 - `nextToken` pagination until exhausted
-- Optional `filters.updatedAt >= updated_after` when `updated_after` is provided
+- Optional `filters.updatedAt >= updated_after` when `updated_after` is provided via CLI `--updated-after` flag (applied uniformly to ALL resource types)
 
 Export additional fields:
 - Assets: Include `inputForms` field in serialization
@@ -176,15 +182,16 @@ In `bundle.py`, after QuickSight export and before ZIP creation:
 if manifest.content and manifest.content.catalog and manifest.content.catalog.enabled:
     from ..helpers.catalog_export import export_catalog
     
-    # Get optional --updated-after CLI flag
+    # Get optional --updated-after from CLI args only (NOT from manifest)
     updated_after = args.updated_after if hasattr(args, 'updated_after') else None
     
     # Export ALL project-owned catalog resources when enabled
+    # No manifest-based filters — the only filter is the optional CLI --updated-after flag
     catalog_data = export_catalog(
         domain_id, 
         project_id,
         region,
-        updated_after=updated_after,
+        updated_after=updated_after,  # CLI-only, applies uniformly to ALL resource types
     )
     
     # Write catalog/catalog_export.json to temp_bundle_dir
@@ -195,14 +202,14 @@ if manifest.content and manifest.content.catalog and manifest.content.catalog.en
     total_files_added += 1
 ```
 
-CLI argument addition:
+CLI argument addition (this is the ONLY way to filter resources — not via manifest):
 
 ```python
 # In bundle command argument parser
 parser.add_argument(
     '--updated-after',
     type=str,
-    help='ISO 8601 timestamp to filter catalog resources by updatedAt (e.g., 2024-01-01T00:00:00Z)',
+    help='ISO 8601 timestamp to filter ALL catalog resources uniformly by updatedAt (e.g., 2024-01-01T00:00:00Z). This is a CLI-only option, not a manifest field.',
     required=False
 )
 ```
@@ -328,17 +335,12 @@ For all manifest configurations `M` where `M.content.catalog.enabled` is true, t
 ### Property 2: Export All Project-Owned Resources
 **Validates: Requirement 2.1, 2.2, 2.3**
 
-When catalog export is enabled, the `CatalogExporter` SHALL query ALL resource types from the source project using `owningProjectIdentifier=project_id` filter, ensuring ONLY resources owned by the source project are exported. The resulting JSON SHALL contain all project-owned resources without filtering by resource type or name.
+When catalog export is enabled, the `CatalogExporter` SHALL query ALL resource types from the source project using `owningProjectIdentifier=project_id` filter, ensuring ONLY resources owned by the source project are exported. The resulting JSON SHALL contain all project-owned resources without any manifest-based filtering by resource type, name, or any other criteria. The only optional filter is the `--updated-after` CLI flag.
 
-### Property 3: Updated-After Filter Correctness
+### Property 3: Updated-After CLI Filter Correctness
 **Validates: Requirement 2.12**
 
-For all ISO 8601 timestamps `T` provided via the `--updated-after` CLI flag, and for all resources `R` in the resulting `catalog_export.json`, the `updatedAt` attribute of `R` in the source system SHALL be greater than or equal to `T`. When `--updated-after` is not provided, all project-owned resources SHALL be exported regardless of their `updatedAt` timestamp.
-
-### Property 3: Updated-After Filter Correctness
-**Validates: Requirement 2.12**
-
-For all ISO 8601 timestamps `T` provided via the `--updated-after` CLI flag, and for all resources `R` in the resulting `catalog_export.json`, the `updatedAt` attribute of `R` in the source system SHALL be greater than or equal to `T`. When `--updated-after` is not provided, all project-owned resources SHALL be exported regardless of their `updatedAt` timestamp.
+For all ISO 8601 timestamps `T` provided via the `--updated-after` CLI flag (not from manifest), and for all resources `R` in the resulting `catalog_export.json`, the `updatedAt` attribute of `R` in the source system SHALL be greater than or equal to `T`. When `--updated-after` is not provided, all project-owned resources SHALL be exported regardless of their `updatedAt` timestamp. This filter is applied uniformly to ALL resource types.
 
 ### Property 4: API Routing by Resource Type
 **Validates: Requirements 2.1, 2.2, 2.6, 2.7**
@@ -441,7 +443,7 @@ Located in `tests/unit/helpers/`:
   - Verify API routing per resource type
   - Verify owningProjectIdentifier filter is applied to all queries
   - Verify pagination handling
-  - Verify --updated-after filter construction and application
+  - Verify --updated-after CLI flag filter construction and application (CLI-only, not manifest)
   - Verify JSON structure output with all resource types
   - Verify error propagation on API failure
   - Verify externalIdentifier and inputForms/termRelations are exported
@@ -482,7 +484,7 @@ Located in `tests/integration/catalog-import-export/`:
 
 - `test_catalog_export.py` — End-to-end export from a real DataZone project
   - Verify all resource types owned by project are exported when enabled
-  - Verify --updated-after CLI flag filters resources correctly
+  - Verify --updated-after CLI flag filters ALL resource types uniformly
   - Verify externalIdentifier is exported for assets
   - Verify inputForms and termRelations are exported
   

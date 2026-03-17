@@ -2,7 +2,7 @@
 
 ## Overview
 
-The SMUS CI/CD CLI provides catalog import/export capabilities that allow you to promote DataZone catalog resources (Glossaries, GlossaryTerms, FormTypes, AssetTypes, and Assets) across different stages (dev, test, prod) as part of your deployment pipeline.
+The SMUS CI/CD CLI provides catalog import/export capabilities that allow you to promote DataZone catalog resources (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products) across different stages (dev, test, prod) as part of your deployment pipeline.
 
 This feature enables you to:
 - Version control your catalog definitions alongside your application code
@@ -22,173 +22,72 @@ The catalog import/export feature supports the following DataZone resource types
 | **AssetTypes** | Asset type definitions that specify structure and metadata for categories of assets |
 | **Assets** | Catalog assets representing data resources with metadata and forms |
 | **Data Products** | Data products that bundle one or more data assets for publishing and sharing |
-| **Metadata Forms** | Metadata form definitions with complete model structure including field definitions, data types, constraints, and validation rules |
 
 ## How It Works
 
 ### Export During Bundle
 
-When you run the `bundle` command, the CLI:
+When you run the `bundle` command with catalog export enabled, the CLI:
 
-1. Queries the DataZone Search and SearchTypes APIs to retrieve catalog resources from your source project
-2. Filters resources by the `updatedAt` timestamp (if configured)
+1. Queries the DataZone Search and SearchTypes APIs to retrieve ALL catalog resources owned by your source project
+2. Optionally filters resources by the `--updated-after` CLI flag (if provided)
 3. Serializes the resources into a `catalog/catalog_export.json` file within the bundle ZIP archive
-4. Preserves resource names, metadata, and cross-references for later import
+4. Preserves resource names, metadata, cross-references, `inputForms`, and `termRelations` for later import
 
 ### Import During Deploy
 
 When you run the `deploy` command, the CLI:
 
 1. Extracts the `catalog/catalog_export.json` file from the bundle
-2. Builds a name-based mapping between source and target project identifiers
-3. Creates or updates resources in the target project in dependency order
+2. Builds an identifier mapping between source and target projects using `externalIdentifier` (with normalization) or name as fallback
+3. Creates, updates, or deletes resources in the target project in dependency order
 4. Resolves cross-references (e.g., GlossaryTerm → Glossary, Asset → AssetType)
-5. Reports a summary of created, updated, and failed resources
+5. Optionally publishes assets and data products when `publish: true` is configured
+6. Reports a summary of created, updated, deleted, and failed resources
 
 ## Configuration
 
 ### Manifest Configuration
 
-To enable catalog export, add `assets`, `glossaries`, `dataProducts`, and/or `metadataForms` sections under `content.catalog` in your `manifest.yaml`:
+The manifest `content.catalog` section is intentionally simple — it only supports three fields:
+
+- `enabled` — boolean to turn catalog export on/off
+- `publish` — boolean to enable automatic publishing during deploy
+- `assets.access` — array for subscription requests (existing functionality)
+
+No filter options (`include`, `names`, `assetTypes`, `updatedAfter`, etc.) exist in the manifest. When enabled, ALL project-owned catalog resources are exported. To filter by date, use the `--updated-after` CLI flag on the bundle command.
 
 ```yaml
 content:
   catalog:
+    enabled: true    # Export ALL project-owned catalog resources
+    publish: false   # Automatically publish assets and data products during deploy (default: false)
+```
+
+#### With automatic publishing
+
+```yaml
+content:
+  catalog:
+    enabled: true
+    publish: true    # Publish assets and data products after import
+```
+
+#### With asset subscription requests (existing functionality)
+
+```yaml
+content:
+  catalog:
+    enabled: true
+    publish: false
     assets:
-      include:              # Optional: defaults to all three types
-        - formTypes
-        - assetTypes
-        - assets
-      updatedAfter: "2025-01-01T00:00:00Z"  # Optional: ISO 8601 timestamp filter
-    glossaries:
-      include:              # Optional: defaults to both types
-        - glossaries
-        - glossaryTerms
-      updatedAfter: "2025-01-01T00:00:00Z"  # Optional: ISO 8601 timestamp filter
-    dataProducts:
-      names:                # Optional: defaults to all data products
-        - "Sales Analytics Product"
-        - "Customer Insights Product"
-      updatedAfter: "2025-01-01T00:00:00Z"  # Optional: ISO 8601 timestamp filter
-    metadataForms:
-      include:              # Optional: defaults to all form types
-        - formTypes
-      updatedAfter: "2025-01-01T00:00:00Z"  # Optional: ISO 8601 timestamp filter
-```
-
-### Configuration Options
-
-#### `assets.include` (optional)
-
-Specifies which asset-related resource types to export. If omitted, all three types (formTypes, assetTypes, assets) are exported by default.
-
-**Example: Export only form types and asset types**
-```yaml
-content:
-  catalog:
-    assets:
-      include:
-        - formTypes
-        - assetTypes
-```
-
-#### `glossaries.include` (optional)
-
-Specifies which glossary-related resource types to export. If omitted, both types (glossaries, glossaryTerms) are exported by default.
-
-**Example: Export only glossaries**
-```yaml
-content:
-  catalog:
-    glossaries:
-      include:
-        - glossaries
-```
-
-#### `assets.updatedAfter` (optional)
-
-Filters exported asset-related resources to only include those modified on or after the specified ISO 8601 timestamp. This is useful for incremental exports.
-
-**Example: Export only asset resources modified since January 1, 2025**
-```yaml
-content:
-  catalog:
-    assets:
-      include:
-        - formTypes
-        - assetTypes
-        - assets
-      updatedAfter: "2025-01-01T00:00:00Z"
-```
-
-#### `glossaries.updatedAfter` (optional)
-
-Filters exported glossary-related resources to only include those modified on or after the specified ISO 8601 timestamp.
-
-**Example: Export only glossary resources modified since January 1, 2025**
-```yaml
-content:
-  catalog:
-    glossaries:
-      include:
-        - glossaries
-        - glossaryTerms
-      updatedAfter: "2025-01-01T00:00:00Z"
-```
-
-#### `dataProducts.names` (optional)
-
-Specifies which data products to export by name. If omitted, all data products are exported by default.
-
-**Example: Export only specific data products**
-```yaml
-content:
-  catalog:
-    dataProducts:
-      names:
-        - "Sales Analytics Product"
-        - "Customer Insights Product"
-```
-
-#### `dataProducts.updatedAfter` (optional)
-
-Filters exported data products to only include those modified on or after the specified ISO 8601 timestamp.
-
-**Example: Export only data products modified since January 1, 2025**
-```yaml
-content:
-  catalog:
-    dataProducts:
-      names:
-        - "Sales Analytics Product"
-      updatedAfter: "2025-01-01T00:00:00Z"
-```
-
-#### `metadataForms.include` (optional)
-
-Specifies which metadata form types to export. If omitted, all form types are exported by default. Metadata forms preserve the complete model structure including all field definitions, data types, constraints, and validation rules.
-
-**Example: Export metadata form types**
-```yaml
-content:
-  catalog:
-    metadataForms:
-      include:
-        - formTypes
-```
-
-#### `metadataForms.updatedAfter` (optional)
-
-Filters exported metadata forms to only include those modified on or after the specified ISO 8601 timestamp.
-
-**Example: Export only metadata forms modified since January 1, 2025**
-```yaml
-content:
-  catalog:
-    metadataForms:
-      include:
-        - formTypes
-      updatedAfter: "2025-01-01T00:00:00Z"
+      access:
+        - selector:
+            search:
+              assetType: GlueTable
+              identifier: covid19_db.countries_aggregated
+          permission: READ
+          requestReason: Required for analytics pipeline
 ```
 
 ### Deployment Configuration
@@ -212,14 +111,14 @@ targets:
 
 ### Basic Workflow
 
-1. **Configure your manifest** with catalog export settings
+1. **Configure your manifest** with `content.catalog.enabled: true`
 2. **Run bundle** to export catalog resources from your source project
 3. **Run deploy** to import catalog resources into your target project
 
 ### Example: Full Deployment Pipeline
 
 ```bash
-# Step 1: Bundle from dev environment
+# Step 1: Bundle from dev environment (exports ALL catalog resources)
 smus-cli bundle --manifest manifest.yaml
 
 # Step 2: Deploy to test environment
@@ -229,69 +128,58 @@ smus-cli deploy --bundle bundle.zip --targets test
 smus-cli deploy --bundle bundle.zip --targets prod
 ```
 
-### Example: Incremental Export
+### Example: Incremental Export with --updated-after
 
-To export only recently modified resources:
+To export only recently modified resources, use the `--updated-after` CLI flag on the bundle command. This filters ALL resource types uniformly by modification timestamp.
 
-```yaml
-content:
-  catalog:
-    assets:
-      updatedAfter: "2025-02-01T00:00:00Z"
-    glossaries:
-      updatedAfter: "2025-02-01T00:00:00Z"
-    dataProducts:
-      updatedAfter: "2025-02-01T00:00:00Z"
-    metadataForms:
-      updatedAfter: "2025-02-01T00:00:00Z"
+```bash
+# Export only resources modified since February 1, 2025
+smus-cli bundle --manifest manifest.yaml --updated-after "2025-02-01T00:00:00Z"
 ```
 
-Then run:
+The `--updated-after` flag:
+- Accepts an ISO 8601 timestamp (e.g., `2025-02-01T00:00:00Z`)
+- Filters ALL resource types uniformly (glossaries, assets, form types, etc.)
+- Is optional — when omitted, all project-owned resources are exported
+- Is a CLI-only option, not a manifest field
+
+### Example: Deploy with Automatic Publishing
+
+```yaml
+# manifest.yaml
+content:
+  catalog:
+    enabled: true
+    publish: true   # Automatically publish assets and data products
+```
+
 ```bash
 smus-cli bundle --manifest manifest.yaml
-```
-
-### Example: Selective Resource Export
-
-To export only specific resource types:
-
-```yaml
-content:
-  catalog:
-    assets:
-      include:
-        - formTypes
-        - assetTypes
-    glossaries:
-      include:
-        - glossaries
-    dataProducts:
-      names:
-        - "Sales Analytics Product"
-    metadataForms:
-      include:
-        - formTypes
+smus-cli deploy --bundle bundle.zip --targets test
 ```
 
 ## Resource Mapping and Dependencies
 
-### Name-Based Identifier Mapping
+### Identifier Mapping
 
-The import process uses resource names to map source identifiers to target identifiers. When a resource with the same name already exists in the target project, it will be updated rather than creating a duplicate.
+The import process uses `externalIdentifier` (with normalization) as the primary mapping key between source and target projects. When a resource doesn't have an `externalIdentifier`, the `name` field is used as a fallback.
 
-**Important:** Resource names must be unique within each resource type in a project.
+- **externalIdentifier**: Normalized by removing AWS account ID and region information before matching
+- **name**: Used as fallback when `externalIdentifier` is not present
+
+When a matching resource exists in the target project, it is updated. When no match is found, a new resource is created.
 
 ### Dependency Order
 
 Resources are created in the following dependency order to ensure references are valid:
 
-1. **Metadata Forms** (no dependencies, created before FormTypes)
-2. **FormTypes** (no dependencies)
-3. **AssetTypes** (may reference FormTypes)
-4. **Assets** (reference AssetTypes)
-5. **Glossaries** (no dependencies)
-6. **GlossaryTerms** (reference Glossaries)
-7. **Data Products** (may reference Assets)
+1. **Glossaries** (no dependencies)
+2. **GlossaryTerms** (reference Glossaries)
+3. **FormTypes** (may reference GlossaryTerms)
+4. **AssetTypes** (reference FormTypes, may reference GlossaryTerms)
+5. **Assets** (reference AssetTypes, may reference GlossaryTerms)
+
+Resources are deleted in reverse dependency order when they exist in the target but not in the bundle.
 
 ### Cross-Reference Resolution
 
@@ -300,7 +188,17 @@ The import process automatically resolves cross-references between resources:
 - **GlossaryTerms** → **Glossaries**: `glossaryId` is remapped to the target glossary
 - **Assets** → **AssetTypes**: `typeIdentifier` is remapped to the target asset type
 - **AssetTypes** → **FormTypes**: Form references are remapped to target form types
-- **Data Products** → **Assets**: Asset references are remapped to target assets
+- **FormTypes/Assets** → **GlossaryTerms**: Glossary term references are remapped
+
+### Resource Deletion
+
+During import, resources that exist in the target project but are NOT present in the bundle are deleted. Deletion follows reverse dependency order to avoid breaking references:
+
+1. Assets
+2. AssetTypes
+3. FormTypes
+4. GlossaryTerms
+5. Glossaries
 
 ## Export JSON Structure
 
@@ -312,7 +210,7 @@ The exported `catalog/catalog_export.json` file has the following structure:
     "sourceProjectId": "abc123",
     "sourceDomainId": "dzd_xyz789",
     "exportTimestamp": "2025-02-26T10:30:00Z",
-    "resourceTypes": ["glossaries", "glossaryTerms", "formTypes", "assetTypes", "assets", "dataProducts", "metadataForms"]
+    "resourceTypes": ["glossaries", "glossaryTerms", "formTypes", "assetTypes", "assets", "dataProducts"]
   },
   "glossaries": [
     {
@@ -335,7 +233,17 @@ The exported `catalog/catalog_export.json` file has the following structure:
   ],
   "formTypes": [...],
   "assetTypes": [...],
-  "assets": [...],
+  "assets": [
+    {
+      "sourceId": "asset_001",
+      "name": "Customer Data",
+      "description": "Customer data asset",
+      "typeIdentifier": "at_001",
+      "formsInput": [],
+      "inputForms": [],
+      "externalIdentifier": "arn:aws:..."
+    }
+  ],
   "dataProducts": [
     {
       "sourceId": "dp_001",
@@ -343,21 +251,10 @@ The exported `catalog/catalog_export.json` file has the following structure:
       "description": "Comprehensive sales data product",
       "items": [...]
     }
-  ],
-  "metadataForms": [
-    {
-      "sourceId": "mf_001",
-      "name": "Customer Metadata Form",
-      "description": "Metadata form for customer data assets",
-      "model": {
-        "smithy": "string containing complete metadata form structure with all field definitions"
-      },
-      "revision": "1",
-      "status": "ENABLED"
-    }
   ]
 }
 ```
+
 
 ## Error Handling
 
@@ -368,6 +265,7 @@ The exported `catalog/catalog_export.json` file has the following structure:
 | DataZone API error | Export fails with descriptive error message |
 | No matching resources | Produces valid JSON with empty arrays, logs informational message |
 | Missing permissions | Export fails with permission error |
+| Invalid `--updated-after` format | Validation error with helpful message |
 
 ### Import Errors
 
@@ -378,6 +276,8 @@ The exported `catalog/catalog_export.json` file has the following structure:
 | All resources fail | Deploy reports failure |
 | Missing catalog file | Silently skipped (backward compatible) |
 | Catalog disabled for stage | Skipped with log message |
+| Publish API failure | Logs error, continues with remaining resources |
+| Deletion failure | Logs error, continues with remaining resources |
 
 ### Partial Failures
 
@@ -385,14 +285,16 @@ The import process is resilient to partial failures. If some resources fail to i
 
 1. The error is logged with resource name, type, and error message
 2. Processing continues with remaining resources
-3. A summary reports counts of created, updated, and failed resources
+3. A summary reports counts of created, updated, deleted, and failed resources
 
 **Example output:**
 ```
 Catalog import summary:
   Created: 15
   Updated: 8
-  Failed: 2
+  Deleted: 2
+  Failed: 1
+  Published: 12
 ```
 
 ## Best Practices
@@ -417,19 +319,13 @@ smus-cli deploy --bundle bundle.zip --targets test
 smus-cli deploy --bundle bundle.zip --targets prod
 ```
 
-### 3. Use Incremental Exports for Large Catalogs
+### 3. Use --updated-after for Large Catalogs
 
-For projects with many catalog resources, use the `updatedAfter` filter to export only recent changes:
+For projects with many catalog resources, use the `--updated-after` CLI flag to export only recent changes:
 
-```yaml
-content:
-  catalog:
-    assets:
-      updatedAfter: "2025-02-20T00:00:00Z"  # Last deployment date
-    glossaries:
-      updatedAfter: "2025-02-20T00:00:00Z"  # Last deployment date
-    metadataForms:
-      updatedAfter: "2025-02-20T00:00:00Z"  # Last deployment date
+```bash
+# Export only resources modified since the last deployment
+smus-cli bundle --manifest manifest.yaml --updated-after "2025-02-20T00:00:00Z"
 ```
 
 ### 4. Disable Catalog Import When Not Needed
@@ -446,7 +342,7 @@ targets:
 
 ### 5. Maintain Unique Resource Names
 
-Ensure resource names are unique within each type to avoid mapping conflicts. The import process uses names to match resources between environments.
+Ensure resource names are unique within each type to avoid mapping conflicts. The import process uses `externalIdentifier` (with normalization) or names to match resources between environments.
 
 ### 6. Review Import Summaries
 
@@ -456,7 +352,9 @@ Always review the import summary after deployment to ensure all resources were c
 Catalog import summary:
   Created: 10
   Updated: 5
+  Deleted: 0
   Failed: 0
+  Published: 8
 ```
 
 ## Limitations
@@ -464,32 +362,26 @@ Catalog import summary:
 ### Current Limitations
 
 1. **Schedule Assets Not Supported**: Assets of type `SageMakerUnifiedStudioScheduleAssetType` are not currently supported for import/export
-2. **Name-Based Matching Only**: Resources are matched by name only; renaming a resource in the source will create a new resource in the target
-3. **No Deletion Support**: The import process does not delete resources that exist in the target but not in the source
-4. **Custom Managed Types**: Only custom (non-managed) FormTypes and AssetTypes are exported; AWS-managed types are excluded
-5. **Data Product Name Filtering**: Data products can only be filtered by exact name match; pattern matching is not supported
+2. **Custom Managed Types**: Only custom (non-managed) FormTypes and AssetTypes are exported; AWS-managed types are excluded
 
 ### Workarounds
 
 **For Schedule Assets**: Manually create schedule assets in each environment or use separate automation for schedule management.
 
-**For Resource Deletion**: Manually delete obsolete resources from target projects or use DataZone APIs directly.
-
 **For Resource Renaming**: To rename a resource across environments:
 1. Create the resource with the new name in the source
 2. Export and deploy to target
-3. Manually delete the old resource from both source and target
+3. The old resource in the target will be deleted automatically (since it's no longer in the bundle)
 
 ## Troubleshooting
 
 ### Problem: Export produces empty arrays
 
-**Cause**: No resources match the filter criteria (e.g., `updatedAfter` is too recent)
+**Cause**: No resources are owned by the source project, or the `--updated-after` CLI timestamp is too recent
 
 **Solution**: 
-- Check the `updatedAfter` timestamp
-- Verify resources exist in the source project
-- Remove the `updatedAfter` filter to export all resources
+- Verify resources exist in the source project and are owned by it
+- If using `--updated-after`, try an earlier timestamp or omit the flag to export all resources
 
 ### Problem: Import fails with "Malformed JSON" error
 
@@ -501,19 +393,19 @@ Catalog import summary:
 
 ### Problem: Resources not updating in target
 
-**Cause**: Resource names don't match between source and target
+**Cause**: Resource `externalIdentifier` or names don't match between source and target
 
 **Solution**:
-- Verify resource names are identical (case-sensitive)
+- Verify resource identifiers or names match
 - Check the import summary for "Created" vs "Updated" counts
-- Query the target project to confirm existing resource names
+- Query the target project to confirm existing resources
 
 ### Problem: Cross-references broken after import
 
 **Cause**: Referenced resources (e.g., Glossaries, AssetTypes) were not exported or failed to import
 
 **Solution**:
-- Ensure all resource types are included in `resourceTypes`
+- Ensure catalog export is enabled (all resource types are exported automatically)
 - Check the import summary for failures
 - Verify dependency resources exist in the target project
 
@@ -525,12 +417,12 @@ Catalog import summary:
 - Verify your IAM role has DataZone permissions:
   - `datazone:Search`
   - `datazone:SearchTypes`
-  - `datazone:CreateGlossary`, `datazone:UpdateGlossary`
-  - `datazone:CreateGlossaryTerm`, `datazone:UpdateGlossaryTerm`
-  - `datazone:CreateFormType`, `datazone:UpdateFormType`
-  - `datazone:CreateAssetType`, `datazone:UpdateAssetType`
-  - `datazone:CreateAsset`, `datazone:UpdateAsset`
-  - `datazone:CreateDataProduct`, `datazone:UpdateDataProduct`
+  - `datazone:CreateGlossary`, `datazone:UpdateGlossary`, `datazone:DeleteGlossary`
+  - `datazone:CreateGlossaryTerm`, `datazone:UpdateGlossaryTerm`, `datazone:DeleteGlossaryTerm`
+  - `datazone:CreateFormType`, `datazone:UpdateFormType`, `datazone:DeleteFormType`
+  - `datazone:CreateAssetType`, `datazone:UpdateAssetType`, `datazone:DeleteAssetType`
+  - `datazone:CreateAsset`, `datazone:UpdateAsset`, `datazone:DeleteAsset`
+  - `datazone:CreateDataProduct`, `datazone:UpdateDataProduct`, `datazone:DeleteDataProduct`
 
 ## Additional Resources
 

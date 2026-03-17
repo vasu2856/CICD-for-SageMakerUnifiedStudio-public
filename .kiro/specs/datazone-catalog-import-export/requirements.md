@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This feature adds support for importing and exporting DataZone catalog assets (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products) as part of the SMUS CI/CD `bundle` and `deploy` commands. During bundling, the CLI exports all catalog resources from a source project using the DataZone Search and SearchTypes APIs and serializes them to JSON. During deployment, the CLI reads the exported JSON, maps source identifiers to target project identifiers using externalIdentifier (when present) or name as fallback, and creates or updates the resources in the target project via DataZone create/update APIs.
+This feature adds support for importing and exporting DataZone catalog assets (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products) as part of the SMUS CI/CD `bundle` and `deploy` commands. During bundling, the CLI exports all catalog resources from a source project using the DataZone Search and SearchTypes APIs and serializes them to JSON. An optional `--updated-after` CLI flag on the bundle command allows filtering resources by modification timestamp. The manifest configuration is intentionally simple: a boolean `enabled` flag to turn catalog export on/off, and an optional `publish` flag for automatic publishing during deployment. No filter options (include lists, name filters, asset type filters, or date filters) exist in the manifest. During deployment, the CLI reads the exported JSON, maps source identifiers to target project identifiers using externalIdentifier (when present) or name as fallback, and creates or updates the resources in the target project via DataZone create/update APIs.
 
 ## Glossary
 
@@ -41,8 +41,10 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 2. WHEN `content.catalog.enabled` is set to true, THE Bundle_Command SHALL export ALL catalog resource types owned by the source project (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products)
 3. WHEN `content.catalog.enabled` is set to false or omitted, THE Bundle_Command SHALL NOT export any catalog resources
 4. THE Manifest SHALL support an optional `content.catalog.publish` boolean field to enable automatic publishing of assets and data products during deployment (default: false)
-5. THE Catalog_Exporter SHALL export the `inputForms` field as part of asset serialization
-6. THE Catalog_Exporter SHALL export the `termRelations` field as part of glossary term serialization
+5. THE Manifest SHALL NOT contain any filter options for catalog resources (no `include`, `names`, `assetTypes`, `updatedAfter`, or any other filter fields within the `content.catalog` section or its subsections)
+6. THE Manifest `content.catalog` section SHALL only support the following fields: `enabled` (boolean), `publish` (boolean), and `assets.access` (array for subscription requests)
+7. THE Catalog_Exporter SHALL export the `inputForms` field as part of asset serialization
+8. THE Catalog_Exporter SHALL export the `termRelations` field as part of glossary term serialization
 
 ### Requirement 2: Export Catalog Resources During Bundle
 
@@ -129,6 +131,6 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 #### Acceptance Criteria
 
 1. IF the DataZone Search_API or SearchTypes_API returns an error during export, THEN THE Catalog_Exporter SHALL raise an exception with a descriptive error message
-2. IF the source project has no catalog resources matching the filter criteria, THEN THE Catalog_Exporter SHALL produce an empty Catalog_Export_JSON with zero resources and log an informational message
+2. IF the source project has no catalog resources (or no resources matching the `--updated-after` CLI timestamp when provided), THEN THE Catalog_Exporter SHALL produce an empty Catalog_Export_JSON with zero resources and log an informational message
 3. IF a create or update API call fails for a specific resource during import, THEN THE Catalog_Importer SHALL log the resource name, type, and error, then continue with the next resource
 4. IF the Catalog_Export_JSON is malformed or missing required fields, THEN THE Catalog_Importer SHALL raise a validation error before attempting any API calls

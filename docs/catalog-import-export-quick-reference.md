@@ -9,27 +9,16 @@ Add to your `manifest.yaml`:
 ```yaml
 content:
   catalog:
-    assets:
-      include:  # Optional: defaults to all
-        - formTypes
-        - assetTypes
-        - assets
-    glossaries:
-      include:  # Optional: defaults to all
-        - glossaries
-        - glossaryTerms
-    dataProducts:
-      names:    # Optional: defaults to all
-        - "Sales Analytics Product"
-    metadataForms:
-      include:  # Optional: defaults to all
-        - formTypes
+    enabled: true    # Export ALL project-owned catalog resources
+    publish: false   # Optional: auto-publish assets and data products during deploy
 ```
+
+That's it — no filter options in the manifest. When enabled, all project-owned resources are exported.
 
 ### 2. Bundle and Deploy
 
 ```bash
-# Bundle from source
+# Bundle from source (exports ALL catalog resources)
 smus-cli bundle --manifest manifest.yaml
 
 # Deploy to target
@@ -46,58 +35,53 @@ smus-cli deploy --bundle bundle.zip --targets test
 | `assetTypes` | Asset type definitions |
 | `assets` | Catalog assets |
 | `dataProducts` | Data products bundling assets |
-| `metadataForms` | Metadata forms with complete model structure |
 
-## Common Configurations
+## Manifest Configuration
 
-### Export All Resources
+The `content.catalog` section only supports these fields:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | boolean | `false` | Enable/disable catalog export |
+| `publish` | boolean | `false` | Auto-publish assets and data products during deploy |
+| `assets.access` | array | — | Subscription requests (existing functionality) |
+
+No filter options (`include`, `names`, `assetTypes`, `updatedAfter`) exist in the manifest.
+
+### Enable export
 
 ```yaml
 content:
   catalog:
-    assets: {}       # Defaults to all asset resource types
-    glossaries: {}   # Defaults to all glossary resource types
-    dataProducts: {} # Defaults to all data products
-    metadataForms: {} # Defaults to all metadata forms
+    enabled: true
 ```
 
-### Export Specific Types Only
+### Enable export with auto-publishing
 
 ```yaml
 content:
   catalog:
+    enabled: true
+    publish: true
+```
+
+### With subscription requests
+
+```yaml
+content:
+  catalog:
+    enabled: true
     assets:
-      include:
-        - formTypes
-        - assetTypes
-    glossaries:
-      include:
-        - glossaries
-    dataProducts:
-      names:
-        - "Sales Analytics Product"
-        - "Customer Insights Product"
-    metadataForms:
-      include:
-        - formTypes
+      access:
+        - selector:
+            search:
+              assetType: GlueTable
+              identifier: covid19_db.countries_aggregated
+          permission: READ
+          requestReason: Required for analytics pipeline
 ```
 
-### Incremental Export (Recent Changes Only)
-
-```yaml
-content:
-  catalog:
-    assets:
-      updatedAfter: "2025-02-01T00:00:00Z"
-    glossaries:
-      updatedAfter: "2025-02-01T00:00:00Z"
-    dataProducts:
-      updatedAfter: "2025-02-01T00:00:00Z"
-    metadataForms:
-      updatedAfter: "2025-02-01T00:00:00Z"
-```
-
-### Disable Import for a Stage
+### Disable import for a stage
 
 ```yaml
 targets:
@@ -107,15 +91,27 @@ targets:
         disable: true
 ```
 
+## Incremental Export with --updated-after
+
+Use the `--updated-after` CLI flag to filter by modification date. This is a CLI-only option (not a manifest field) that filters ALL resource types uniformly.
+
+```bash
+# Export only resources modified since a specific date
+smus-cli bundle --manifest manifest.yaml --updated-after "2025-02-01T00:00:00Z"
+
+# Export all resources (no date filter)
+smus-cli bundle --manifest manifest.yaml
+```
+
 ## Dependency Order
 
 Resources are created in this order:
 
 ```
-Metadata Forms → FormTypes → AssetTypes → Assets
-Glossaries → GlossaryTerms
-Data Products (after Assets)
+Glossaries → GlossaryTerms → FormTypes → AssetTypes → Assets
 ```
+
+Resources are deleted in reverse order when missing from the bundle.
 
 ## Cross-References
 
@@ -123,14 +119,16 @@ Automatically resolved:
 - GlossaryTerms → Glossaries
 - Assets → AssetTypes
 - AssetTypes → FormTypes
-- AssetTypes → Metadata Forms
-- Data Products → Assets
+- FormTypes/Assets → GlossaryTerms
 
 ## Common Commands
 
 ```bash
 # Bundle with catalog export
 smus-cli bundle --manifest manifest.yaml
+
+# Bundle with incremental export (CLI flag, not manifest)
+smus-cli bundle --manifest manifest.yaml --updated-after "2025-02-01T00:00:00Z"
 
 # Deploy to dev
 smus-cli deploy --bundle bundle.zip --targets dev
@@ -143,11 +141,11 @@ smus-cli deploy --bundle bundle.zip --targets dev,test,prod
 
 | Problem | Solution |
 |---|---|
-| Empty export | Check `updatedAfter` filter or verify resources exist |
+| Empty export | Verify resources exist and are owned by the project. If using `--updated-after`, try an earlier timestamp or omit the flag. |
 | Malformed JSON error | Re-run bundle command |
-| Resources not updating | Verify names match exactly (case-sensitive) |
+| Resources not updating | Verify `externalIdentifier` or names match exactly |
 | Permission denied | Check IAM permissions for DataZone APIs |
-| Cross-references broken | Ensure all resource types are exported |
+| Cross-references broken | Ensure catalog export is enabled (all types exported automatically) |
 
 ## Required IAM Permissions
 
@@ -162,18 +160,22 @@ smus-cli deploy --bundle bundle.zip --targets dev,test,prod
         "datazone:SearchTypes",
         "datazone:CreateGlossary",
         "datazone:UpdateGlossary",
+        "datazone:DeleteGlossary",
         "datazone:CreateGlossaryTerm",
         "datazone:UpdateGlossaryTerm",
+        "datazone:DeleteGlossaryTerm",
         "datazone:CreateFormType",
         "datazone:UpdateFormType",
+        "datazone:DeleteFormType",
         "datazone:CreateAssetType",
         "datazone:UpdateAssetType",
+        "datazone:DeleteAssetType",
         "datazone:CreateAsset",
         "datazone:UpdateAsset",
+        "datazone:DeleteAsset",
         "datazone:CreateDataProduct",
         "datazone:UpdateDataProduct",
-        "datazone:CreateMetadataForm",
-        "datazone:UpdateMetadataForm"
+        "datazone:DeleteDataProduct"
       ],
       "Resource": "*"
     }
@@ -184,7 +186,7 @@ smus-cli deploy --bundle bundle.zip --targets dev,test,prod
 ## Best Practices
 
 1. ✅ Test in dev/test before prod
-2. ✅ Use incremental exports for large catalogs
+2. ✅ Use `--updated-after` CLI flag for incremental exports of large catalogs
 3. ✅ Maintain unique resource names
 4. ✅ Review import summaries
 5. ✅ Version control your manifest
@@ -193,8 +195,6 @@ smus-cli deploy --bundle bundle.zip --targets dev,test,prod
 ## Limitations
 
 - ❌ Schedule assets not supported
-- ❌ No resource deletion
-- ❌ Name-based matching only
 - ❌ AWS-managed types excluded
 
 ## Example Output
@@ -203,12 +203,14 @@ smus-cli deploy --bundle bundle.zip --targets dev,test,prod
 Catalog import summary:
   Created: 15
   Updated: 8
+  Deleted: 2
   Failed: 0
+  Published: 12
 ```
 
 ## More Information
 
 - [SMUS CI/CD CLI Documentation](../README.md) - Main documentation
 - [Full Catalog Import/Export Guide](catalog-import-export-guide.md) - Complete guide with detailed explanations
-- [Manifest Schema](manifest-schema.md) - YAML schema reference
+- [Manifest Schema Reference](manifest-schema.md) - YAML schema reference
 - [Example Application](../examples/catalog-import-export/) - Working example
