@@ -24,6 +24,8 @@ def build_domain_config(target_config) -> Dict[str, Any]:
     config["domain"] = {
         "region": target_config.domain.region,
     }
+    if target_config.domain.id:
+        config["domain"]["id"] = target_config.domain.id
     if target_config.domain.name:
         config["domain"]["name"] = target_config.domain.name
         config["domain_name"] = target_config.domain.name
@@ -70,19 +72,26 @@ def find_missing_env_vars(data: Union[Dict, List, str]) -> List[str]:
     return sorted(missing)
 
 
-def substitute_env_vars(data: Union[Dict, List, str]) -> Union[Dict, List, str]:
+def substitute_env_vars(
+    data: Union[Dict, List, str], resolve_aws_pseudo_vars: bool = True
+) -> Union[Dict, List, str]:
     """
     Recursively substitute environment variables in YAML data.
 
     Supports ${VAR_NAME} or ${VAR_NAME:default_value} syntax for environment variable substitution.
 
-    Pseudo environment variables (auto-resolved from AWS credentials):
-    - AWS_ACCOUNT_ID: Current AWS account ID from STS
-    - STS_ACCOUNT_ID: Current AWS account ID from STS (alias for AWS_ACCOUNT_ID)
-    - STS_REGION: Current AWS region from boto3 session
+    Pseudo environment variables:
+    - AWS_ACCOUNT_ID: Current AWS account ID (from STS when resolve_aws_pseudo_vars=True,
+                      otherwise falls back to os.getenv, then leaves placeholder as-is)
+    - STS_ACCOUNT_ID: Alias for AWS_ACCOUNT_ID
+    - STS_REGION: Current AWS region (from boto3 session when resolve_aws_pseudo_vars=True,
+                  otherwise falls back to os.getenv/AWS_DEFAULT_REGION, then placeholder)
 
     Args:
         data: YAML data (dict, list, or string)
+        resolve_aws_pseudo_vars: If True (default), resolve AWS_ACCOUNT_ID/STS_ACCOUNT_ID/STS_REGION
+            via live AWS calls. If False, attempt os.getenv first and leave placeholder as-is
+            if not available (no AWS calls made).
 
     Returns:
         Data with environment variables substituted
@@ -91,9 +100,12 @@ def substitute_env_vars(data: Union[Dict, List, str]) -> Union[Dict, List, str]:
         ValueError: If a required variable (without default) is not found
     """
     if isinstance(data, dict):
-        return {key: substitute_env_vars(value) for key, value in data.items()}
+        return {
+            key: substitute_env_vars(value, resolve_aws_pseudo_vars)
+            for key, value in data.items()
+        }
     elif isinstance(data, list):
-        return [substitute_env_vars(item) for item in data]
+        return [substitute_env_vars(item, resolve_aws_pseudo_vars) for item in data]
     elif isinstance(data, str):
         # Pattern to match ${VAR_NAME} or ${VAR_NAME:default_value}
         pattern = r"\$\{([^}:]+)(?::([^}]*))?\}"
@@ -104,22 +116,33 @@ def substitute_env_vars(data: Union[Dict, List, str]) -> Union[Dict, List, str]:
             default_value = match.group(2) if has_default else None
 
             # Handle pseudo environment variables
-            if var_name == "STS_ACCOUNT_ID" or var_name == "AWS_ACCOUNT_ID":
-                import boto3
+            if var_name in ("STS_ACCOUNT_ID", "AWS_ACCOUNT_ID"):
+                if resolve_aws_pseudo_vars:
+                    import boto3
 
-                return boto3.client("sts").get_caller_identity()["Account"]
+                    return boto3.client("sts").get_caller_identity()["Account"]
+                # Fall back to env var, then leave placeholder as-is
+                return os.getenv(var_name) or match.group(0)
+
             elif var_name == "STS_REGION":
-                import boto3
+                if resolve_aws_pseudo_vars:
+                    import boto3
 
-                region = boto3.Session().region_name
-                if region:
-                    return region
-                elif has_default:
-                    return default_value
-                else:
-                    raise ValueError(
-                        f"Variable ${{{var_name}}} could not be resolved: No AWS region configured"
-                    )
+                    region = boto3.Session().region_name
+                    if region:
+                        return region
+                    elif has_default:
+                        return default_value
+                    else:
+                        raise ValueError(
+                            f"Variable ${{{var_name}}} could not be resolved: No AWS region configured"
+                        )
+                # Fall back to env var or AWS_DEFAULT_REGION, then leave placeholder as-is
+                return (
+                    os.getenv(var_name)
+                    or os.getenv("AWS_DEFAULT_REGION")
+                    or match.group(0)
+                )
 
             # Regular environment variable lookup
             value = os.getenv(var_name)
@@ -137,13 +160,20 @@ def substitute_env_vars(data: Union[Dict, List, str]) -> Union[Dict, List, str]:
         return data
 
 
-def load_yaml(file_path: str, check_missing_vars: bool = True) -> Dict[str, Any]:
+def load_yaml(
+    file_path: str,
+    check_missing_vars: bool = True,
+    resolve_aws_pseudo_vars: bool = True,
+) -> Dict[str, Any]:
     """
     Load and parse YAML file.
 
     Args:
         file_path: Path to the YAML file
         check_missing_vars: If True, check for missing required env vars before substitution
+        resolve_aws_pseudo_vars: If True (default), resolve AWS_ACCOUNT_ID/STS_ACCOUNT_ID/STS_REGION
+            via live AWS calls. If False, attempt os.getenv first and leave placeholder as-is
+            if not available (no AWS calls made).
 
     Returns:
         Parsed YAML content as dictionary
@@ -173,7 +203,9 @@ def load_yaml(file_path: str, check_missing_vars: bool = True) -> Dict[str, Any]
                         + "\n\nPlease set these environment variables before running the command."
                     )
 
-            return substitute_env_vars(data)
+            return substitute_env_vars(
+                data, resolve_aws_pseudo_vars=resolve_aws_pseudo_vars
+            )
     except yaml.YAMLError as e:
         raise yaml.YAMLError(f"Invalid YAML syntax in {file_path}: {e}")
 
@@ -383,15 +415,20 @@ def _resolve_domain_id(config: Dict[str, Any], region: str) -> Optional[str]:
     logger.debug(f"domain_id from CloudFormation: {domain_id}")
 
     if not domain_id:
-        # Try to resolve domain by name or tags
+        # Try to resolve domain by id, name, or tags
         domain_config = config.get("domain", {})
+        domain_direct_id = domain_config.get("id")
         domain_name = domain_config.get("name")
         domain_tags = domain_config.get("tags")
 
+        logger.debug(f"domain_direct_id: {domain_direct_id}")
         logger.debug(f"domain_name: {domain_name}")
         logger.debug(f"domain_tags: {domain_tags}")
 
-        if domain_name or domain_tags:
+        if domain_direct_id:
+            domain_id = domain_direct_id
+            logger.debug(f"Using domain id directly: {domain_id}")
+        elif domain_name or domain_tags:
             try:
                 logger.debug(
                     f"Calling datazone.resolve_domain_id with name={domain_name}, tags={domain_tags}, region={region}"

@@ -16,7 +16,7 @@ Connections enable your workflows to interact with:
 
 **Two ways to create connections:**
 1. **Manifest-based** (recommended) - Define in `manifest.yaml` for automated creation
-2. **Console-based** - Create manually in SMUS console
+2. **Console-based** - Create manually in SMUS portal
 
 ---
 
@@ -45,12 +45,7 @@ stages:
       region: us-east-1
     project:
       name: test-project
-      create: true
     bootstrap:
-      project:
-        create: true
-        profileName: 'All capabilities'
-        owners: [admin@example.com]
       environments:
         - EnvironmentConfigurationName: 'OnDemand Workflows'
       
@@ -402,14 +397,8 @@ stages:
       region: us-east-1
     project:
       name: test-data-platform
-      create: true
     
     bootstrap:
-      project:
-        create: true
-        profileName: 'All capabilities'
-        owners: [admin@example.com]
-      
       environments:
         - EnvironmentConfigurationName: 'OnDemand Workflows'
       

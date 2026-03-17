@@ -51,7 +51,7 @@ stages:
         result = self.run_describe(manifest)
         assert result.exit_code == 0
         assert "Pipeline: MinimalPipeline" in result.stdout
-        assert "Domain: minimal-domain" in result.stdout
+        assert "staging: minimal-project (domain: minimal-domain, region: us-east-1)" in result.stdout
 
     def test_complex_manifest_with_workflows(self):
         """Test complex manifest with multiple workflows and targets."""
@@ -90,7 +90,8 @@ stages:
 
         # Check pipeline info
         assert "Pipeline: ComplexPipeline" in result.stdout
-        assert "Domain: complex-domain" in result.stdout
+        # Domain is now shown inline per-target
+        assert "development: dev-project (domain: complex-domain, region: us-east-1)" in result.stdout
 
         # Check targets
         assert "Targets:" in result.stdout
@@ -478,5 +479,4 @@ stages:
         result = self.run_describe(manifest, ["--connections"])
         assert result.exit_code == 0
         assert "Pipeline: Pipeline-With_Special_Characters123" in result.stdout
-        assert "Domain: domain-with-dashes" in result.stdout
-        assert "target-with-dashes: project_with_underscores" in result.stdout
+        assert "target-with-dashes: project_with_underscores (domain: domain-with-dashes, region: us-east-1)" in result.stdout

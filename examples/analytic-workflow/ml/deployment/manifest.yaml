@@ -6,9 +6,9 @@ content:
     include:
     - ml/bundle/deployment-code
   - name: deployment-workflows
-    connectionName: default.s3_shared
     include:
-    - ml/bundle/deployment-workflows
+    - workflows/ml_deployment_workflow.yaml
+    - workflows/ml_deployment_notebook.ipynb
   - name: model-artifacts
     connectionName: default.s3_shared
     include:
@@ -35,12 +35,10 @@ stages:
       region: ${TEST_DOMAIN_REGION:us-east-1}
     project:
       name: test-marketing
-      create: true
       owners:
       - Eng1
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
-      contributors: []
       role:
         arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/test-marketing-role
     environment_variables:
@@ -71,14 +69,6 @@ stages:
       region: ${PROD_DOMAIN_REGION:us-east-1}
     project:
       name: prod-marketing
-      create: true
-      owners:
-      - Eng1
-      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
-      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
-      contributors: []
-      role:
-        arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/prod-marketing-role
     environment_variables:
       S3_PREFIX: prod
     deployment_configuration:

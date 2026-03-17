@@ -63,14 +63,14 @@ stages:
             # Should be valid JSON
             output_data = json.loads(result.stdout)
             assert "bundle" in output_data
-            assert "domain" in output_data
             assert "targets" in output_data
             assert output_data["bundle"] == "TestPipeline"
-            assert output_data["domain"]["name"] == "test-domain"
-            assert output_data["domain"]["region"] == "us-east-1"
             assert "dev" in output_data["targets"]
             assert "test" in output_data["targets"]
             assert "prod" in output_data["targets"]
+            # Domain is now per-target, not top-level
+            assert output_data["targets"]["dev"]["domain"]["name"] == "test-domain"
+            assert output_data["targets"]["dev"]["domain"]["region"] == "us-east-1"
         finally:
             import os
 
@@ -88,9 +88,9 @@ stages:
 
             assert result.exit_code == 0
             assert "Pipeline: TestPipeline" in result.stdout
-            assert "Domain: test-domain (us-east-1)" in result.stdout
+            # Domain is now shown inline per-target
+            assert "dev: dev-project (domain: test-domain, region: us-east-1)" in result.stdout
             assert "Targets:" in result.stdout
-            assert "dev: dev-project" in result.stdout
             assert "test: test-project" in result.stdout
             assert "prod: prod-project" in result.stdout
         finally:
@@ -164,7 +164,7 @@ stages:
             assert result.exit_code == 1
             # Error messages go to stderr in typer
             assert (
-                "Target 'invalid' not found" in result.stderr
+                "Target(s) not found in manifest: invalid" in result.stderr
                 or "invalid" in result.stderr
             )
             assert (

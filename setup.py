@@ -22,7 +22,7 @@ if os.path.exists("configuration"):
 install_requires = [
     "typer>=0.9.0",
     "pyyaml>=6.0",
-    "boto3>=1.26.0",
+    "boto3>=1.42.60",
     "botocore>=1.29.0",
     "jsonschema>=4.17.0",
     "rich>=13.0.0",
@@ -43,7 +43,7 @@ dev_requires = [
 ]
 
 setup(
-    name="smus-cicd-cli",
+    name="smus-cli",
     version="1.0.0",
     author="AWS SageMaker Unified Studio Team",
     author_email="sagemaker-unified-studio@amazon.com",

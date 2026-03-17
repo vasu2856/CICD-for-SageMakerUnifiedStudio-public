@@ -189,17 +189,8 @@ stages:
       region: ${AWS_REGION:us-east-1}
     project:
       name: test-marketing
-      create: true
-      profileName: 'All capabilities'
-      owners: ['alice@company.com']
-      contributors: ['bob@company.com']
       role:
         arn: arn:aws:iam::123456789012:role/MyProjectRole
-      user_parameters:
-        - environment_configuration_name: 'Lakehouse Database'
-          parameters:
-            - name: glueDbName
-              value: test_marketing_db
     
     # Bootstrap actions for project setup
     bootstrap:
@@ -260,10 +251,6 @@ stages:
       region: ${AWS_REGION:us-east-1}
     project:
       name: prod-marketing
-      create: true
-      profileName: 'All capabilities'
-      owners: ['alice@company.com']
-      contributors: []
     
     bootstrap:
       actions:
@@ -433,13 +420,41 @@ stages:
 
 **Required Properties:**
 - `stage` (required): Deployment stage name (`DEV`, `TEST`, `PROD`)
-- `domain.name` (required): SageMaker Unified Studio domain name
 - `domain.region` (required): AWS region where domain exists
 - `project.name` (required): Project name in the domain
 
-### Target Initialization
+**Domain Identification (one of the following):**
+- `domain.id`: Domain ID as shown in the SMUS portal — the easiest option for customers
+- `domain.name`: Domain name
+- `domain.tags`: Tag key-value pairs to look up the domain (all tags must match)
 
-Auto-create projects, environments, and connections:
+```yaml
+# Option 1: domain ID (visible in the SMUS portal)
+stages:
+  dev:
+    domain:
+      id: dzd_xxxxxxxxxxxx
+      region: us-east-1
+
+# Option 2: domain name
+stages:
+  dev:
+    domain:
+      name: my-studio-domain
+      region: us-east-1
+
+# Option 3: tags
+stages:
+  dev:
+    domain:
+      tags:
+        purpose: my-domain-tag
+      region: us-east-1
+```
+
+### Bootstrap Actions
+
+Configure environments, connections, and post-deployment workflows:
 
 ```yaml
 stages:
@@ -450,15 +465,6 @@ stages:
       region: us-east-1
     project:
       name: test-marketing
-      create: true
-      profileName: 'All capabilities'
-      owners: ['alice@company.com']
-      contributors: ['bob@company.com', 'charlie@company.com']
-      user_parameters:
-        - environment_configuration_name: 'Lakehouse Database'
-          parameters:
-            - name: glueDbName
-              value: my_unique_db_name
     
     bootstrap:
       actions:
@@ -480,12 +486,6 @@ stages:
 ```
 
 **Project Properties:**
-- `create` (optional): Auto-create project (default: `false`)
-- `profileName` (required if create=true): Project profile name
-- `owners` (optional): List of owner email addresses or IAM ARNs
-  - Use `*` as wildcard for account ID: `arn:aws:iam::*:role/MyRole` (replaced with current account)
-- `contributors` (optional): List of contributor email addresses or IAM ARNs
-  - Use `*` as wildcard for account ID: `arn:aws:iam::*:role/MyRole` (replaced with current account)
 - `role` (optional): Customer-provided IAM role for the project
   - `arn`: IAM role ARN (e.g., `arn:aws:iam::123456789012:role/MyProjectRole`)
   - Use `*` as wildcard for account ID: `arn:aws:iam::*:role/MyProjectRole` (replaced with current account)
@@ -1011,7 +1011,7 @@ etl_dag:
 ## Validation Rules
 
 ### Required Fields
-- `applicationName`
+- `applicationName` - A logical name for this CI/CD manifest environment — not a SMUS resource. This name can be anything.
 - `content` with at least `workflows` defined
 - `stages` (at least one stage)
 - Each stage must have: `stage`, `domain.name`, `domain.region`, `project.name`

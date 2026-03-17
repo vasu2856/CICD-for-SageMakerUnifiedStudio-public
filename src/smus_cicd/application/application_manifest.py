@@ -20,11 +20,16 @@ class DomainConfig:
     region: str
     name: Optional[str] = None
     tags: Optional[Dict[str, str]] = None
+    id: Optional[str] = None
 
     def get_name(self) -> Optional[str]:
-        """Get domain name, resolving from tags if needed."""
+        """Get domain name, resolving from id, tags if needed."""
         if self.name:
             return self.name
+        if self.id:
+            from ..helpers.datazone import get_domain_name_by_id
+
+            return get_domain_name_by_id(self.id, self.region)
         if self.tags:
             from ..helpers.datazone import resolve_domain_id
 
@@ -239,13 +244,17 @@ class ApplicationManifest:
     _file_path: Optional[str] = field(default=None, init=False)
 
     @classmethod
-    def from_file(cls, manifest_file: str) -> "ApplicationManifest":
+    def from_file(
+        cls, manifest_file: str, resolve_aws_pseudo_vars: bool = True
+    ) -> "ApplicationManifest":
         """Load bundle manifest from YAML file with validation."""
         from .validation import validate_manifest_file
 
         # Validate manifest file (YAML syntax + schema)
         # Missing env var check happens in load_yaml
-        is_valid, errors, manifest_data = validate_manifest_file(manifest_file)
+        is_valid, errors, manifest_data = validate_manifest_file(
+            manifest_file, resolve_aws_pseudo_vars=resolve_aws_pseudo_vars
+        )
         if not is_valid:
             error_msg = (
                 f"Manifest validation failed for {manifest_file}:\n"
@@ -385,6 +394,7 @@ class ApplicationManifest:
                 region=domain_data.get("region", ""),
                 name=domain_data.get("name"),
                 tags=domain_data.get("tags"),
+                id=domain_data.get("id"),
             )
 
             if not domain.region.strip():

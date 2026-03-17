@@ -582,7 +582,7 @@ def list_workflow_runs(
 
     except Exception as e:
         logger.error(f"Failed to list workflow runs for {workflow_arn}: {e}")
-        return []
+        raise
 
 
 def is_workflow_run_active(run: Dict[str, Any]) -> bool:
@@ -1074,6 +1074,8 @@ def monitor_workflow_logs_live(
     final_status = None
     final_run_id = run_id
     first_fetch = True
+    consecutive_errors = 0
+    MAX_CONSECUTIVE_ERRORS = 10
 
     while True:
         try:
@@ -1128,14 +1130,24 @@ def monitor_workflow_logs_live(
                 final_status = target_run.get("status") or "COMPLETED"
                 break
 
+            consecutive_errors = 0  # reset on successful iteration
             time.sleep(5)
 
         except Exception as e:
-            # Log error but continue monitoring
+            consecutive_errors += 1
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.error(f"Error in live monitoring: {e}")
+            logger.error(
+                f"Error in live monitoring ({consecutive_errors}/{MAX_CONSECUTIVE_ERRORS}): {e}"
+            )
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                return {
+                    "success": False,
+                    "final_status": "ERROR",
+                    "error": str(e),
+                    "run_id": final_run_id,
+                }
             time.sleep(5)
 
     return {

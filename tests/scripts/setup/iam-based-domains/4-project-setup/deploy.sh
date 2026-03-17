@@ -72,7 +72,7 @@ if [ -n "$EXISTING_PROJECT" ] && [ "$EXISTING_PROJECT" != "None" ]; then
     exit 0
 fi
 
-echo "🚀 Creating DataZone project using internal DataZone client..."
+echo "🚀 Creating DataZone project..."
 echo "   Project Name: $DEV_PROJECT_NAME"
 echo "   Domain: $DOMAIN_NAME"
 
@@ -100,7 +100,7 @@ fi
 echo "✅ Both roles exist and are accessible"
 echo ""
 
-# Use Python script with internal DataZone client for customerProvidedRoleConfigs support
+# Use Python script for customerProvidedRoleConfigs support
 python3 "$SCRIPT_DIR/create_project_with_roles.py" \
     --domain-name "$DOMAIN_NAME" \
     --project-name "$DEV_PROJECT_NAME" \
@@ -130,9 +130,8 @@ else
     echo ""
     echo "💡 Troubleshooting tips:"
     echo "   1. Ensure the IAM role exists: $PROJECT_ROLE_ARN"
-    echo "   2. Check if datazone-internal client is available"
-    echo "   3. Verify domain permissions and project profile access"
-    echo "   4. Check AWS credentials and region configuration"
+    echo "   2. Verify domain permissions and project profile access"
+    echo "   3. Check AWS credentials and region configuration"
     
     exit 1
 fi

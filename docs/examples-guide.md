@@ -124,7 +124,6 @@ stages:
       region: us-east-1
     project:
       name: test-ml-training
-      create: true
       owners:
         - Eng1
         - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
@@ -163,7 +162,6 @@ tests:
 - **Custom Role**: Uses project-specific IAM role for SageMaker training permissions
 - **MLflow Integration**: Tracks experiments, parameters, and metrics automatically
 - **SageMaker Distribution**: Uses pre-built images with common ML libraries
-- **Project Creation**: `create: true` automatically creates project if it doesn't exist
 
 **Use this example when:**
 - Training ML models with SageMaker
@@ -217,7 +215,6 @@ stages:
       region: us-east-1
     project:
       name: test-ml-deployment
-      create: true
       owners:
         - Eng1
         - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
@@ -421,7 +418,6 @@ stages:
       region: us-east-1
     project:
       name: test-marketing
-      create: true
       owners:
         - Eng1
         - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
