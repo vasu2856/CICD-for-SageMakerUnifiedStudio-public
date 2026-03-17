@@ -178,6 +178,7 @@ Resources are created in the following dependency order to ensure references are
 3. **FormTypes** (may reference GlossaryTerms)
 4. **AssetTypes** (reference FormTypes, may reference GlossaryTerms)
 5. **Assets** (reference AssetTypes, may reference GlossaryTerms)
+6. **Data Products** (may reference Assets)
 
 Resources are deleted in reverse dependency order when they exist in the target but not in the bundle.
 
@@ -189,16 +190,18 @@ The import process automatically resolves cross-references between resources:
 - **Assets** → **AssetTypes**: `typeIdentifier` is remapped to the target asset type
 - **AssetTypes** → **FormTypes**: Form references are remapped to target form types
 - **FormTypes/Assets** → **GlossaryTerms**: Glossary term references are remapped
+- **Data Products** → **Assets**: Item references within data products are preserved
 
 ### Resource Deletion
 
 During import, resources that exist in the target project but are NOT present in the bundle are deleted. Deletion follows reverse dependency order to avoid breaking references:
 
-1. Assets
-2. AssetTypes
-3. FormTypes
-4. GlossaryTerms
-5. Glossaries
+1. Data Products
+2. Assets
+3. AssetTypes
+4. FormTypes
+5. GlossaryTerms
+6. Glossaries
 
 ## Export JSON Structure
 

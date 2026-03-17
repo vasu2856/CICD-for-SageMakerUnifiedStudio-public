@@ -315,13 +315,14 @@ graph TD
     GT -.can be referenced by.-> FT[FormTypes]
     FT --> AT[AssetTypes]
     AT --> A
+    A --> DP[Data Products]
 ```
 
-Creation order: `Glossaries` → `GlossaryTerms` → (`FormTypes`, `AssetTypes` can reference terms) → `Assets`
+Creation order: `Glossaries` → `GlossaryTerms` → (`FormTypes`, `AssetTypes` can reference terms) → `Assets` → `Data Products`
 
-Deletion order (reverse): `Assets` → `AssetTypes` → `FormTypes`, `GlossaryTerms` → `Glossaries`
+Deletion order (reverse): `Data Products` → `Assets` → `AssetTypes` → `FormTypes` → `GlossaryTerms` → `Glossaries`
 
-Note: Assets and FormTypes can reference GlossaryTerms, so GlossaryTerms must be created before Assets and FormTypes, and deleted after them.
+Note: Assets and FormTypes can reference GlossaryTerms, so GlossaryTerms must be created before Assets and FormTypes, and deleted after them. Data Products can reference Assets, so they are created last and deleted first.
 
 ## Correctness Properties
 

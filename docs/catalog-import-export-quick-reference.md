@@ -108,7 +108,7 @@ smus-cli bundle --manifest manifest.yaml
 Resources are created in this order:
 
 ```
-Glossaries → GlossaryTerms → FormTypes → AssetTypes → Assets
+Glossaries → GlossaryTerms → FormTypes → AssetTypes → Assets → Data Products
 ```
 
 Resources are deleted in reverse order when missing from the bundle.
@@ -120,6 +120,7 @@ Automatically resolved:
 - Assets → AssetTypes
 - AssetTypes → FormTypes
 - FormTypes/Assets → GlossaryTerms
+- Data Products → Assets (item references preserved)
 
 ## Common Commands
 
