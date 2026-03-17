@@ -45,13 +45,13 @@ def show_help_suggestion():
     """Show helpful suggestions for common mistakes."""
     console.print("\n[yellow]💡 Common usage patterns:[/yellow]")
     console.print(
-        "   [cyan]smus-cli describe --manifest my-pipeline.yaml --targets dev[/cyan]"
+        "   [cyan]smus-cicd-cli describe --manifest my-pipeline.yaml --targets dev[/cyan]"
     )
     console.print(
-        "   [cyan]smus-cli monitor --manifest my-pipeline.yaml --output JSON[/cyan]"
+        "   [cyan]smus-cicd-cli monitor --manifest my-pipeline.yaml --output JSON[/cyan]"
     )
     console.print(
-        "   [cyan]smus-cli deploy --manifest my-pipeline.yaml --targets prod[/cyan]"
+        "   [cyan]smus-cicd-cli deploy --manifest my-pipeline.yaml --targets prod[/cyan]"
     )
 
     console.print("\n[yellow]🔧 Universal switches (work on all commands):[/yellow]")
@@ -63,15 +63,15 @@ def show_help_suggestion():
     )
 
     console.print("\n[yellow]📖 For detailed help:[/yellow]")
-    console.print("   [cyan]smus-cli --help[/cyan]")
-    console.print("   [cyan]smus-cli <command> --help[/cyan]")
+    console.print("   [cyan]smus-cicd-cli --help[/cyan]")
+    console.print("   [cyan]smus-cicd-cli <command> --help[/cyan]")
 
 
 app = typer.Typer(
     help="SMUS CI/CD CLI - Manage SageMaker Unified Studio CI/CD pipelines",
     no_args_is_help=True,
     add_completion=False,
-    epilog="💡 Use 'smus-cli <command> --help' for command-specific help",
+    epilog="💡 Use 'smus-cicd-cli <command> --help' for command-specific help",
 )
 
 
@@ -97,7 +97,7 @@ def main(
 # Register commands with proper ordering
 @app.command(
     "describe",
-    help="1. Describe and validate pipeline manifest file. Example: smus-cli describe --manifest pipeline.yaml --targets dev",
+    help="1. Describe and validate pipeline manifest file. Example: smus-cicd-cli describe --manifest pipeline.yaml --targets dev",
     rich_help_panel="Pipeline Commands",
 )
 def describe(
@@ -134,7 +134,7 @@ def describe(
 
 @app.command(
     "bundle",
-    help="2. Create bundle zip files. Bundles from dev target by default. Example: smus-cli bundle --targets test",
+    help="2. Create bundle zip files. Bundles from dev target by default. Example: smus-cicd-cli bundle --targets test",
     rich_help_panel="Pipeline Commands",
 )
 def bundle(
@@ -208,7 +208,7 @@ def bundle(
 
 @app.command(
     "deploy",
-    help="3. Deploy bundle files to target (auto-initializes if needed). Example: smus-cli deploy --manifest pipeline.yaml --targets prod",
+    help="3. Deploy bundle files to target (auto-initializes if needed). Example: smus-cicd-cli deploy --manifest pipeline.yaml --targets prod",
     rich_help_panel="Pipeline Commands",
 )
 def deploy(
@@ -250,7 +250,7 @@ def deploy(
 
 @app.command(
     "monitor",
-    help="4. Monitor workflow status. Example: smus-cli monitor --manifest pipeline.yaml --targets dev",
+    help="4. Monitor workflow status. Example: smus-cicd-cli monitor --manifest pipeline.yaml --targets dev",
     rich_help_panel="Pipeline Commands",
 )
 def monitor(
@@ -280,7 +280,7 @@ def monitor(
 
 @app.command(
     "create",
-    help="0. Create new pipeline manifest. Example: smus-cli create --output pipeline.yaml --name 'MyPipeline'",
+    help="0. Create new pipeline manifest. Example: smus-cicd-cli create --output pipeline.yaml --name 'MyPipeline'",
     rich_help_panel="Pipeline Commands",
 )
 def create(
@@ -327,7 +327,7 @@ def create(
 
 @app.command(
     "logs",
-    help="5. Fetch workflow logs from CloudWatch. Example: smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/my-workflow",
+    help="5. Fetch workflow logs from CloudWatch. Example: smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/my-workflow",
     rich_help_panel="Pipeline Commands",
 )
 def logs(
@@ -351,7 +351,7 @@ def logs(
 
 @app.command(
     "run",
-    help="6. Run Airflow CLI commands in target environment. Example: smus-cli run --workflow my_dag --manifest pipeline.yaml",
+    help="6. Run Airflow CLI commands in target environment. Example: smus-cicd-cli run --workflow my_dag --manifest pipeline.yaml",
     rich_help_panel="Pipeline Commands",
 )
 def run(
@@ -381,7 +381,7 @@ def run(
 
 @app.command(
     "test",
-    help="6. Run tests for pipeline targets. Example: smus-cli test --targets marketing-test-stage",
+    help="6. Run tests for pipeline targets. Example: smus-cicd-cli test --targets marketing-test-stage",
     rich_help_panel="Pipeline Commands",
 )
 def test(
@@ -413,7 +413,7 @@ def test(
 
 @app.command(
     "delete",
-    help="7. Delete projects and environments. Example: smus-cli delete --targets marketing-test-stage --force",
+    help="7. Delete projects and environments. Example: smus-cicd-cli delete --targets marketing-test-stage --force",
     rich_help_panel="Pipeline Commands",
 )
 def delete(
@@ -441,7 +441,7 @@ def delete(
 
 @app.command(
     "integrate",
-    help="Integrate SMUS CLI with other tools (Q CLI). Example: smus-cli integrate qcli",
+    help="Integrate SMUS CI/CD CLI with other tools (Q CLI). Example: smus-cicd-cli integrate qcli",
     rich_help_panel="Pipeline Commands",
 )
 def integrate(
@@ -453,16 +453,16 @@ def integrate(
     ),
 ):
     """
-    Integrate SMUS CLI with external tools.
+    Integrate SMUS CI/CD CLI with external tools.
 
     Currently supports:
     - qcli: Amazon Q CLI integration via MCP (Model Context Protocol)
 
     Examples:
-      smus-cli integrate qcli                           # Setup with default config
-      smus-cli integrate qcli --configure custom.yaml   # Setup with custom config
-      smus-cli integrate qcli --status                  # Check integration status
-      smus-cli integrate qcli --uninstall               # Remove integration
+      smus-cicd-cli integrate qcli                           # Setup with default config
+      smus-cicd-cli integrate qcli --configure custom.yaml   # Setup with custom config
+      smus-cicd-cli integrate qcli --status                  # Check integration status
+      smus-cicd-cli integrate qcli --uninstall               # Remove integration
     """
     configure_logging("TEXT", LOG_LEVEL)
     if tool.lower() == "qcli":
@@ -477,7 +477,7 @@ def integrate(
 
 @app.command(
     "chat",
-    help="8. Start interactive AI chat agent. Example: smus-cli chat",
+    help="8. Start interactive AI chat agent. Example: smus-cicd-cli chat",
     rich_help_panel="Pipeline Commands",
 )
 def chat(
@@ -493,10 +493,10 @@ def chat(
     ),
 ):
     """
-    Start interactive chat with SMUS CLI AI agent.
+    Start interactive chat with SMUS CI/CD CLI AI agent.
 
     The agent can:
-    - Answer questions about SMUS CLI
+    - Answer questions about SMUS CI/CD CLI
     - Help build new pipelines
     - Troubleshoot issues
     - Provide examples and guidance

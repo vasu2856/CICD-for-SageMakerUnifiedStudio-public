@@ -85,7 +85,7 @@ class TestSMUSMCPServer:
 
     def test_handle_query_smus_kb_tool(self):
         """Test query_smus_kb tool."""
-        self.server.docs["readme"] = "# SMUS CLI\nThis is about pipelines"
+        self.server.docs["readme"] = "# SMUS CI/CD CLI\nThis is about pipelines"
 
         request = {
             "jsonrpc": "2.0",

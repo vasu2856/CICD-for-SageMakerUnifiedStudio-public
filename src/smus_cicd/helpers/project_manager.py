@@ -1,4 +1,4 @@
-"""Project management utilities for SMUS CLI."""
+"""Project management utilities for SMUS CI/CD CLI."""
 
 from typing import Any, Dict, List, Optional
 

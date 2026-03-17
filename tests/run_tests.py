@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Comprehensive test runner for SMUS CLI with coverage analysis."""
+"""Comprehensive test runner for SMUS CI/CD CLI with coverage analysis."""
 
 import argparse
 import os
@@ -166,7 +166,7 @@ def generate_coverage_report():
 
 def main():
     """Main test runner."""
-    parser = argparse.ArgumentParser(description="SMUS CLI Test Runner with Coverage")
+    parser = argparse.ArgumentParser(description="SMUS CI/CD CLI Test Runner with Coverage")
     parser.add_argument(
         "--type",
         choices=["unit", "integration", "all"],

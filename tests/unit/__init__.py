@@ -1,1 +1,1 @@
-"""Unit tests for SMUS CLI commands."""
+"""Unit tests for SMUS CI/CD CLI commands."""

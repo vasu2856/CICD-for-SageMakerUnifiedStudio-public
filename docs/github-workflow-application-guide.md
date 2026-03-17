@@ -334,7 +334,7 @@ jobs:
       manifest_path: 'model/manifest.yaml'
       test_branch: 'ml-model-test-branch'
       prod_branch: 'ml-model-prod-branch'
-      smus_cli_path: 'tools/smus-cli'  # Custom path
+      smus_cli_path: 'tools/smus-cicd-cli'  # Custom path
     secrets:
       AWS_ROLE_ARN_TEST: ${{ secrets.AWS_ROLE_ARN_ML_TEST }}
       AWS_ROLE_ARN_PROD: ${{ secrets.AWS_ROLE_ARN_ML_PROD }}
@@ -555,7 +555,7 @@ You can start with one strategy and migrate to another later:
 All three strategies use the same:
 - AWS infrastructure (OIDC, IAM roles)
 - GitHub setup (environments, secrets)
-- SMUS CLI commands
+- SMUS CI/CD CLI commands
 - Manifest format (with minor additions)
 
 The main difference is in the workflow logic, not the infrastructure setup.

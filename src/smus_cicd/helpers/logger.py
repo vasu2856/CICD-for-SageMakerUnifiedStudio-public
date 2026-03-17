@@ -1,4 +1,4 @@
-"""Logging configuration for SMUS CLI."""
+"""Logging configuration for SMUS CI/CD CLI."""
 
 import logging
 import sys

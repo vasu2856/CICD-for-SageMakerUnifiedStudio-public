@@ -886,15 +886,15 @@ Workflow:
 Artifact Promotion
 
 1. Create bundle from dev:
-   smus-cli bundle --manifest manifest.yaml
+   smus-cicd-cli bundle --manifest manifest.yaml
 
 2. Store bundle in artifact repository
 
 3. Deploy bundle to test:
-   smus-cli deploy --bundle Bundle-MyApp-test-*.zip --targets test
+   smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets test
 
 4. Promote to prod:
-   smus-cli deploy --bundle Bundle-MyApp-test-*.zip --targets prod
+   smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets prod
 ```
 
 ### 3. Tag-Based Deployment
@@ -1066,7 +1066,7 @@ Solution: Ensure workflow.create runs before workflow.run
 
 ### B. References
 
-- [SMUS CLI README](../README.md)
+- [SMUS CI/CD CLI README](../README.md)
 - [Manifest Schema](manifest-schema.md)
 - [CLI Commands](cli-commands.md)
 - [Bootstrap Actions](bootstrap-actions.md)

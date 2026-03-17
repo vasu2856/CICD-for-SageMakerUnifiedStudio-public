@@ -446,4 +446,4 @@ def _display_next_steps(
         typer.echo("2. Set create: true for projects that need to be created")
 
     typer.echo("4. Add workflows if needed")
-    typer.echo("5. Validate with: smus-cli describe --pipeline <manifest-file>")
+    typer.echo("5. Validate with: smus-cicd-cli describe --pipeline <manifest-file>")

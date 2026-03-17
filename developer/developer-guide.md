@@ -22,7 +22,7 @@ pip install -e ".[dev]"
 
 ```bash
 # Run the CLI
-smus-cli --help
+smus-cicd-cli --help
 
 # Or using Python module
 python -m smus_cicd.cli --help
@@ -468,7 +468,7 @@ isort src/smus_cicd/
 # Quick test examples:
 # Notebook: python -c "import papermill as pm; pm.execute_notebook('nb.ipynb', '/tmp/out.ipynb', parameters={'p': 'v'})"
 # Manifest: python -c "from smus_cicd.application.application_manifest import ApplicationManifest; m = ApplicationManifest.from_file('manifest.yaml'); print(m.initialization)"
-# CLI: smus-cli describe --manifest manifest.yaml
+# CLI: smus-cicd-cli describe --manifest manifest.yaml
 
 # Run full integration test only after fix confirmed working
 ```

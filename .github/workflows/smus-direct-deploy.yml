@@ -56,7 +56,7 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
       
-      - name: Install SMUS CLI
+      - name: Install SMUS CI/CD CLI
         run: |
           
           python -m pip install --upgrade pip
@@ -129,7 +129,7 @@ jobs:
             echo "tracking-server-name=$TRACKING_SERVER_NAME" >> $GITHUB_OUTPUT
           fi
       
-      - name: smus-cli deploy to test (direct from branch)
+      - name: smus-cicd-cli deploy to test (direct from branch)
         env:
           DOMAIN_REGION: ${{ vars.DOMAIN_REGION }}
           TEST_DOMAIN_REGION: ${{ vars.DOMAIN_REGION }}
@@ -142,7 +142,7 @@ jobs:
         run: |
           echo "🚀 Deploying directly from branch to test"
           
-          smus-cli deploy \
+          smus-cicd-cli deploy \
             --manifest ${{ inputs.manifest_path }} \
             --targets ${{ inputs.test_target }}
       
@@ -226,7 +226,7 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
       
-      - name: Install SMUS CLI
+      - name: Install SMUS CI/CD CLI
         run: |
           
           python -m pip install --upgrade pip
@@ -252,7 +252,7 @@ jobs:
           echo "account-id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
           echo "✓ AWS Account ID: $ACCOUNT_ID"
       
-      - name: smus-cli test
+      - name: smus-cicd-cli test
         env:
           DOMAIN_REGION: ${{ vars.DOMAIN_REGION }}
           TEST_DOMAIN_REGION: ${{ vars.DOMAIN_REGION }}
@@ -264,6 +264,6 @@ jobs:
           AWS_ACCOUNT_ID: ${{ steps.aws-account-test.outputs.account-id }}
         run: |
           
-          smus-cli test \
+          smus-cicd-cli test \
             --manifest ${{ inputs.manifest_path }} \
             --targets ${{ inputs.test_target }}

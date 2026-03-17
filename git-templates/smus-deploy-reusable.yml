@@ -54,13 +54,13 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
       
-      - name: Install SMUS CLI
+      - name: Install SMUS CI/CD CLI
         run: |
           pip install -e .
       
       - name: Validate manifest
         run: |
-          smus-cli describe --manifest ${{ inputs.manifest_path }}
+          smus-cicd-cli describe --manifest ${{ inputs.manifest_path }}
 
   deploy:
     name: Deploy to ${{ inputs.targets }}
@@ -75,7 +75,7 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
       
-      - name: Install SMUS CLI
+      - name: Install SMUS CI/CD CLI
         run: |
           pip install -e .
       
@@ -94,7 +94,7 @@ jobs:
       
       - name: Deploy
         run: |
-          smus-cli deploy \
+          smus-cicd-cli deploy \
             --manifest ${{ inputs.manifest_path }} \
             --targets ${{ inputs.targets }}
 
@@ -112,7 +112,7 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
       
-      - name: Install SMUS CLI
+      - name: Install SMUS CI/CD CLI
         run: |
           pip install -e .
       
@@ -131,6 +131,6 @@ jobs:
       
       - name: Run tests
         run: |
-          smus-cli test \
+          smus-cicd-cli test \
             --manifest ${{ inputs.manifest_path }} \
             --targets ${{ inputs.targets }}
