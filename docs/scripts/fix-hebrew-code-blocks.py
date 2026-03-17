@@ -22,7 +22,7 @@ def fix_code_blocks_rtl(content: str) -> str:
 def main():
     script_dir = Path(__file__).parent
     project_root = script_dir.parent
-    he_readme = project_root / "docs" / "langs" / "he" / "README.md"
+    he_readme = project_root / "langs" / "he" / "README.md"
     
     print(f"Reading {he_readme}...")
     with open(he_readme, 'r', encoding='utf-8') as f:

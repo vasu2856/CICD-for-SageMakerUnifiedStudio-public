@@ -96,7 +96,7 @@ def translate_with_bedrock(content: str, target_lang: str, lang_name: str) -> st
 def main():
     # Get project root
     script_dir = Path(__file__).parent
-    project_root = script_dir.parent
+    project_root = script_dir.parent.parent
     
     # Read source README
     readme_path = project_root / "README.md"
