@@ -1,1 +1,1 @@
-"""Integration tests for SMUS CLI."""
+"""Integration tests for SMUS CI/CD CLI."""

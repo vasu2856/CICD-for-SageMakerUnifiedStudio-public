@@ -1,4 +1,4 @@
-"""Utility functions for SMUS CLI."""
+"""Utility functions for SMUS CI/CD CLI."""
 
 import os
 import re

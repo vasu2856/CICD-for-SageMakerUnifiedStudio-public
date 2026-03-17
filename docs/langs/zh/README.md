@@ -43,16 +43,16 @@ pip install -e .
 **部署你的第一个应用：**
 ```bash
 # 验证配置
-smus-cli describe --manifest manifest.yaml --connect
+smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # 创建部署 bundle（可选）
-smus-cli bundle --manifest manifest.yaml
+smus-cicd-cli bundle --manifest manifest.yaml
 
 # 部署到测试环境
-smus-cli deploy --targets test --manifest manifest.yaml
+smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # 运行验证测试
-smus-cli test --manifest manifest.yaml --targets test
+smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 **查看运行实例：** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
@@ -101,7 +101,7 @@ bootstrap:
 → **[管理员指南](docs/getting-started/admin-quickstart.md)** - 15分钟内配置基础设施和 pipeline  
 → **[GitHub Workflow 模板](git-templates/)** - 用于自动部署的通用、可重用 workflow 模板
 
-**CLI 是您的抽象层:** 您只需调用 `smus-cli deploy` - CLI 处理所有 AWS 服务交互（DataZone、Glue、Athena、SageMaker、MWAA、S3、IAM 等）并执行 bootstrap actions（workflow 运行、日志流式处理、QuickSight 刷新、EventBridge 事件）。您的 workflow 保持简单和通用。
+**CLI 是您的抽象层:** 您只需调用 `smus-cicd-cli deploy` - CLI 处理所有 AWS 服务交互（DataZone、Glue、Athena、SageMaker、MWAA、S3、IAM 等）并执行 bootstrap actions（workflow 运行、日志流式处理、QuickSight 刷新、EventBridge 事件）。您的 workflow 保持简单和通用。
 
 ---
 
@@ -138,7 +138,7 @@ bootstrap:
 - **QuickSight数据集刷新** - 使用`quicksight.refresh_dataset`在ETL部署后自动刷新仪表板
 - **EventBridge集成** - 使用`eventbridge.put_events`发出自定义事件用于下游自动化和CI/CD编排
 - **DataZone连接** - 在部署期间配置MLflow和其他服务连接
-- **顺序执行** - 动作在`smus-cli deploy`期间按顺序运行，确保可靠的初始化和验证
+- **顺序执行** - 动作在`smus-cicd-cli deploy`期间按顺序运行，确保可靠的初始化和验证
 
 ### 📊 目录集成
 - **资产发现** - 自动查找所需的目录资产（Glue、Lake Formation、DataZone）
@@ -208,12 +208,12 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 
 **问题：**传统部署方法迫使 DevOps 团队学习 AWS 分析服务（Glue、Athena、DataZone、SageMaker、MWAA 等）并理解 SMUS 项目结构，或迫使数据团队成为 CI/CD 专家。
 
-**解决方案：**SMUS CLI 是封装所有 AWS 和 SMUS 复杂性的抽象层：
+**解决方案：**SMUS CI/CD CLI 是封装所有 AWS 和 SMUS 复杂性的抽象层：
 
 ```
-数据团队                      SMUS CLI                         DevOps 团队
+数据团队                      SMUS CI/CD CLI                         DevOps 团队
     ↓                            ↓                                  ↓
-manifest.yaml          smus-cli deploy                    GitHub Actions
+manifest.yaml          smus-cicd-cli deploy                    GitHub Actions
 (做什么和在哪里)        (AWS 抽象层)                       (如何做和何时做)
 ```
 
@@ -223,7 +223,7 @@ manifest.yaml          smus-cli deploy                    GitHub Actions
 - 环境配置
 - 业务逻辑
 
-**SMUS CLI 处理所有 AWS 复杂性：**
+**SMUS CI/CD CLI 处理所有 AWS 复杂性：**
 - DataZone 域和项目管理
 - AWS Glue、Athena、SageMaker、MWAA API
 - S3 存储和工件管理
@@ -242,7 +242,7 @@ manifest.yaml          smus-cli deploy                    GitHub Actions
 
 **结果：**
 - 数据团队永远不接触 CI/CD 配置
-- **DevOps 团队永远不直接调用 AWS API** - 他们只需调用 `smus-cli deploy`
+- **DevOps 团队永远不直接调用 AWS API** - 他们只需调用 `smus-cicd-cli deploy`
 - **CI/CD workflow 是通用的** - 同样的 workflow 适用于 Glue 应用、SageMaker 应用或 Bedrock 应用
 - 两个团队都能独立运用各自的专长工作
 
@@ -300,17 +300,17 @@ Workflow 以 YAML 格式定义为 Airflow DAG（有向无环图）。支持 [MWA
 - 执行安全和合规策略
 - 示例：`.github/workflows/deploy.yml`
 
-**关键见解：**DevOps 团队创建适用于任何应用的通用、可重用 workflow。他们不需要知道应用是使用 Glue、SageMaker 还是 Bedrock - CLI 处理所有 AWS 服务交互。workflow 只需调用 `smus-cli deploy`，CLI 完成其余工作。
+**关键见解：**DevOps 团队创建适用于任何应用的通用、可重用 workflow。他们不需要知道应用是使用 Glue、SageMaker 还是 Bedrock - CLI 处理所有 AWS 服务交互。workflow 只需调用 `smus-cicd-cli deploy`，CLI 完成其余工作。
 
 ### 部署模式
 
 **基于 bundle（工件）：**创建版本化归档 → 将归档部署到各个 stage
 - 适用于：审计跟踪、回滚能力、合规性
-- 命令：`smus-cli bundle` 然后 `smus-cli deploy --manifest app.tar.gz`
+- 命令：`smus-cicd-cli bundle` 然后 `smus-cicd-cli deploy --manifest app.tar.gz`
 
 **直接（基于 Git）：**无中间工件直接从源代码部署
 - 适用于：更简单的 workflow、快速迭代、以 git 为真实来源
-- 命令：`smus-cli deploy --manifest manifest.yaml --stage test`
+- 命令：`smus-cicd-cli deploy --manifest manifest.yaml --stage test`
 
 两种模式都适用于任何存储和 git 内容源的组合。
 
@@ -319,10 +319,10 @@ Workflow 以 YAML 格式定义为 Airflow DAG（有向无环图）。支持 [MWA
 ### 所有组件如何协同工作
 
 ```
-1. 数据团队                    2. DevOps 团队                 3. SMUS CLI（抽象层）
+1. 数据团队                    2. DevOps 团队                 3. SMUS CI/CD CLI（抽象层）
    ↓                               ↓                              ↓
 创建 manifest.yaml          创建通用 workflow               Workflow 调用：
-- Glue 作业                  - 合并时测试                    smus-cli deploy --manifest manifest.yaml
+- Glue 作业                  - 合并时测试                    smus-cicd-cli deploy --manifest manifest.yaml
 - SageMaker 训练            - 生产环境审批                     ↓
 - Athena 查询               - 安全扫描                      CLI 处理所有 AWS 复杂性：
 - S3 位置                   - 通知规则                      - DataZone API
@@ -338,7 +338,7 @@ Workflow 以 YAML 格式定义为 Airflow DAG（有向无环图）。支持 [MWA
 **优点：**
 - 数据团队永远不需要学习 GitHub Actions
 - **DevOps 团队永远不调用 AWS API** - CLI 封装了所有 AWS 分析、ML 和 SMUS 复杂性
-- CI/CD workflow 很简单：只需调用 `smus-cli deploy`
+- CI/CD workflow 很简单：只需调用 `smus-cicd-cli deploy`
 - 同样的 workflow 适用于任何应用，无论使用哪些 AWS 服务
 
 ---
@@ -692,7 +692,7 @@ stages:
 ### Developer Experience
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Project templates | 🔄 | `smus-cli init` with templates |
+| Project templates | 🔄 | `smus-cicd-cli init` with templates |
 | Manifest initialization | ✅ | [Create Command](docs/cli-commands.md#create) |
 | Interactive setup | 🔄 | Guided configuration prompts |
 | Local development | ✅ | [CLI Commands](docs/cli-commands.md) |

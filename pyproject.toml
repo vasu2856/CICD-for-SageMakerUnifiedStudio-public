@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "smus-cli"
+name = "smus-cicd-cli"
 version = "1.0.0"
 authors = [
     {name = "AWS SageMaker Unified Studio Team", email = "sagemaker-unified-studio@amazon.com"},
@@ -51,7 +51,7 @@ dev = [
 ]
 
 [project.scripts]
-smus-cli = "smus_cicd.cli:app"
+smus-cicd-cli = "smus_cicd.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/aws/CICD-for-SageMakerUnifiedStudio"

@@ -2,7 +2,7 @@
 
 ← [Back to Main README](../README.md)
 
-The SMUS CLI provides eight main commands for managing CI/CD pipelines in SageMaker Unified Studio.
+The SMUS CI/CD CLI provides eight main commands for managing CI/CD pipelines in SageMaker Unified Studio.
 
 ## Global Options
 
@@ -18,20 +18,20 @@ All commands support these global options:
 **Examples:**
 ```bash
 # Debug mode for troubleshooting
-smus-cli describe --manifest manifest.yaml --log-level DEBUG
+smus-cicd-cli describe --manifest manifest.yaml --log-level DEBUG
 
 # Quiet mode - only errors
-smus-cli deploy --targets prod --log-level ERROR
+smus-cicd-cli deploy --targets prod --log-level ERROR
 
 # JSON output for automation
-smus-cli describe --manifest manifest.yaml --output JSON --log-level WARNING
+smus-cicd-cli describe --manifest manifest.yaml --output JSON --log-level WARNING
 ```
 
 **Environment Variable:**
 ```bash
 # Set default log level
 export SMUS_LOG_LEVEL=DEBUG
-smus-cli describe --manifest manifest.yaml
+smus-cicd-cli describe --manifest manifest.yaml
 ```
 
 ---
@@ -40,26 +40,26 @@ smus-cli describe --manifest manifest.yaml
 
 | Command | Purpose | Example |
 |---------|---------|---------|
-| `create` | Create new bundle manifest | `smus-cli create --output manifest.yaml` |
-| `describe` | Validate and show bundle configuration | `smus-cli describe --manifest manifest.yaml --connect` |
-| `bundle` | Package files from source environment | `smus-cli bundle --targets dev` |
-| `deploy` | Deploy bundle to target environment | `smus-cli deploy --targets test --manifest bundle.zip` |
-| `run` | Execute workflow commands or trigger workflows | `smus-cli run --workflow my_dag` |
-| `logs` | Fetch workflow logs from CloudWatch | `smus-cli logs --workflow arn:aws:airflow-serverless:region:account:workflow/name` |
-| `monitor` | Monitor workflow status | `smus-cli monitor --manifest manifest.yaml` |
-| `test` | Run tests for pipeline targets | `smus-cli test --targets marketing-test-stage` |
-| `integrate` | Integrate with external tools (Q CLI) | `smus-cli integrate qcli` |
-| `delete` | Remove target environments | `smus-cli delete --stages marketing-test-stage --force` |
+| `create` | Create new bundle manifest | `smus-cicd-cli create --output manifest.yaml` |
+| `describe` | Validate and show bundle configuration | `smus-cicd-cli describe --manifest manifest.yaml --connect` |
+| `bundle` | Package files from source environment | `smus-cicd-cli bundle --targets dev` |
+| `deploy` | Deploy bundle to target environment | `smus-cicd-cli deploy --targets test --manifest bundle.zip` |
+| `run` | Execute workflow commands or trigger workflows | `smus-cicd-cli run --workflow my_dag` |
+| `logs` | Fetch workflow logs from CloudWatch | `smus-cicd-cli logs --workflow arn:aws:airflow-serverless:region:account:workflow/name` |
+| `monitor` | Monitor workflow status | `smus-cicd-cli monitor --manifest manifest.yaml` |
+| `test` | Run tests for pipeline targets | `smus-cicd-cli test --targets marketing-test-stage` |
+| `integrate` | Integrate with external tools (Q CLI) | `smus-cicd-cli integrate qcli` |
+| `delete` | Remove target environments | `smus-cicd-cli delete --stages marketing-test-stage --force` |
 
 ## Detailed Command Examples
 
 ### 1. Describe Pipeline Configuration
 ```bash
 # Basic describe
-smus-cli describe --manifest manifest.yaml
+smus-cicd-cli describe --manifest manifest.yaml
 
 # Describe with connection details and AWS connectivity
-smus-cli describe --manifest manifest.yaml --connect
+smus-cicd-cli describe --manifest manifest.yaml --connect
 ```
 **Example Output:**
 ```
@@ -107,22 +107,22 @@ Manifest Workflows:
 ### 2. Bundle Creation
 ```bash
 # Bundle for specific target
-smus-cli bundle --targets dev --output-dir ./bundles
+smus-cicd-cli bundle --targets dev --output-dir ./bundles
 
 # Bundle for multiple targets
-smus-cli bundle --targets dev,test --output-dir /tmp/bundles
+smus-cicd-cli bundle --targets dev,test --output-dir /tmp/bundles
 ```
 
 ### 3. Deploy Bundle
 ```bash
 # Deploy using auto-created bundle
-smus-cli deploy --stages test
+smus-cicd-cli deploy --stages test
 
 # Deploy using pre-created bundle file
-smus-cli deploy --stages test --manifest /path/to/bundle.zip
+smus-cicd-cli deploy --stages test --manifest /path/to/bundle.zip
 
 # Deploy with JSON output
-smus-cli deploy --stages test --manifest bundle.zip --output JSON
+smus-cicd-cli deploy --stages test --manifest bundle.zip --output JSON
 ```
 
 ### 4. Run Commands and Workflows
@@ -130,25 +130,25 @@ smus-cli deploy --stages test --manifest bundle.zip --output JSON
 #### Execute Airflow CLI Commands (MWAA)
 ```bash
 # Get Airflow version
-smus-cli run --workflow test_dag --command version
+smus-cicd-cli run --workflow test_dag --command version
 
 # List all DAGs
-smus-cli run --workflow sample_dag --command "dags list"
+smus-cicd-cli run --workflow sample_dag --command "dags list"
 
 # Get DAG state
-smus-cli run --workflow sample_dag --command "dags state sample_dag"
+smus-cicd-cli run --workflow sample_dag --command "dags state sample_dag"
 ```
 
 #### Trigger Workflows
 ```bash
 # Trigger single workflow (works with both MWAA and serverless Airflow)
-smus-cli run --workflow test_dag
+smus-cicd-cli run --workflow test_dag
 
 # Trigger workflow on specific target
-smus-cli run --workflow test_dag --stages prod
+smus-cicd-cli run --workflow test_dag --stages prod
 
 # Trigger with JSON output
-smus-cli run --workflow test_dag --output JSON
+smus-cicd-cli run --workflow test_dag --output JSON
 ```
 
 **Example Output (TEXT format - MWAA):**
@@ -198,16 +198,16 @@ smus-cli run --workflow test_dag --output JSON
 ### 5. Fetch Workflow Logs
 ```bash
 # Fetch logs for serverless Airflow workflow
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyPipeline_test_test_dag
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyPipeline_test_test_dag
 
 # Fetch logs with live monitoring
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyPipeline_test_test_dag --live
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyPipeline_test_test_dag --live
 
 # Fetch specific number of log lines
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyPipeline_test_test_dag --lines 50
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyPipeline_test_test_dag --lines 50
 
 # Fetch logs with JSON output
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyPipeline_test_test_dag --output JSON
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyPipeline_test_test_dag --output JSON
 ```
 
 **Example Output:**
@@ -229,40 +229,40 @@ smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workf
 ### 6. Monitor Workflows
 ```bash
 # Monitor all targets
-smus-cli monitor --manifest manifest.yaml
+smus-cicd-cli monitor --manifest manifest.yaml
 
 # Monitor specific targets with JSON output
-smus-cli monitor --stages test --output JSON
+smus-cicd-cli monitor --stages test --output JSON
 ```
 
 ### 6. Test Pipeline
 ```bash
 # Run tests for all targets
-smus-cli test --manifest manifest.yaml
+smus-cicd-cli test --manifest manifest.yaml
 
 # Run tests for specific targets with verbose output
-smus-cli test --stages test --verbose
+smus-cicd-cli test --stages test --verbose
 
 # Stream test output directly to console
-smus-cli test --stages test --test-output console
+smus-cicd-cli test --stages test --test-output console
 ```
 
 ### 8. Integrate with External Tools
 ```bash
 # Setup Q CLI integration (MCP server)
-smus-cli integrate qcli
+smus-cicd-cli integrate qcli
 
 # Check integration status
-smus-cli integrate qcli --status
+smus-cicd-cli integrate qcli --status
 
 # Uninstall integration
-smus-cli integrate qcli --uninstall
+smus-cicd-cli integrate qcli --uninstall
 ```
 
 **What it does:**
-- Registers SMUS CLI as an MCP (Model Context Protocol) server with Amazon Q CLI
+- Registers SMUS CI/CD CLI as an MCP (Model Context Protocol) server with Amazon Q CLI
 - Enables Q CLI to access SMUS pipeline examples, documentation, and validation
-- Provides natural language interface to SMUS CLI capabilities
+- Provides natural language interface to SMUS CI/CD CLI capabilities
 
 **Available MCP Tools:**
 - `get_pipeline_example` - Generate bundle manifests from templates
@@ -286,13 +286,13 @@ Q: [Validates and reports any schema errors]
 ### 9. Delete Resources
 ```bash
 # Delete with confirmation
-smus-cli delete --stages test
+smus-cicd-cli delete --stages test
 
 # Force delete without confirmation
-smus-cli delete --stages test --force
+smus-cicd-cli delete --stages test --force
 
 # Async delete (don't wait for completion)
-smus-cli delete --stages test --force --async
+smus-cicd-cli delete --stages test --force --async
 ```
 
 ## Universal Options
@@ -364,7 +364,7 @@ Manifest Workflows:
 
 ### 2. Create Bundle from Dev Environment
 ```bash
-smus-cli bundle --manifest manifest.yaml --targets dev
+smus-cicd-cli bundle --manifest manifest.yaml --targets dev
 ```
 **Example Output:**
 ```
@@ -404,7 +404,7 @@ Bundle creation complete for target: dev
 
 ### 3. Deploy to Test Environment
 ```bash
-smus-cli deploy --stages test --manifest manifest.yaml
+smus-cicd-cli deploy --stages test --manifest manifest.yaml
 ```
 **Example Output:**
 ```
@@ -449,7 +449,7 @@ Deploying workflows to: default.s3_shared/workflows (append: True)
 
 ### 4. Monitor Workflow Status
 ```bash
-smus-cli monitor --manifest manifest.yaml
+smus-cicd-cli monitor --manifest manifest.yaml
 ```
 **Example Output:**
 ```
@@ -481,7 +481,7 @@ Domain: cicd-test-domain (us-east-1)
 
 ### 5. Trigger Workflow Execution
 ```bash
-smus-cli run --manifest manifest.yaml --stages test --workflow test_dag --command trigger
+smus-cicd-cli run --manifest manifest.yaml --stages test --workflow test_dag --command trigger
 ```
 **Example Output:**
 ```
@@ -496,7 +496,7 @@ smus-cli run --manifest manifest.yaml --stages test --workflow test_dag --comman
 
 ### 7. Run Tests
 ```bash
-smus-cli test --manifest manifest.yaml --stages marketing-test-stage
+smus-cicd-cli test --manifest manifest.yaml --stages marketing-test-stage
 ```
 **Example Output:**
 ```
@@ -520,7 +520,7 @@ Domain: cicd-test-domain (us-east-1)
 
 ### 8. Clean Up Resources
 ```bash
-smus-cli delete --stages test --manifest manifest.yaml --force
+smus-cicd-cli delete --stages test --manifest manifest.yaml --force
 ```
 **Example Output:**
 ```
@@ -540,7 +540,7 @@ Targets to delete:
 **What this shows:** The delete command removes SageMaker Unified Studio projects and their associated resources. It provides a summary of deletion operations, showing which projects were successfully removed. This is useful for cleaning up test environments and managing resource lifecycle in your CI/CD pipeline.
 
 ```bash
-smus-cli --help
+smus-cicd-cli --help
 ```
 
 ### Pipeline Commands
@@ -561,7 +561,7 @@ smus-cli --help
 Creates a new bundle manifest file with basic structure.
 
 ```bash
-smus-cli create [OPTIONS]
+smus-cicd-cli create [OPTIONS]
 ```
 
 #### Options
@@ -577,13 +577,13 @@ smus-cli create [OPTIONS]
 
 ```bash
 # Create basic bundle manifest
-smus-cli create
+smus-cicd-cli create
 
 # Create with custom output file and name
-smus-cli create --output my-manifest.yaml --name MyPipeline
+smus-cicd-cli create --output my-manifest.yaml --name MyPipeline
 
 # Create with specific stages and region
-smus-cli create --output manifest.yaml --stages dev,test,prod --region us-west-2
+smus-cicd-cli create --output manifest.yaml --stages dev,test,prod --region us-west-2
 ```
 
 ### 1. describe - Describe Pipeline Configuration
@@ -591,7 +591,7 @@ smus-cli create --output manifest.yaml --stages dev,test,prod --region us-west-2
 Validates and displays information about your bundle manifest.
 
 ```bash
-smus-cli describe [OPTIONS]
+smus-cicd-cli describe [OPTIONS]
 ```
 
 #### Options
@@ -607,16 +607,16 @@ smus-cli describe [OPTIONS]
 
 ```bash
 # Basic describe
-smus-cli describe
+smus-cicd-cli describe
 
 # Describe specific targets with workflows
-smus-cli describe -t dev,test -w
+smus-cicd-cli describe -t dev,test -w
 
 # Describe with AWS connection info in JSON format
-smus-cli describe --connect -o JSON
+smus-cicd-cli describe --connect -o JSON
 
 # Describe specific pipeline file
-smus-cli describe -p my-manifest.yaml
+smus-cicd-cli describe -p my-manifest.yaml
 ```
 
 ### 2. bundle - Create Deployment Packages
@@ -624,7 +624,7 @@ smus-cli describe -p my-manifest.yaml
 Creates bundle zip files by downloading from S3.
 
 ```bash
-smus-cli bundle [OPTIONS] [TARGET_POSITIONAL]
+smus-cicd-cli bundle [OPTIONS] [TARGET_POSITIONAL]
 ```
 
 #### Options
@@ -661,19 +661,19 @@ bundlesDirectory: s3://my-datazone-bucket/bundles
 
 ```bash
 # Bundle default target
-smus-cli bundle
+smus-cicd-cli bundle
 
 # Bundle specific targets
-smus-cli bundle --targets dev,test
+smus-cicd-cli bundle --targets dev,test
 
 # Bundle to custom directory
-smus-cli bundle --output-dir /path/to/bundles
+smus-cicd-cli bundle --output-dir /path/to/bundles
 
 # Bundle with JSON output
-smus-cli bundle --output JSON
+smus-cicd-cli bundle --output JSON
 
 # Bundle using positional argument (backward compatibility)
-smus-cli bundle dev
+smus-cicd-cli bundle dev
 ```
 
 ### 3. deploy - Deploy to Targets
@@ -697,7 +697,7 @@ Deploys bundle files to target environments (auto-initializes if needed). The de
 5. **Deployment Metrics**: Optionally emits deployment lifecycle events to EventBridge for monitoring and alerting (see [Bundle Deployment Metrics](pipeline-deployment-metrics.md))
 
 ```bash
-smus-cli deploy [OPTIONS] [TARGET_POSITIONAL]
+smus-cicd-cli deploy [OPTIONS] [TARGET_POSITIONAL]
 ```
 
 #### Options
@@ -736,19 +736,19 @@ See [Bundle Deployment Metrics](pipeline-deployment-metrics.md) for complete set
 
 ```bash
 # Deploy to default target
-smus-cli deploy
+smus-cicd-cli deploy
 
 # Deploy to specific targets
-smus-cli deploy --stages test,prod
+smus-cicd-cli deploy --stages test,prod
 
 # Deploy with pre-created bundle
-smus-cli deploy --stages test --manifest /path/to/bundle.zip
+smus-cicd-cli deploy --stages test --manifest /path/to/bundle.zip
 
 # Deploy with EventBridge monitoring enabled
-smus-cli deploy --stages prod --emit-events
+smus-cicd-cli deploy --stages prod --emit-events
 
 # Deploy using positional argument (backward compatibility)
-smus-cli deploy test
+smus-cicd-cli deploy test
 ```
 
 ### 4. monitor - Monitor Workflow Status
@@ -756,7 +756,7 @@ smus-cli deploy test
 Monitors workflow status across target environments.
 
 ```bash
-smus-cli monitor [OPTIONS]
+smus-cicd-cli monitor [OPTIONS]
 ```
 
 #### Options
@@ -770,16 +770,16 @@ smus-cli monitor [OPTIONS]
 
 ```bash
 # Monitor all targets (one-time snapshot)
-smus-cli monitor
+smus-cicd-cli monitor
 
 # Monitor specific targets
-smus-cli monitor -t dev,test
+smus-cicd-cli monitor -t dev,test
 
 # Live monitoring - continuously poll until workflows complete
-smus-cli monitor --live
+smus-cicd-cli monitor --live
 
 # Monitor with JSON output
-smus-cli monitor -o JSON
+smus-cicd-cli monitor -o JSON
 ```
 
 #### Live Monitoring
@@ -811,7 +811,7 @@ Pipeline: IntegrationTestMLWorkflow
 Fetches and displays workflow logs from CloudWatch (supports serverless Airflow workflows).
 
 ```bash
-smus-cli logs [OPTIONS]
+smus-cicd-cli logs [OPTIONS]
 ```
 
 #### Options
@@ -825,16 +825,16 @@ smus-cli logs [OPTIONS]
 
 ```bash
 # Fetch logs for serverless Airflow workflow
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow
 
 # Live log monitoring (streams logs in real-time)
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow --live
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow --live
 
 # Fetch specific number of lines
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow --lines 50
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow --lines 50
 
 # Fetch logs with JSON output
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow --output JSON
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow --output JSON
 ```
 
 **Example Output:**
@@ -856,7 +856,7 @@ smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workf
 Executes workflow commands on target environments (supports both MWAA and serverless Airflow).
 
 ```bash
-smus-cli run [OPTIONS]
+smus-cicd-cli run [OPTIONS]
 ```
 
 #### Options
@@ -871,13 +871,13 @@ smus-cli run [OPTIONS]
 
 ```bash
 # Trigger workflow (works with both MWAA and serverless Airflow)
-smus-cli run --workflow my_dag
+smus-cicd-cli run --workflow my_dag
 
 # Run Airflow CLI command (MWAA only)
-smus-cli run --workflow my_dag --command version
+smus-cicd-cli run --workflow my_dag --command version
 
 # Run on specific target with JSON output
-smus-cli run --workflow my_dag --stages prod --output JSON
+smus-cicd-cli run --workflow my_dag --stages prod --output JSON
 ```
 
 ### 6. logs - Fetch Workflow Logs
@@ -885,7 +885,7 @@ smus-cli run --workflow my_dag --stages prod --output JSON
 Fetches and displays workflow logs from CloudWatch (supports serverless Airflow workflows).
 
 ```bash
-smus-cli logs [OPTIONS]
+smus-cicd-cli logs [OPTIONS]
 ```
 
 #### Options
@@ -899,13 +899,13 @@ smus-cli logs [OPTIONS]
 
 ```bash
 # Fetch logs for serverless Airflow workflow
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow
 
 # Live log monitoring
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow --live
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow --live
 
 # Fetch specific number of lines with JSON output
-smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow --lines 50 --output JSON
+smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/MyWorkflow --lines 50 --output JSON
 ```
 
 ### 8. delete - Delete Target Environments
@@ -913,7 +913,7 @@ smus-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workf
 Deletes DataZone projects and associated resources for specified targets.
 
 ```bash
-smus-cli delete [OPTIONS]
+smus-cicd-cli delete [OPTIONS]
 ```
 
 #### Options
@@ -928,16 +928,16 @@ smus-cli delete [OPTIONS]
 
 ```bash
 # Delete single target with confirmation
-smus-cli delete -t test
+smus-cicd-cli delete -t test
 
 # Delete multiple targets without confirmation
-smus-cli delete -t test,prod --force
+smus-cicd-cli delete -t test,prod --force
 
 # Delete asynchronously (don't wait for completion)
-smus-cli delete -t test --force --async
+smus-cicd-cli delete -t test --force --async
 
 # Delete with JSON output
-smus-cli delete -t test --force -o JSON
+smus-cicd-cli delete -t test --force -o JSON
 ```
 
 #### Behavior
@@ -980,29 +980,29 @@ All commands support:
 ### Development Workflow
 ```bash
 # 1. Create new pipeline
-smus-cli create -o my-manifest.yaml
+smus-cicd-cli create -o my-manifest.yaml
 
 # 2. Validate configuration
-smus-cli describe --manifest my-manifest.yaml
+smus-cicd-cli describe --manifest my-manifest.yaml
 
 # 3. Create bundle from dev
-smus-cli bundle --manifest my-manifest.yaml --targets dev
+smus-cicd-cli bundle --manifest my-manifest.yaml --targets dev
 
 # 4. Deploy to test
-smus-cli deploy --manifest my-manifest.yaml --targets test
+smus-cicd-cli deploy --manifest my-manifest.yaml --targets test
 
 # 5. Monitor deployment
-smus-cli monitor --manifest my-manifest.yaml --targets test
+smus-cicd-cli monitor --manifest my-manifest.yaml --targets test
 
 # 6. Run workflow commands
-smus-cli run --workflow my_dag --command "dags list" --targets test
+smus-cicd-cli run --workflow my_dag --command "dags list" --targets test
 ```
 
 ### Cleanup Workflow
 ```bash
 # Delete test environment
-smus-cli delete -t test --force
+smus-cicd-cli delete -t test --force
 
 # Delete multiple environments
-smus-cli delete -t test,staging --force --async
+smus-cicd-cli delete -t test,staging --force --async
 ```

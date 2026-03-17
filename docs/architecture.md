@@ -101,8 +101,8 @@ Bootstrap actions use a registry pattern for extensibility:
 │         └────────────────┼──────────────────┘                            │
 │                          │                                               │
 │                   ┌──────▼──────┐                                        │
-│                   │  SMUS CLI   │                                        │
-│                   │             │                                        │
+│                   │ SMUS CI/CD  │                                        │
+│                   │    CLI      │                                        │
 │                   │  Commands:  │                                        │
 │                   │  • describe │                                        │
 │                   │  • bundle   │                                        │
@@ -333,7 +333,7 @@ Provides tools for AI assistants (Amazon Q CLI) to:
 ### 1. Describe Command Flow
 
 ```
-User runs: smus-cli describe --manifest manifest.yaml --connect
+User runs: smus-cicd-cli describe --manifest manifest.yaml --connect
 
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. CLI Layer (describe.py)                                  │
@@ -370,7 +370,7 @@ User runs: smus-cli describe --manifest manifest.yaml --connect
 
 ```
 
-User runs: smus-cli deploy --manifest manifest.yaml --targets test
+User runs: smus-cicd-cli deploy --manifest manifest.yaml --targets test
 
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. CLI Layer (deploy.py)                                    │
@@ -437,7 +437,7 @@ User runs: smus-cli deploy --manifest manifest.yaml --targets test
 ### 3. Monitor Command Flow
 
 ```
-User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
+User runs: smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
 
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. CLI Layer (monitor.py)                                   │
@@ -505,7 +505,7 @@ User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
 │                        Validation Phase                                  │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cli describe --manifest manifest.yaml --connect             │  │
+│  │ smus-cicd-cli describe --manifest manifest.yaml --connect             │  │
 │  │                                                                   │  │
 │  │ ✓ Validate YAML syntax                                           │  │
 │  │ ✓ Validate schema                                                │  │
@@ -521,7 +521,7 @@ User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
 │                        Bundle Phase (Optional)                           │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cli bundle --manifest manifest.yaml --targets test           │  │
+│  │ smus-cicd-cli bundle --manifest manifest.yaml --targets test           │  │
 │  │                                                                   │  │
 │  │ 1. Download content from dev environment                         │  │
 │  │    - S3 files                                                    │  │
@@ -540,7 +540,7 @@ User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
 │                        Deployment Phase                                  │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cli deploy --manifest manifest.yaml --targets test          │  │
+│  │ smus-cicd-cli deploy --manifest manifest.yaml --targets test          │  │
 │  │                                                                   │  │
 │  │ Phase 1: Infrastructure Initialization                           │  │
 │  │ ├─ Resolve domain ID from tags                                   │  │
@@ -573,7 +573,7 @@ User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
 │                        Monitoring Phase                                  │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cli monitor --manifest manifest.yaml --targets test --live  │  │
+│  │ smus-cicd-cli monitor --manifest manifest.yaml --targets test --live  │  │
 │  │                                                                   │  │
 │  │ ├─ Find workflow ARNs                                            │  │
 │  │ ├─ Poll workflow status                                          │  │
@@ -587,7 +587,7 @@ User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
 │                        Testing Phase                                     │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cli test --manifest manifest.yaml --targets test            │  │
+│  │ smus-cicd-cli test --manifest manifest.yaml --targets test            │  │
 │  │                                                                   │  │
 │  │ ├─ Run integration tests                                         │  │
 │  │ ├─ Validate data quality                                         │  │
@@ -603,7 +603,7 @@ User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
 │  Repeat deployment for next stage (test → prod)                         │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cli deploy --manifest manifest.yaml --targets prod          │  │
+│  │ smus-cicd-cli deploy --manifest manifest.yaml --targets prod          │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -617,7 +617,7 @@ User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
 ```
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          SMUS CLI                                        │
+│                        SMUS CI/CD CLI                                    │
 └────────────────────────────┬────────────────────────────────────────────┘
                              │
                              │ Boto3 SDK
@@ -672,7 +672,7 @@ User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
 │  │                                                                   │  │
 │  │ jobs:                                                             │  │
 │  │   deploy-test:                                                    │  │
-│  │     - Install SMUS CLI                                            │  │
+│  │     - Install SMUS CI/CD CLI                                        │  │
 │  │     - Validate manifest                                           │  │
 │  │     - Run unit tests                                              │  │
 │  │     - Deploy to test                                              │  │
@@ -689,13 +689,13 @@ User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
                            │ Calls
                            │
 ┌──────────────────────────▼──────────────────────────────────────────────┐
-│                          SMUS CLI                                        │
+│                        SMUS CI/CD CLI                                    │
 │                                                                          │
 │  Commands executed:                                                     │
-│  1. smus-cli describe --manifest manifest.yaml --connect                │
-│  2. smus-cli deploy --manifest manifest.yaml --targets test             │
-│  3. smus-cli test --manifest manifest.yaml --targets test               │
-│  4. smus-cli deploy --manifest manifest.yaml --targets prod             │
+│  1. smus-cicd-cli describe --manifest manifest.yaml --connect           │
+│  2. smus-cicd-cli deploy --manifest manifest.yaml --targets test        │
+│  3. smus-cicd-cli test --manifest manifest.yaml --targets test          │
+│  4. smus-cicd-cli deploy --manifest manifest.yaml --targets prod        │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -725,7 +725,7 @@ User runs: smus-cli monitor --manifest manifest.yaml --targets test --live
                              │ Function Calls
                              │
 ┌────────────────────────────▼────────────────────────────────────────────┐
-│                          SMUS CLI                                        │
+│                        SMUS CI/CD CLI                                    │
 │                                                                          │
 │  Executes commands programmatically:                                    │
 │  • Load and validate manifest                                           │
@@ -972,7 +972,7 @@ def my_command(
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          SMUS CLI                                        │
+│                        SMUS CI/CD CLI                                    │
 │                                                                          │
 │  Python Logging:                                                        │
 │  • DEBUG: Detailed execution traces                                     │
@@ -1135,15 +1135,15 @@ Workflow:
 Artifact Promotion
 
 1. Create bundle from dev:
-   smus-cli bundle --manifest manifest.yaml
+   smus-cicd-cli bundle --manifest manifest.yaml
 
 2. Store bundle in artifact repository
 
 3. Deploy bundle to test:
-   smus-cli deploy --bundle Bundle-MyApp-test-*.zip --targets test
+   smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets test
 
 4. Promote to prod:
-   smus-cli deploy --bundle Bundle-MyApp-test-*.zip --targets prod
+   smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets prod
 ```
 
 ### 3. Tag-Based Deployment
@@ -1283,7 +1283,7 @@ Solution: Ensure workflow.create runs before workflow.run
 
 ### B. References
 
-- [SMUS CLI README](../README.md)
+- [SMUS CI/CD CLI README](../README.md)
 - [Manifest Schema](manifest-schema.md)
 - [CLI Commands](cli-commands.md)
 - [Bootstrap Actions](bootstrap-actions.md)

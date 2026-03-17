@@ -31,11 +31,11 @@ Your application content can come from:
 **Workflow:**
 ```bash
 # Step 1: Create bundle archive
-smus-cli bundle --manifest manifest.yaml --output ./bundles/
+smus-cicd-cli bundle --manifest manifest.yaml --output ./bundles/
 
 # Step 2: Deploy the same bundle to multiple targets
-smus-cli deploy --manifest manifest.yaml --stage test --manifest myapp-v1.0.0.tar.gz
-smus-cli deploy --manifest manifest.yaml --stage prod --manifest myapp-v1.0.0.tar.gz
+smus-cicd-cli deploy --manifest manifest.yaml --stage test --manifest myapp-v1.0.0.tar.gz
+smus-cicd-cli deploy --manifest manifest.yaml --stage prod --manifest myapp-v1.0.0.tar.gz
 ```
 
 **What happens:**
@@ -113,7 +113,7 @@ This example demonstrates most features of the manifest:
 applicationName: MLTrainingPipeline
 
 # Optional: Directory for storing bundle archives (local path or S3)
-# Only used when creating bundles with `smus-cli bundle` command
+# Only used when creating bundles with `smus-cicd-cli bundle` command
 bundlesDirectory: s3://sagemaker-unified-studio-123456789012-us-east-1-domain/bundles
 
 # Application content - what to include in deployments
@@ -844,7 +844,7 @@ export AWS_REGION=us-west-2
 export PROJECT_PREFIX=analytics
 export TEAM_NAME=datascience
 
-smus-cli deploy --manifest manifest.yaml --stage dev
+smus-cicd-cli deploy --manifest manifest.yaml --stage dev
 ```
 
 **Resolution Rules:**

@@ -34,9 +34,9 @@ def run_command(
         output: Output format (TEXT or JSON)
 
     Examples:
-        smus-cli run -w test_dag
-        smus-cli run -w test_dag -t prod
-        smus-cli run -w test_dag -c "dags list" -t dev  # MWAA only
+        smus-cicd-cli run -w test_dag
+        smus-cicd-cli run -w test_dag -t prod
+        smus-cicd-cli run -w test_dag -c "dags list" -t dev  # MWAA only
     """
     # Configure logging based on output format
     import os

@@ -43,16 +43,16 @@ pip install -e .
 **Déployez votre première application :**
 ```bash
 # Valider la configuration
-smus-cli describe --manifest manifest.yaml --connect
+smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # Créer un bundle de déploiement (optionnel)
-smus-cli bundle --manifest manifest.yaml
+smus-cicd-cli bundle --manifest manifest.yaml
 
 # Déployer vers l'environnement de test
-smus-cli deploy --targets test --manifest manifest.yaml
+smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Exécuter les tests de validation
-smus-cli test --manifest manifest.yaml --targets test
+smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 **Voir en action :** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
@@ -101,7 +101,7 @@ bootstrap:
 → **[Guide Administrateur](docs/getting-started/admin-quickstart.md)** - Configurez l'infrastructure et les pipelines en 15 minutes  
 → **[Modèles de Workflow GitHub](git-templates/)** - Modèles de workflow génériques et réutilisables pour le déploiement automatisé
 
-**Le CLI est votre couche d'abstraction :** Vous appelez simplement `smus-cli deploy` - le CLI gère toutes les interactions avec les services AWS (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.) et exécute les actions bootstrap (exécutions de workflow, streaming de logs, actualisations QuickSight, événements EventBridge). Vos workflows restent simples et génériques.
+**Le CLI est votre couche d'abstraction :** Vous appelez simplement `smus-cicd-cli deploy` - le CLI gère toutes les interactions avec les services AWS (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.) et exécute les actions bootstrap (exécutions de workflow, streaming de logs, actualisations QuickSight, événements EventBridge). Vos workflows restent simples et génériques.
 
 ---
 
@@ -138,7 +138,7 @@ bootstrap:
 - **Actualisation des Jeux de Données QuickSight** - Actualisez automatiquement les tableaux de bord après le déploiement ETL avec `quicksight.refresh_dataset`
 - **Intégration EventBridge** - Émettez des événements personnalisés pour l'automatisation en aval et l'orchestration CI/CD avec `eventbridge.put_events`
 - **Connexions DataZone** - Provisionnez MLflow et d'autres connexions de service pendant le déploiement
-- **Exécution Séquentielle** - Les actions s'exécutent dans l'ordre pendant `smus-cli deploy` pour une initialisation et une validation fiables
+- **Exécution Séquentielle** - Les actions s'exécutent dans l'ordre pendant `smus-cicd-cli deploy` pour une initialisation et une validation fiables
 
 ### 📊 Intégration du Catalogue
 - **Découverte des Ressources** - Trouvez automatiquement les ressources de catalogue requises (Glue, Lake Formation, DataZone)
@@ -208,12 +208,12 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 
 **Le Problème :** Les approches traditionnelles de déploiement forcent les équipes DevOps à apprendre les services analytiques AWS (Glue, Athena, DataZone, SageMaker, MWAA, etc.) et à comprendre les structures de projet SMUS, ou forcent les équipes de données à devenir des experts en CI/CD.
 
-**La Solution :** SMUS CLI est la couche d'abstraction qui encapsule toute la complexité AWS et SMUS :
+**La Solution :** SMUS CI/CD CLI est la couche d'abstraction qui encapsule toute la complexité AWS et SMUS :
 
 ```
-Équipes de Données              SMUS CLI                    Équipes DevOps
+Équipes de Données              SMUS CI/CD CLI                    Équipes DevOps
     ↓                              ↓                             ↓
-manifest.yaml             smus-cli deploy                GitHub Actions
+manifest.yaml             smus-cicd-cli deploy                GitHub Actions
 (QUOI & OÙ)             (ABSTRACTION AWS)               (COMMENT & QUAND)
 ```
 
@@ -223,7 +223,7 @@ manifest.yaml             smus-cli deploy                GitHub Actions
 - Les configurations d'environnement
 - La logique métier
 
-**SMUS CLI gère TOUTE la complexité AWS :**
+**SMUS CI/CD CLI gère TOUTE la complexité AWS :**
 - Gestion des domaines et projets DataZone
 - APIs AWS Glue, Athena, SageMaker, MWAA
 - Gestion du stockage S3 et des artefacts
@@ -242,7 +242,7 @@ manifest.yaml             smus-cli deploy                GitHub Actions
 
 **Résultat :**
 - Les équipes de données ne touchent jamais aux configs CI/CD
-- **Les équipes DevOps n'appellent jamais directement les APIs AWS** - elles appellent simplement `smus-cli deploy`
+- **Les équipes DevOps n'appellent jamais directement les APIs AWS** - elles appellent simplement `smus-cicd-cli deploy`
 - **Les workflows CI/CD sont génériques** - le même workflow fonctionne pour les apps Glue, SageMaker ou Bedrock
 - Les deux équipes travaillent indépendamment selon leur expertise
 
@@ -300,17 +300,17 @@ Workflows GitHub Actions (ou autres systèmes CI/CD) qui automatisent le déploi
 - Applique les politiques de sécurité et conformité
 - Exemple : `.github/workflows/deploy.yml`
 
-**Point clé :** Les équipes DevOps créent des workflows génériques et réutilisables qui fonctionnent pour N'IMPORTE QUELLE application. Ils n'ont pas besoin de savoir si l'app utilise Glue, SageMaker ou Bedrock - le CLI gère toutes les interactions avec les services AWS. Le workflow appelle simplement `smus-cli deploy` et le CLI fait le reste.
+**Point clé :** Les équipes DevOps créent des workflows génériques et réutilisables qui fonctionnent pour N'IMPORTE QUELLE application. Ils n'ont pas besoin de savoir si l'app utilise Glue, SageMaker ou Bedrock - le CLI gère toutes les interactions avec les services AWS. Le workflow appelle simplement `smus-cicd-cli deploy` et le CLI fait le reste.
 
 ### Modes de Déploiement
 
 **Basé sur Bundle (Artefact) :** Créer une archive versionnée → déployer l'archive vers les stages
 - Bon pour : pistes d'audit, capacité de rollback, conformité
-- Commande : `smus-cli bundle` puis `smus-cli deploy --manifest app.tar.gz`
+- Commande : `smus-cicd-cli bundle` puis `smus-cicd-cli deploy --manifest app.tar.gz`
 
 **Direct (Basé sur Git) :** Déployer directement depuis les sources sans artefacts intermédiaires
 - Bon pour : workflows plus simples, itération rapide, git comme source de vérité
-- Commande : `smus-cli deploy --manifest manifest.yaml --stage test`
+- Commande : `smus-cicd-cli deploy --manifest manifest.yaml --stage test`
 
 Les deux modes fonctionnent avec toute combinaison de sources de stockage et git.
 
@@ -319,10 +319,10 @@ Les deux modes fonctionnent avec toute combinaison de sources de stockage et git
 ### Comment Tout Fonctionne Ensemble
 
 ```
-1. Équipe de Données           2. Équipe DevOps              3. SMUS CLI (L'Abstraction)
+1. Équipe de Données           2. Équipe DevOps              3. SMUS CI/CD CLI (L'Abstraction)
    ↓                              ↓                             ↓
 Crée manifest.yaml            Crée workflow générique       Le workflow appelle :
-- Jobs Glue                    - Test à la fusion            smus-cli deploy --manifest manifest.yaml
+- Jobs Glue                    - Test à la fusion            smus-cicd-cli deploy --manifest manifest.yaml
 - Entraînement SageMaker      - Approbation pour prod         ↓
 - Requêtes Athena             - Scans de sécurité          CLI gère TOUTE la complexité AWS :
 - Emplacements S3             - Règles de notification      - APIs DataZone
@@ -338,7 +338,7 @@ Crée manifest.yaml            Crée workflow générique       Le workflow appe
 **La beauté :**
 - Les équipes de données n'apprennent jamais GitHub Actions
 - **Les équipes DevOps n'appellent jamais les APIs AWS** - le CLI encapsule toute la complexité AWS analytics, ML et SMUS
-- Les workflows CI/CD sont simples : juste appeler `smus-cli deploy`
+- Les workflows CI/CD sont simples : juste appeler `smus-cicd-cli deploy`
 - Le même workflow fonctionne pour TOUTE application, quels que soient les services AWS utilisés
 
 ---
@@ -692,7 +692,7 @@ stages:
 ### Developer Experience
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Project templates | 🔄 | `smus-cli init` with templates |
+| Project templates | 🔄 | `smus-cicd-cli init` with templates |
 | Manifest initialization | ✅ | [Create Command](docs/cli-commands.md#create) |
 | Interactive setup | 🔄 | Guided configuration prompts |
 | Local development | ✅ | [CLI Commands](docs/cli-commands.md) |

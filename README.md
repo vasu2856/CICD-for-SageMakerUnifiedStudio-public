@@ -44,16 +44,16 @@ pip install -e .
 **Deploy your first application:**
 ```bash
 # Validate configuration
-smus-cli describe --manifest manifest.yaml --connect
+smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # Create deployment bundle (optional)
-smus-cli bundle --manifest manifest.yaml
+smus-cicd-cli bundle --manifest manifest.yaml
 
 # Deploy to test environment
-smus-cli deploy --targets test --manifest manifest.yaml
+smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run validation tests
-smus-cli test --manifest manifest.yaml --targets test
+smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 **See it in action:** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
@@ -82,7 +82,7 @@ smus-cli test --manifest manifest.yaml --targets test
 → **[Admin Guide](docs/getting-started/admin-quickstart.md)** - Configure infrastructure and pipelines in 15 minutes  
 → **[GitHub Workflow Templates](git-templates/)** - Generic, reusable workflow templates for automated deployment
 
-**The CLI is your abstraction layer:** You just call `smus-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic.
+**The CLI is your abstraction layer:** You just call `smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic.
 
 ---
 
@@ -146,15 +146,15 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 
 **The Problem:** Traditional deployment approaches force DevOps teams to learn AWS analytics services (Glue, Athena, DataZone, SageMaker, MWAA, etc.) and understand SMUS project structures, or force data teams to become CI/CD experts.
 
-**The Solution:** SMUS CLI is the abstraction layer that encapsulates all AWS and SMUS complexity.
+**The Solution:** SMUS CI/CD CLI is the abstraction layer that encapsulates all AWS and SMUS complexity.
 
 **Example workflow:**
 
 ```
-1. DevOps Team                 2. Data Team                    3. SMUS CLI (The Abstraction)
+1. DevOps Team                 2. Data Team                    3. SMUS CI/CD CLI (The Abstraction)
    ↓                               ↓                              ↓
 Defines the PROCESS            Defines the CONTENT            Workflow calls:
-- Test on merge                - Glue jobs                    smus-cli deploy --manifest manifest.yaml
+- Test on merge                - Glue jobs                    smus-cicd-cli deploy --manifest manifest.yaml
 - Approval for prod            - SageMaker training             ↓
 - Security scans               - Athena queries               CLI handles ALL AWS complexity:
 - Notification rules           - File structure               - DataZone APIs
@@ -175,7 +175,7 @@ service knowledge needed!
 - Deployment orchestration
 - Monitoring and alerting
 
-**SMUS CLI handles ALL AWS complexity:**
+**SMUS CI/CD CLI handles ALL AWS complexity:**
 - DataZone domain and project management
 - AWS Glue, Athena, SageMaker, MWAA APIs
 - S3 storage and artifact management
@@ -193,7 +193,7 @@ service knowledge needed!
 - Business logic
 
 **Result:** 
-- **DevOps teams never call AWS APIs directly** - they just call `smus-cli deploy`
+- **DevOps teams never call AWS APIs directly** - they just call `smus-cicd-cli deploy`
 - **CI/CD workflows are generic** - same workflow works for Glue apps, SageMaker apps, or Bedrock apps
 - Data teams never touch CI/CD configs
 - Both teams work independently using their expertise
@@ -262,17 +262,17 @@ GitHub Actions workflows (or other CI/CD systems) that automate deployment:
 - Enforces security and compliance policies
 - Example: `.github/workflows/deploy.yml`
 
-**Key insight:** DevOps teams create generic, reusable workflows that work for ANY application. They don't need to know if the app uses Glue, SageMaker, or Bedrock - the CLI handles all AWS service interactions. The workflow just calls `smus-cli deploy` and the CLI does the rest.
+**Key insight:** DevOps teams create generic, reusable workflows that work for ANY application. They don't need to know if the app uses Glue, SageMaker, or Bedrock - the CLI handles all AWS service interactions. The workflow just calls `smus-cicd-cli deploy` and the CLI does the rest.
 
 ### Deployment Modes
 
 **Bundle-based (Artifact):** Create versioned archive → deploy archive to stages
 - Good for: audit trails, rollback capability, compliance
-- Command: `smus-cli bundle` then `smus-cli deploy --manifest app.tar.gz`
+- Command: `smus-cicd-cli bundle` then `smus-cicd-cli deploy --manifest app.tar.gz`
 
 **Direct (Git-based):** Deploy directly from sources without intermediate artifacts
 - Good for: simpler workflows, rapid iteration, git as source of truth
-- Command: `smus-cli deploy --manifest manifest.yaml --stage test`
+- Command: `smus-cicd-cli deploy --manifest manifest.yaml --stage test`
 
 Both modes work with any combination of storage and git content sources.
 
@@ -999,7 +999,7 @@ genai_dev_workflow:
 ### Developer Experience
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Project templates | 🔄 | `smus-cli init` with templates |
+| Project templates | 🔄 | `smus-cicd-cli init` with templates |
 | Manifest initialization | ✅ | [Create Command](docs/cli-commands.md#create) |
 | Interactive setup | 🔄 | Guided configuration prompts |
 | Local development | ✅ | [CLI Commands](docs/cli-commands.md) |
@@ -1034,7 +1034,7 @@ genai_dev_workflow:
 | Redshift queries | ✅ | [RedshiftDataOperator](docs/airflow-aws-operators.md#amazon-redshift) |
 
 ### Bootstrap Actions
-**Automated Workflow Execution & Event-Driven Workflows** - Trigger workflows automatically during deployment with `workflow.run` (use `trailLogs: true` to stream logs and wait for completion). Fetch workflow logs for validation and debugging with `workflow.logs`. Automatically refresh QuickSight dashboards after ETL deployment with `quicksight.refresh_dataset`. Emit custom events for downstream automation and CI/CD orchestration with `eventbridge.put_events`. Provision MLflow and other DataZone connections during deployment. Actions run in order during `smus-cli deploy` for reliable initialization and validation.
+**Automated Workflow Execution & Event-Driven Workflows** - Trigger workflows automatically during deployment with `workflow.run` (use `trailLogs: true` to stream logs and wait for completion). Fetch workflow logs for validation and debugging with `workflow.logs`. Automatically refresh QuickSight dashboards after ETL deployment with `quicksight.refresh_dataset`. Emit custom events for downstream automation and CI/CD orchestration with `eventbridge.put_events`. Provision MLflow and other DataZone connections during deployment. Actions run in order during `smus-cicd-cli deploy` for reliable initialization and validation.
 
 | Feature | Status | Notes |
 |---------|--------|-------|

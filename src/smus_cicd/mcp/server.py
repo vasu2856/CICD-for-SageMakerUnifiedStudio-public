@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCP Server for SMUS CLI integration with Q CLI."""
+"""MCP Server for SMUS CI/CD CLI integration with Q CLI."""
 
 import json
 import sys
@@ -15,7 +15,7 @@ import yaml
 
 
 class SMUSMCPServer:
-    """MCP Server exposing SMUS CLI capabilities to Q CLI."""
+    """MCP Server exposing SMUS CI/CD CLI capabilities to Q CLI."""
 
     def __init__(self, config_path: str = None):
         """Initialize SMUS MCP server."""
@@ -173,13 +173,13 @@ class SMUSMCPServer:
                 },
                 {
                     "name": "query_smus_kb",
-                    "description": "Search SMUS CLI documentation for SageMaker Unified Studio bundles, deployment guides, and examples. Use this for questions about bundle.yaml, SMUS configuration, targets, bundles, workflows, or SageMaker project deployment.",
+                    "description": "Search SMUS CI/CD CLI documentation for SageMaker Unified Studio bundles, deployment guides, and examples. Use this for questions about bundle.yaml, SMUS configuration, targets, bundles, workflows, or SageMaker project deployment.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
                             "query": {
                                 "type": "string",
-                                "description": "Question about SMUS CLI, SageMaker bundles, or deployment",
+                                "description": "Question about SMUS CI/CD CLI, SageMaker bundles, or deployment",
                             },
                             "max_results": {
                                 "type": "integer",
@@ -290,8 +290,8 @@ class SMUSMCPServer:
         project_name = args.get("project_name")
 
         try:
-            # Try to use smus-cli describe to check project
-            cmd = ["smus-cli", "describe", "-p", "bundle.yaml", "--connect"]
+            # Try to use smus-cicd-cli describe to check project
+            cmd = ["smus-cicd-cli", "describe", "-p", "bundle.yaml", "--connect"]
             subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
             # For now, return a helpful message
@@ -302,9 +302,9 @@ To verify this project exists, you can run:
 aws datazone list-projects --domain-identifier <domain-id>
 ```
 
-Or use the SMUS CLI:
+Or use the SMUS CI/CD CLI:
 ```bash
-smus-cli describe -p bundle.yaml --connect
+smus-cicd-cli describe -p bundle.yaml --connect
 ```
 
 ✅ Assuming project exists. Ready to create CI/CD configuration.
@@ -394,7 +394,7 @@ bundle:
 {github_actions}
 ```
 
-Save these files and run: `smus-cli deploy --bundle bundle.yaml -t dev`"""
+Save these files and run: `smus-cicd-cli deploy --bundle bundle.yaml -t dev`"""
 
         return {"content": [{"type": "text", "text": response}]}
 
@@ -458,13 +458,13 @@ task = PythonOperator(
             if target == "dev":
                 deploy_steps += f"""      - name: Deploy to {target}
         if: github.ref == 'refs/heads/main'
-        run: smus-cli deploy --manifest bundle.yaml --targets {target}
+        run: smus-cicd-cli deploy --manifest bundle.yaml --targets {target}
 
 """
             else:
                 deploy_steps += f"""      - name: Deploy to {target}
         if: github.event_name == 'workflow_dispatch'
-        run: smus-cli deploy --manifest bundle.yaml --targets {target}
+        run: smus-cicd-cli deploy --manifest bundle.yaml --targets {target}
 
 """
 
@@ -748,7 +748,7 @@ workflows:
                 {
                     "uri": "smus://docs/getting-started",
                     "name": "Getting Started Guide",
-                    "description": "Quick start guide for SMUS CLI",
+                    "description": "Quick start guide for SMUS CI/CD CLI",
                     "mimeType": "text/markdown",
                 },
             ]

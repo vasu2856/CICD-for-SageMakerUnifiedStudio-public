@@ -65,7 +65,7 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
       
-      - name: Install SMUS CLI
+      - name: Install SMUS CI/CD CLI
         run: pip install -e .
       
       # Temporary: Register mwaaserverless-internal model until service is GA
@@ -83,7 +83,7 @@ jobs:
       
       - name: Bundle application
         run: |
-          smus-cli bundle \
+          smus-cicd-cli bundle \
             --manifest ${{ inputs.manifest_path }} \
             --targets dev
 
@@ -100,7 +100,7 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
       
-      - name: Install SMUS CLI
+      - name: Install SMUS CI/CD CLI
         run: pip install -e .
       
       # Temporary: Register mwaaserverless-internal model until service is GA
@@ -112,7 +112,7 @@ jobs:
       
       - name: Validate configuration
         run: |
-          smus-cli describe --manifest ${{ inputs.manifest_path }} --connect
+          smus-cicd-cli describe --manifest ${{ inputs.manifest_path }} --connect
 
   deploy-test:
     name: Deploy to Test
@@ -128,7 +128,7 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
       
-      - name: Install SMUS CLI
+      - name: Install SMUS CI/CD CLI
         run: pip install -e .
       
       # Temporary: Register mwaaserverless-internal model until service is GA
@@ -146,7 +146,7 @@ jobs:
       
       - name: Deploy to test
         run: |
-          smus-cli deploy \
+          smus-cicd-cli deploy \
             --manifest ${{ inputs.manifest_path }} \
             --targets ${{ inputs.test_target }}
 
@@ -165,7 +165,7 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
       
-      - name: Install SMUS CLI
+      - name: Install SMUS CI/CD CLI
         run: pip install -e .
       
       # Temporary: Register mwaaserverless-internal model until service is GA
@@ -183,7 +183,7 @@ jobs:
       
       - name: Run validation tests
         run: |
-          smus-cli test \
+          smus-cicd-cli test \
             --manifest ${{ inputs.manifest_path }} \
             --targets ${{ inputs.test_target }}
 
@@ -202,7 +202,7 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
       
-      - name: Install SMUS CLI
+      - name: Install SMUS CI/CD CLI
         run: pip install -e .
       
       # Temporary: Register mwaaserverless-internal model until service is GA
@@ -220,6 +220,6 @@ jobs:
       
       - name: Deploy to production
         run: |
-          smus-cli deploy \
+          smus-cicd-cli deploy \
             --manifest ${{ inputs.manifest_path }} \
             --targets ${{ inputs.prod_target }}

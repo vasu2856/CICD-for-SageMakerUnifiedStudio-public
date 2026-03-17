@@ -9,11 +9,11 @@
 > 
 > **This document** covers general CI/CD concepts and implementation details.
 
-This guide explains how to integrate the SMUS CLI with CI/CD platforms like GitHub Actions and GitLab CI for automated pipeline management across multiple environments with proper security boundaries and approval workflows.
+This guide explains how to integrate the SMUS CI/CD CLI with CI/CD platforms like GitHub Actions and GitLab CI for automated pipeline management across multiple environments with proper security boundaries and approval workflows.
 
-## Overview: CI/CD with SMUS CLI
+## Overview: CI/CD with SMUS CI/CD CLI
 
-The SMUS CLI enables automated deployment and management of SageMaker Unified Studio projects through any CI/CD platform. The CLI provides intelligent infrastructure management, multi-environment support, and seamless integration with existing DevOps workflows.
+The SMUS CI/CD CLI enables automated deployment and management of SageMaker Unified Studio projects through any CI/CD platform. The CLI provides intelligent infrastructure management, multi-environment support, and seamless integration with existing DevOps workflows.
 
 ### Key Benefits
 
@@ -113,7 +113,7 @@ aws cloudformation deploy \
 
 ### Automatic Infrastructure Creation
 
-The SMUS CLI intelligently manages infrastructure creation and updates:
+The SMUS CI/CD CLI intelligently manages infrastructure creation and updates:
 
 #### **Idempotent Operations**
 - **Safe Re-runs**: CLI detects existing resources and skips creation
@@ -123,7 +123,7 @@ The SMUS CLI intelligently manages infrastructure creation and updates:
 #### **Domain Management**
 ```bash
 # CLI automatically creates DataZone domain if missing
-smus-cli deploy --manifest manifest.yaml --stages test
+smus-cicd-cli deploy --manifest manifest.yaml --stages test
 # Creates domain "my-studio-domain" if it doesn't exist
 # Uses existing domain if already present
 ```
@@ -131,7 +131,7 @@ smus-cli deploy --manifest manifest.yaml --stages test
 #### **Project Creation**
 ```bash
 # CLI creates SageMaker projects as needed
-smus-cli deploy --manifest manifest.yaml --stages test,prod
+smus-cicd-cli deploy --manifest manifest.yaml --stages test,prod
 # Creates "my-project-test" and "my-project-prod" projects
 # Skips creation if projects already exist
 ```
@@ -217,7 +217,7 @@ Branch Protection Rules:
 
 ### Stage Progression
 
-The SMUS CLI supports a standard deployment progression with automatic infrastructure management:
+The SMUS CI/CD CLI supports a standard deployment progression with automatic infrastructure management:
 
 #### **Development → Test → Production Flow**
 
@@ -240,7 +240,7 @@ graph TD
 #### **Bundle Creation Process**
 ```bash
 # CLI packages all deployment artifacts
-smus-cli bundle --manifest manifest.yaml --targets test
+smus-cicd-cli bundle --manifest manifest.yaml --targets test
 ```
 
 **What gets bundled:**
@@ -264,7 +264,7 @@ The CLI handles infrastructure creation during deployment:
 
 ```bash
 # Single command creates all required infrastructure
-smus-cli deploy --manifest manifest.yaml --stages test
+smus-cicd-cli deploy --manifest manifest.yaml --stages test
 
 # CLI automatically:
 # 1. Creates DataZone domain if missing
@@ -327,7 +327,7 @@ deploy-production:
   steps:
     - name: Deploy to Production
       run: |
-        smus-cli deploy --manifest manifest.yaml --stages prod
+        smus-cicd-cli deploy --manifest manifest.yaml --stages prod
 ```
 
 **GitLab CI Example:**
@@ -339,7 +339,7 @@ deploy-production:
     action: start
   when: manual  # Requires manual trigger
   script:
-    - smus-cli deploy --manifest manifest.yaml --stages prod
+    - smus-cicd-cli deploy --manifest manifest.yaml --stages prod
 ```
 
 #### **Approval Workflow Process**
@@ -358,37 +358,37 @@ deploy-production:
 #### **1. Configuration Validation**
 ```bash
 # Validates bundle configuration and connectivity
-smus-cli describe --manifest manifest.yaml --connect
+smus-cicd-cli describe --manifest manifest.yaml --connect
 ```
 
 #### **2. Bundle Creation**
 ```bash
 # Creates deployment bundle from source environment
-smus-cli bundle --manifest manifest.yaml --targets test
+smus-cicd-cli bundle --manifest manifest.yaml --targets test
 ```
 
 #### **3. Infrastructure-Aware Deployment**
 ```bash
 # Deploys with automatic infrastructure creation
-smus-cli deploy --manifest manifest.yaml --stages test
+smus-cicd-cli deploy --manifest manifest.yaml --stages test
 ```
 
 #### **4. Test Execution**
 ```bash
 # Runs validation tests on deployed environment
-smus-cli test --manifest manifest.yaml --stages test
+smus-cicd-cli test --manifest manifest.yaml --stages test
 ```
 
 #### **5. Production Deployment**
 ```bash
 # Deploys to production with approval gates
-smus-cli deploy --manifest manifest.yaml --stages prod
+smus-cicd-cli deploy --manifest manifest.yaml --stages prod
 ```
 
 #### **6. Monitoring and Status**
 ```bash
 # Monitors deployment status and health
-smus-cli monitor --manifest manifest.yaml --stages prod
+smus-cicd-cli monitor --manifest manifest.yaml --stages prod
 ```
 
 ## Manual Reviewers and Approval Process
@@ -431,7 +431,7 @@ deploy-production:
       when: manual
       allow_failure: false
   script:
-    - smus-cli deploy --manifest manifest.yaml --stages prod
+    - smus-cicd-cli deploy --manifest manifest.yaml --stages prod
 ```
 
 ### Approval Workflow Mechanics
@@ -531,7 +531,7 @@ create-bundle:
 ```
 
 **Purpose**: Packages deployment artifacts including DAGs, notebooks, and catalog assets
-**CLI Command**: `smus-cli bundle --manifest manifest.yaml --targets test`
+**CLI Command**: `smus-cicd-cli bundle --manifest manifest.yaml --targets test`
 **Infrastructure Impact**: Creates S3 storage for bundles if not present
 
 #### **Job 3: Test Environment Deployment**
@@ -544,7 +544,7 @@ deploy-test:
 ```
 
 **Purpose**: Deploys to test environment with automatic infrastructure provisioning
-**CLI Command**: `smus-cli deploy --manifest manifest.yaml --stages test`
+**CLI Command**: `smus-cicd-cli deploy --manifest manifest.yaml --stages test`
 **Infrastructure Created**:
 - SageMaker project (if missing)
 - Lakehouse environment (if missing)
@@ -561,7 +561,7 @@ run-tests:
 ```
 
 **Purpose**: Validates deployment through automated testing
-**CLI Command**: `smus-cli test --manifest manifest.yaml --stages test`
+**CLI Command**: `smus-cicd-cli test --manifest manifest.yaml --stages test`
 
 #### **Job 5: Production Deployment (Manual Approval)**
 ```yaml
@@ -573,7 +573,7 @@ deploy-prod:
 ```
 
 **Manual Approval Gate**: Uses GitHub environment `aws-env-amirbo-6778` with protection rules
-**CLI Command**: `smus-cli deploy --manifest manifest.yaml --stages prod`
+**CLI Command**: `smus-cicd-cli deploy --manifest manifest.yaml --stages prod`
 **Infrastructure Management**: Creates production infrastructure idempotently
 
 ### Repository-Specific Features
@@ -641,7 +641,7 @@ The workflow demonstrates automatic catalog asset management:
 # CLI automatically handles catalog asset subscriptions
 - name: Deploy with Catalog Assets
   run: |
-    smus-cli deploy --manifest manifest.yaml --stages prod
+    smus-cicd-cli deploy --manifest manifest.yaml --stages prod
     # CLI automatically:
     # 1. Identifies catalog assets in bundle
     # 2. Requests subscriptions for production project
@@ -696,7 +696,7 @@ PROD_DOMAIN_REGION = us-east-2
    - Protection rules: Required reviewers (2)
    - Used for: production deployment, monitoring
 
-This implementation showcases how the SMUS CLI's infrastructure management capabilities work in practice, automatically creating and managing AWS resources while providing secure, auditable deployments with proper approval workflows.
+This implementation showcases how the SMUS CI/CD CLI's infrastructure management capabilities work in practice, automatically creating and managing AWS resources while providing secure, auditable deployments with proper approval workflows.
 
 For more detailed information about CLI commands and bundle configuration, see:
 - [CLI Commands Documentation](cli-commands.md)

@@ -78,7 +78,7 @@ def create_or_update_project_role(
         response = iam.get_role(RoleName=role_name)
         existing_role_arn = response["Role"]["Arn"]
 
-        # Check if role was created by SMUS CLI
+        # Check if role was created by SMUS CI/CD CLI
         tags = response["Role"].get("Tags", [])
         is_smus_managed = any(
             tag["Key"] == "CreatedBy" and tag["Value"] == "SMUS-CICD" for tag in tags
@@ -113,7 +113,7 @@ def create_or_update_project_role(
     response = iam.create_role(
         RoleName=role_name,
         AssumeRolePolicyDocument=trust_policy,
-        Description="SMUS project role created by SMUS CLI",
+        Description="SMUS project role created by SMUS CI/CD CLI",
         Tags=[
             {"Key": "CreatedBy", "Value": "SMUS-CICD"},
             {"Key": "ManagedBy", "Value": "SMUS-CLI"},

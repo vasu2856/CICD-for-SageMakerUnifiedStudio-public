@@ -43,7 +43,7 @@ dev_requires = [
 ]
 
 setup(
-    name="smus-cli",
+    name="smus-cicd-cli",
     version="1.0.0",
     author="AWS SageMaker Unified Studio Team",
     author_email="sagemaker-unified-studio@amazon.com",
@@ -76,7 +76,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "smus-cli=smus_cicd.cli:app",
+            "smus-cicd-cli=smus_cicd.cli:app",
         ],
     },
     data_files=data_files,

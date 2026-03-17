@@ -27,7 +27,7 @@ def logs_command(
     if not workflow:
         typer.echo("❌ Error: --workflow parameter is required")
         typer.echo(
-            "Usage: smus-cli logs --workflow arn:aws:airflow-serverless:region:account:workflow/name"
+            "Usage: smus-cicd-cli logs --workflow arn:aws:airflow-serverless:region:account:workflow/name"
         )
         raise typer.Exit(1)
 

@@ -247,7 +247,7 @@ properties:
   
   tests:
     type: object
-    description: "Integration tests to run with 'smus-cli test' command"
+    description: "Integration tests to run with 'smus-cicd-cli test' command"
     properties:
       folder:
         type: string
