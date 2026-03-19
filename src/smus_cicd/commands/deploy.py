@@ -604,7 +604,12 @@ def _deploy_bundle_to_target(
     # storage/git items).
     effective_bundle_path = bundle_path or bundle_file
     catalog_import_success = _import_catalog_from_bundle(
-        effective_bundle_path, target_config, config, emitter, metadata, manifest=manifest
+        effective_bundle_path,
+        target_config,
+        config,
+        emitter,
+        metadata,
+        manifest=manifest,
     )
 
     # Return overall success - storage must succeed, git is optional

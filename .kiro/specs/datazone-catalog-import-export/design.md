@@ -187,6 +187,8 @@ Internal helpers:
 | `_delete_resource(client, domain_id, project_id, resource_id, resource_type)` | Call delete API for resources missing from bundle |
 | `_identify_resources_to_delete(client, domain_id, project_id, catalog_data)` | Query target project to find resources not present in bundle |
 | `_publish_resource(client, domain_id, resource_id, resource_type, max_wait_seconds, poll_interval)` | Call publish API for assets and data products that were published in the source (listingStatus == "ACTIVE"), then poll to verify listing becomes ACTIVE before counting as published. Returns False if listing status is FAILED or verification times out. |
+| `_resolve_target_data_source(client, domain_id, project_id, source_ds_type, database_name)` | Find a data source in the target project that matches the source type and covers the asset's database. Matching priority: (1) exact `databaseName` match in `relationalFilterConfigurations`, (2) wildcard `"*"` database filter, (3) first candidate of same type. Returns `{dataSourceId, dataSourceRunId}` or None. |
+| `_normalize_forms_input_for_api(forms_input, resource_type, client, domain_id, project_id)` | Normalize formsInput for Create/Update APIs: rename `typeName` → `typeIdentifier`, remap `typeRevision` to target domain revision, and remap `DataSourceReferenceForm` content to the target domain's data source using `_resolve_target_data_source()`. Extracts `databaseName` from the asset's `GlueTableForm` to match the correct target data source. Strips the form if no matching data source is found. |
 | `_validate_catalog_json(catalog_data)` | Validate required top-level keys and metadata fields |
 
 ### 4. Bundle Command Integration
@@ -428,6 +430,11 @@ For all import operations where `skipPublish` is false (default), the `CatalogIm
 
 For any DataZone Search or SearchTypes API call that returns an error during export, the `CatalogExporter` SHALL raise an exception containing the API error message, and SHALL NOT produce a partial `catalog_export.json`.
 
+### Property 18: DataSourceReferenceForm Remapping
+**Validates: Requirement 5.15**
+
+For all assets `A` in the `catalog_export.json` that contain a `DataSourceReferenceForm` in their `formsInput`, the `CatalogImporter` SHALL remap the form's `dataSourceIdentifier.id`, `filterableDataSourceId`, and `dataSourceRunId` to the corresponding data source in the target project. The target data source SHALL be matched by: (1) same `dataSourceType` + exact `databaseName` match in `relationalFilterConfigurations`, (2) same type + wildcard `"*"` database filter, (3) first candidate of same type. The `databaseName` for matching SHALL be extracted from the asset's `GlueTableForm` content. If no matching data source exists in the target project, the `DataSourceReferenceForm` SHALL be stripped from the asset's forms.
+
 ### Property 17: Malformed JSON Validation
 **Validates: Requirement 7.4**
 
@@ -451,6 +458,8 @@ For all JSON inputs `J` that are missing any of the required top-level keys `{me
 | Resource exists in target but not in bundle | Delete resource in reverse dependency order |
 | Deletion fails due to dependency | Log error, continue with next resource, report in summary |
 | Invalid --updated-after timestamp format | Raise validation error with helpful message |
+| DataSourceReferenceForm with no matching target data source | Strip the form from the asset's formsInput, log warning |
+| DataSourceReferenceForm JSON parse failure | Strip the form from the asset's formsInput, log warning |
 
 ## Testing Strategy
 

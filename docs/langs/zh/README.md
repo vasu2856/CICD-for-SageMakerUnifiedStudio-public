@@ -397,6 +397,8 @@ data-notebooks/
 - **[Connections Guide](docs/connections.md)** - 配置AWS服务集成
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - CI/CD自动化设置
 - **[Deployment Metrics](docs/pipeline-deployment-metrics.md)** - 使用EventBridge进行监控
+- **[Catalog Import/Export Guide](docs/catalog-import-export-guide.md)** - 跨环境推广DataZone目录资源
+- **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - 目录部署快速参考
 
 ### 参考
 - **[Manifest Schema](docs/manifest-schema.md)** - YAML schema验证和结构

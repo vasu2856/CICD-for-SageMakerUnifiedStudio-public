@@ -383,6 +383,8 @@ data-notebooks/
 - **[接続ガイド](docs/connections.md)** - AWSサービス統合の設定
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - CI/CD自動化のセットアップ
 - **[Deployment Metrics](docs/pipeline-deployment-metrics.md)** - EventBridgeによるモニタリング
+- **[Catalog Import/Export Guide](docs/catalog-import-export-guide.md)** - 環境間でDataZoneカタログリソースを昇格
+- **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - カタログデプロイのクイックリファレンス
 
 ### リファレンス
 - **[Manifest Schema](docs/manifest-schema.md)** - YAMLスキーマの検証と構造

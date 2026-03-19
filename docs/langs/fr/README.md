@@ -250,6 +250,8 @@ Déployez des notebooks Jupyter avec orchestration d'exécution parallèle pour 
 - **[Guide des Connexions](docs/connections.md)** - Configurer les intégrations des services AWS
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - Configuration de l'automatisation CI/CD
 - **[Métriques de Déploiement](docs/pipeline-deployment-metrics.md)** - Surveillance avec EventBridge
+- **[Catalog Import/Export Guide](docs/catalog-import-export-guide.md)** - Promouvoir les ressources du catalogue DataZone entre environnements
+- **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - Référence rapide pour le déploiement du catalogue
 
 ### Référence
 - **[Manifest Schema](docs/manifest-schema.md)** - Validation et structure du schéma YAML

@@ -1,5 +1,7 @@
 # DataZone Catalog Import/Export Guide
 
+← [Back to Main README](../README.md)
+
 ## Overview
 
 The SMUS CI/CD CLI provides catalog import/export capabilities that allow you to promote DataZone catalog resources (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products) across different stages (dev, test, prod) as part of your deployment pipeline.

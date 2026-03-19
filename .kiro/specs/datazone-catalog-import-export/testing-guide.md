@@ -290,6 +290,12 @@ Validates forms normalization for API compatibility.
 | U135 | Asset form revision resolves to `None` keeps original | Original revision kept | ✅ |
 | U136 | AssetType form without `typeRevision` skips revision remap | No revision field added | ✅ |
 | U137 | AssetType form revision resolves to `None` keeps original | Original revision kept | ✅ |
+| U138a | Asset form: `DataSourceReferenceForm` remapped to target data source by exact databaseName match | `dataSourceIdentifier.id` updated to target DS | ✅ |
+| U138b | Asset form: `DataSourceReferenceForm` remapped via wildcard `"*"` database filter when no exact match | Wildcard DS used | ✅ |
+| U138c | Asset form: `DataSourceReferenceForm` falls back to first candidate of same type | First candidate DS used | ✅ |
+| U138d | Asset form: `DataSourceReferenceForm` stripped when no matching data source in target | Form removed from output | ✅ |
+| U138e | Asset form: `databaseName` extracted from `GlueTableForm` content for data source matching | Correct DB name used | ✅ |
+| U138f | Asset form: `DataSourceReferenceForm` remap updates `filterableDataSourceId` and `dataSourceRunId` | All three fields updated | ✅ |
 
 ---
 
@@ -443,6 +449,7 @@ Validates import correctness properties across randomly generated catalog data.
 | P17a | Missing a top-level key in catalog JSON raises `ValueError` | Exception raised | ✅ |
 | P17b | Missing a metadata key in catalog JSON raises `ValueError` | Exception raised | ✅ |
 | P17c | `import_catalog` rejects malformed JSON before making any API calls | No API calls made | ✅ |
+| P18 | When an asset has a `DataSourceReferenceForm`, the form is remapped to the target domain's data source by type + databaseName matching | `dataSourceIdentifier.id` updated to target DS | ✅ |
 
 ---
 
@@ -600,6 +607,7 @@ These tests require real AWS credentials and DataZone domains. Run via `smus-cli
 | 5.12 Summary counts | P14, U102 |
 | 5.13 Publishing (source-state + skipPublish + verification) | P15a–P15c, U85–U92, U97–U100 |
 | 5.14 Publish failure handling | U87, U88, U91, U100 |
+| 5.15 DataSourceReferenceForm remapping | U138a–U138f, P18 |
 | 6.1–6.3 Deploy integration | I8, I15 |
 | 7.1 Export error propagation | P16, U8, U16, U43 |
 | 7.2 Empty project export | U44 |
@@ -625,6 +633,7 @@ These tests require real AWS credentials and DataZone domains. Run via `smus-cli
 | P15: Automatic Publishing | U85–U92, U97–U100 | P15a–P15c | I13, I14 |
 | P16: Export Error Propagation | U8, U16, U43 | P16 | — |
 | P17: Malformed JSON Validation | U59–U62, U103 | P17a–P17c | — |
+| P18: DataSourceReferenceForm Remapping | U138a–U138f | P18 | — |
 
 ---
 

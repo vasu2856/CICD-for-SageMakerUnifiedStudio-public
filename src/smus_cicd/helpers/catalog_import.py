@@ -121,9 +121,7 @@ def _is_managed_resource(name: str) -> bool:
     return name.startswith(_MANAGED_FORM_TYPE_PREFIX) if name else False
 
 
-def _check_import_permissions(
-    client, domain_id: str, project_id: str
-) -> List[str]:
+def _check_import_permissions(client, domain_id: str, project_id: str) -> List[str]:
     """
     Check whether the project's domain unit has the policy grants needed for
     catalog import by calling ListPolicyGrants for each required policy type.
@@ -140,17 +138,19 @@ def _check_import_permissions(
     # Resolve the project's domain unit — grants live on the domain unit,
     # not on the project itself.
     try:
-        project = client.get_project(
-            domainIdentifier=domain_id, identifier=project_id
-        )
+        project = client.get_project(domainIdentifier=domain_id, identifier=project_id)
         domain_unit_id = project.get("domainUnitId")
     except Exception as e:
-        logger.warning("Could not resolve domain unit for project %s: %s", project_id, e)
+        logger.warning(
+            "Could not resolve domain unit for project %s: %s", project_id, e
+        )
         # Can't verify — let the import proceed and fail naturally
         return []
 
     if not domain_unit_id:
-        logger.warning("Project %s has no domainUnitId, skipping permission check", project_id)
+        logger.warning(
+            "Project %s has no domainUnitId, skipping permission check", project_id
+        )
         return []
 
     missing = []
@@ -451,9 +451,7 @@ def _resolve_cross_references(
             term_map = id_map.get("glossaryTerms", {})
             for relation_type, term_ids in term_relations.items():
                 if isinstance(term_ids, list):
-                    resolved_ids = [
-                        term_map.get(tid, tid) for tid in term_ids
-                    ]
+                    resolved_ids = [term_map.get(tid, tid) for tid in term_ids]
                     resolved_relations[relation_type] = resolved_ids
                 else:
                     resolved_relations[relation_type] = term_ids
@@ -488,7 +486,9 @@ def _resolve_cross_references(
     return resolved
 
 
-def _get_form_type_revision(client, domain_id: str, form_type_name: str) -> Optional[str]:
+def _get_form_type_revision(
+    client, domain_id: str, form_type_name: str
+) -> Optional[str]:
     """Return the current revision of a form type in the target domain."""
     try:
         resp = client.get_form_type(
@@ -601,7 +601,11 @@ def _resolve_target_data_source(
 
 
 def _normalize_forms_input_for_api(
-    forms_input, resource_type: str, client=None, domain_id: str = "", project_id: str = ""
+    forms_input,
+    resource_type: str,
+    client=None,
+    domain_id: str = "",
+    project_id: str = "",
 ):
     """
     Normalize formsInput fields for DataZone Create/Update APIs.
@@ -630,7 +634,9 @@ def _normalize_forms_input_for_api(
     # Cache looked-up revisions to avoid repeated API calls
     revision_cache: Dict[str, Optional[str]] = {}
 
-    def _resolve_revision(form_name: str, original_revision: Optional[str]) -> Optional[str]:
+    def _resolve_revision(
+        form_name: str, original_revision: Optional[str]
+    ) -> Optional[str]:
         """Look up the target-domain revision for a form type."""
         if not client or not domain_id:
             return original_revision
@@ -681,7 +687,10 @@ def _normalize_forms_input_for_api(
 
                     if cache_key not in _ds_cache:
                         _ds_cache[cache_key] = _resolve_target_data_source(
-                            client, domain_id, project_id, source_ds_type,
+                            client,
+                            domain_id,
+                            project_id,
+                            source_ds_type,
                             database_name=db_name,
                         )
                     target_ds = _ds_cache[cache_key]
@@ -877,8 +886,10 @@ def _import_resource(
                     kwargs["description"] = resolved["description"]
                 if resolved.get("formsInput"):
                     normalized = _normalize_forms_input_for_api(
-                        resolved["formsInput"], "assetTypes",
-                        client=client, domain_id=domain_id,
+                        resolved["formsInput"],
+                        "assetTypes",
+                        client=client,
+                        domain_id=domain_id,
                     )
                     # Filter out managed/system forms that cannot be used
                     # in custom asset type creation
@@ -905,8 +916,10 @@ def _import_resource(
             normalized_forms = None
             if resolved.get("formsInput"):
                 normalized_forms = _normalize_forms_input_for_api(
-                    resolved["formsInput"], "assets",
-                    client=client, domain_id=domain_id,
+                    resolved["formsInput"],
+                    "assets",
+                    client=client,
+                    domain_id=domain_id,
                     project_id=project_id,
                 )
             if is_update:
@@ -920,12 +933,14 @@ def _import_resource(
                         identifier=existing_id,
                     )
                     for form in existing_asset.get("formsOutput", []):
-                        existing_forms.append({
-                            "formName": form.get("formName"),
-                            "typeIdentifier": form.get("typeName"),
-                            "typeRevision": form.get("typeRevision"),
-                            "content": form.get("content"),
-                        })
+                        existing_forms.append(
+                            {
+                                "formName": form.get("formName"),
+                                "typeIdentifier": form.get("typeName"),
+                                "typeRevision": form.get("typeRevision"),
+                                "content": form.get("content"),
+                            }
+                        )
                 except Exception:
                     pass
 
@@ -1170,7 +1185,6 @@ def _delete_resource(
         return False
 
 
-
 def _publish_resource(
     client,
     domain_id: str,
@@ -1244,9 +1258,7 @@ def _publish_resource(
                 )
                 return True
             elif listing_status == "FAILED":
-                logger.error(
-                    f"Listing FAILED for {resource_type} {resource_id}"
-                )
+                logger.error(f"Listing FAILED for {resource_type} {resource_id}")
                 return False
             # Still CREATING / PENDING — keep polling
         except Exception as e:
@@ -1259,7 +1271,6 @@ def _publish_resource(
         f"for {resource_type} {resource_id}"
     )
     return False
-
 
 
 def import_catalog(

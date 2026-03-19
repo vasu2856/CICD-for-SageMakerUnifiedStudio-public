@@ -136,7 +136,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - Preserve `inputForms` field when importing assets
     - Preserve `termRelations` field when importing glossary terms
     - Log errors per resource, continue processing, return `{created, updated, deleted, failed, published}` summary
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.8, 5.9, 5.10, 5.11, 5.12, 5.13, 5.14, 7.3, 7.4_
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.8, 5.9, 5.10, 5.11, 5.12, 5.13, 5.14, 5.15, 7.3, 7.4_
   - [x] 5.2 Write unit tests for CatalogImporter
     - Mock DataZone client with boto3 stubber
     - Test externalIdentifier-based mapping with normalization

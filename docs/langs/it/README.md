@@ -286,6 +286,8 @@ dashboard-glue-quick/
 - **[Guida alle Connessioni](docs/connections.md)** - Configura integrazioni con servizi AWS
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - Configurazione automazione CI/CD
 - **[Deployment Metrics](docs/pipeline-deployment-metrics.md)** - Monitoraggio con EventBridge
+- **[Catalog Import/Export Guide](docs/catalog-import-export-guide.md)** - Promuovere risorse del catalogo DataZone tra ambienti
+- **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - Riferimento rapido per il deployment del catalogo
 
 ### Riferimenti
 - **[Manifest Schema](docs/manifest-schema.md)** - Validazione e struttura schema YAML
