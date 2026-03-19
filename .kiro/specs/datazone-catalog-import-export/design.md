@@ -2,7 +2,7 @@
 
 ## Overview
 
-This design adds catalog resource export/import capabilities to the SMUS CI/CD `bundle` and `deploy` commands. During bundling, a new `CatalogExporter` component queries the DataZone Search and SearchTypes APIs to retrieve Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products that are owned by the source project, serializing them into `catalog/catalog_export.json` within the bundle ZIP. The export captures each asset's and data product's `listingStatus` to preserve the source publish state. The manifest configuration is intentionally simple: only `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array) — no filter options of any kind exist in the manifest. An optional `--updated-after` CLI flag on the bundle command allows filtering ALL resource types uniformly by modification timestamp. During deployment, a new `CatalogImporter` component reads the exported JSON, builds an identifier mapping between source and target projects using externalIdentifier (with normalization) or name as fallback, creates or updates resources in dependency order via DataZone create/update APIs, and publishes assets and data products that were published (listingStatus == "LISTED") in the source project unless `skipPublish` is set to true.
+This design adds catalog resource export/import capabilities to the SMUS CI/CD `bundle` and `deploy` commands. During bundling, a new `CatalogExporter` component queries the DataZone Search and SearchTypes APIs to retrieve Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products that are owned by the source project, serializing them into `catalog/catalog_export.json` within the bundle ZIP. The Search API supports `owningProjectIdentifier` as a request parameter for server-side ownership filtering, while the SearchTypes API requires client-side filtering by `owningProjectId` on response items (it does not support the `owningProjectIdentifier` parameter). For assets, an additional `get_asset` API call per item enriches search results with full details including `formsOutput`, since the Search API only returns summary data. The export captures each asset's and data product's `listingStatus` to preserve the source publish state. The manifest configuration is intentionally simple: only `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array) — no filter options of any kind exist in the manifest. An optional `--updated-after` CLI flag on the bundle command allows filtering ALL resource types uniformly by modification timestamp. During deployment, a new `CatalogImporter` component reads the exported JSON, builds an identifier mapping between source and target projects using externalIdentifier (with normalization) or name as fallback, creates or updates resources in dependency order via DataZone create/update APIs, and publishes assets and data products that were published (listingStatus == "ACTIVE") in the source project unless `skipPublish` is set to true.
 
 The design follows existing patterns in the codebase: helpers live in `src/smus_cicd/helpers/`, manifest configuration extends the existing schema, and the deploy command orchestrates import after storage and QuickSight deployments.
 
@@ -38,7 +38,7 @@ flowchart TD
 
 Extend `content.catalog` in `application-manifest-schema.yaml` with a simple `enabled` boolean, optional `skipPublish` boolean, and preserve the existing `assets.access` array for subscription requests. The manifest contains NO filter options — no `include`, `names`, `assetTypes`, `updatedAfter`, or any other filter fields. The `--updated-after` timestamp is purely a CLI flag on the bundle command, not a manifest field.
 
-Publishing behavior: By default, assets and data products are published during import only if they were published (`listingStatus == "LISTED"`) in the source project. This preserves the source publish state across environments. Set `skipPublish: true` to skip all publishing regardless of source state.
+Publishing behavior: By default, assets and data products are published during import only if they were published (`listingStatus == "ACTIVE"`) in the source project. This preserves the source publish state across environments. Set `skipPublish: true` to skip all publishing regardless of source state.
 
 ```yaml
 content:
@@ -111,24 +111,34 @@ Internal helpers:
 
 | Function | Purpose |
 |---|---|
-| `_search_resources(client, domain_id, project_id, search_scope, updated_after)` | Paginated Search API call for Assets, GlossaryTerms, Glossaries with owningProjectIdentifier filter and optional updatedAfter filter (from CLI flag only) |
-| `_search_type_resources(client, domain_id, project_id, type_filter, updated_after)` | Paginated SearchTypes API call for FormTypes, AssetTypes with owningProjectIdentifier filter and optional updatedAfter filter (from CLI flag only) |
-| `_serialize_resource(resource, resource_type)` | Extract user-configurable fields, preserve `name`, `externalIdentifier`, and source identifier |
+| `_search_resources(client, domain_id, project_id, search_scope, updated_after)` | Paginated Search API call for Assets, GlossaryTerms, Glossaries with `owningProjectIdentifier` parameter and optional updatedAfter filter (from CLI flag only) |
+| `_search_type_resources(client, domain_id, project_id, search_scope, updated_after)` | Paginated SearchTypes API call for FormTypes, AssetTypes with client-side `owningProjectId` filtering and optional updatedAfter filter (from CLI flag only). Note: the SearchTypes API does NOT support the `owningProjectIdentifier` parameter — ownership filtering is done client-side on response items. |
+| `_enrich_asset_items(client, domain_id, items)` | Call `get_asset` for each asset item to retrieve full details including `formsOutput`, `description`, and `listingStatus` — the Search API only returns summary data without form details |
+| `_serialize_resource(resource, resource_type)` | Extract user-configurable fields, preserve `name`, `externalIdentifier`, and source identifier. For assets, uses `identifier` (from Search API) or `id` (from GetAsset API) as `sourceId` fallback. |
 | `_normalize_external_identifier(external_id)` | Remove AWS account ID and region information from externalIdentifier |
 
 API routing:
 
 | Resource Type | API | searchScope / typeFilter | Ownership Filter |
 |---|---|---|---|
-| glossaries | `search` | `searchScope="GLOSSARY"` | `owningProjectIdentifier=project_id` |
-| glossaryTerms | `search` | `searchScope="GLOSSARY_TERM"` | `owningProjectIdentifier=project_id` |
-| formTypes | `searchTypes` | `searchScope="FORM_TYPE"`, `managed=False` | `owningProjectIdentifier=project_id` |
-| assetTypes | `searchTypes` | `searchScope="ASSET_TYPE"`, `managed=False` | `owningProjectIdentifier=project_id` |
-| assets | `search` | `searchScope="ASSET"` | `owningProjectIdentifier=project_id` |
-| dataProducts | `search` | `searchScope="DATA_PRODUCT"` | `owningProjectIdentifier=project_id` |
+| glossaries | `search` | `searchScope="GLOSSARY"` | `owningProjectIdentifier=project_id` (API parameter) |
+| glossaryTerms | `search` | `searchScope="GLOSSARY_TERM"` | `owningProjectIdentifier=project_id` (API parameter) |
+| formTypes | `searchTypes` | `searchScope="FORM_TYPE"`, `managed=False` | Client-side filter: `owningProjectId == project_id` |
+| assetTypes | `searchTypes` | `searchScope="ASSET_TYPE"`, `managed=False` | Client-side filter: `owningProjectId == project_id` |
+| assets | `search` | `searchScope="ASSET"` | `owningProjectIdentifier=project_id` (API parameter) |
+| dataProducts | `search` | `searchScope="DATA_PRODUCT"` | `owningProjectIdentifier=project_id` (API parameter) |
+
+**Important API differences:**
+- The `search` API supports `owningProjectIdentifier` as a request parameter for server-side ownership filtering.
+- The `searchTypes` API does NOT support `owningProjectIdentifier` as a request parameter. Ownership filtering for FormTypes and AssetTypes is performed client-side by checking `owningProjectId` on each response item.
+
+**Asset enrichment:**
+- The `search` API returns only summary data for assets — it does NOT include `formsOutput` (form data).
+- After searching assets, `_enrich_asset_items()` calls `get_asset` for each asset to retrieve the full asset details including `formsOutput`, `description`, and `listingStatus`.
+- The `get_asset` API returns `id` instead of `identifier`, so `_serialize_resource` handles both via `asset.get("identifier") or asset.get("id")` for the `sourceId` field.
 
 All queries use:
-- `owningProjectIdentifier=project_id` (CRITICAL: only export project-owned resources)
+- Ownership filtering (server-side via `owningProjectIdentifier` for Search API, client-side via `owningProjectId` for SearchTypes API)
 - `sort=[{"attribute": "updatedAt", "order": "DESCENDING"}]`
 - `nextToken` pagination until exhausted
 - Optional `filters.updatedAt >= updated_after` when `updated_after` is provided via CLI `--updated-after` flag (applied uniformly to ALL resource types)
@@ -151,7 +161,7 @@ def import_catalog(
     Import catalog resources into a target DataZone project.
 
     Publishing behavior: By default, assets and data products are published only
-    if they were published (listingStatus == "LISTED") in the source project.
+    if they were published (listingStatus == "ACTIVE") in the source project.
     Set skip_publish=True to skip all publishing regardless of source state.
 
     Args:
@@ -176,7 +186,7 @@ Internal helpers:
 | `_import_resource(client, domain_id, project_id, resource, resource_type, id_map)` | Call create or update API; handle ConflictException for idempotency |
 | `_delete_resource(client, domain_id, project_id, resource_id, resource_type)` | Call delete API for resources missing from bundle |
 | `_identify_resources_to_delete(client, domain_id, project_id, catalog_data)` | Query target project to find resources not present in bundle |
-| `_publish_resource(client, domain_id, resource_id, resource_type)` | Call publish API for assets and data products that were published in the source (listingStatus == "LISTED"), unless skipPublish is set |
+| `_publish_resource(client, domain_id, resource_id, resource_type, max_wait_seconds, poll_interval)` | Call publish API for assets and data products that were published in the source (listingStatus == "ACTIVE"), then poll to verify listing becomes ACTIVE before counting as published. Returns False if listing status is FAILED or verification times out. |
 | `_validate_catalog_json(catalog_data)` | Validate required top-level keys and metadata fields |
 
 ### 4. Bundle Command Integration
@@ -342,7 +352,7 @@ For all manifest configurations `M` where `M.content.catalog.enabled` is true, t
 ### Property 2: Export All Project-Owned Resources
 **Validates: Requirement 2.1, 2.2, 2.3**
 
-When catalog export is enabled, the `CatalogExporter` SHALL query ALL resource types from the source project using `owningProjectIdentifier=project_id` filter, ensuring ONLY resources owned by the source project are exported. The resulting JSON SHALL contain all project-owned resources without any manifest-based filtering by resource type, name, or any other criteria. The only optional filter is the `--updated-after` CLI flag.
+When catalog export is enabled, the `CatalogExporter` SHALL query ALL resource types from the source project. For the Search API (Assets, Glossaries, GlossaryTerms, Data Products), the `owningProjectIdentifier` parameter is used for server-side filtering. For the SearchTypes API (FormTypes, AssetTypes), client-side filtering by `owningProjectId` is used since the SearchTypes API does not support the `owningProjectIdentifier` parameter. The resulting JSON SHALL contain all project-owned resources without any manifest-based filtering. The only optional filter is the `--updated-after` CLI flag.
 
 ### Property 3: Updated-After CLI Filter Correctness
 **Validates: Requirement 2.12**
@@ -352,7 +362,7 @@ For all ISO 8601 timestamps `T` provided via the `--updated-after` CLI flag (not
 ### Property 4: API Routing by Resource Type
 **Validates: Requirements 2.1, 2.2, 2.6, 2.7**
 
-For all resource types `RT` in `{glossaries, glossaryTerms, assets, dataProducts}`, the `CatalogExporter` SHALL invoke the DataZone `search` API with the corresponding `searchScope` value. For all resource types `RT` in `{formTypes, assetTypes}`, the `CatalogExporter` SHALL invoke the DataZone `searchTypes` API with the corresponding `searchScope` and `managed=False`.
+For all resource types `RT` in `{glossaries, glossaryTerms, assets, dataProducts}`, the `CatalogExporter` SHALL invoke the DataZone `search` API with the corresponding `searchScope` value and `owningProjectIdentifier` parameter. For all resource types `RT` in `{formTypes, assetTypes}`, the `CatalogExporter` SHALL invoke the DataZone `searchTypes` API with the corresponding `searchScope`, `managed=False`, and client-side `owningProjectId` filtering (since `searchTypes` does not support the `owningProjectIdentifier` parameter). For assets, the `CatalogExporter` SHALL additionally call `get_asset` per item to enrich search results with full details including `formsOutput`.
 
 ### Property 5: Pagination Completeness
 **Validates: Requirement 2.5**
@@ -367,7 +377,7 @@ For all valid export operations, the resulting JSON SHALL contain exactly the ke
 ### Property 7: Field Preservation During Serialization
 **Validates: Requirement 3.3, 3.4, 3.5, 3.6**
 
-For all resources `R` exported by the `CatalogExporter`, the serialized JSON representation SHALL preserve the `name` field, `externalIdentifier` field (when present), all user-configurable attributes (description, model, formsInput, etc.), and the source identifier stored as `sourceId`. For assets, the `inputForms` field SHALL be preserved. For glossary terms, the `termRelations` field SHALL be preserved. For metadata form types, the complete `model` structure SHALL be preserved.
+For all resources `R` exported by the `CatalogExporter`, the serialized JSON representation SHALL preserve the `name` field, `externalIdentifier` field (when present), all user-configurable attributes (description, model, formsInput, etc.), and the source identifier stored as `sourceId`. For assets, the `formsOutput` field (retrieved via `get_asset` enrichment, since the Search API does not return it) SHALL be serialized as `formsInput`. The `sourceId` for assets SHALL be resolved using `identifier` (from Search API) or `id` (from GetAsset API) as fallback. For glossary terms, the `termRelations` field SHALL be preserved. For metadata form types, the complete `model` structure SHALL be preserved.
 
 ### Property 8: Catalog Export JSON Round-Trip
 **Validates: Requirement 3.7**
@@ -406,12 +416,12 @@ For any import operation where `K` out of `N` resources fail during create/updat
 ### Property 14: Import Summary Counts
 **Validates: Requirement 5.12, 6.3**
 
-For all import operations, the `CatalogImporter` SHALL return counts `{created, updated, deleted, failed, published}` where `created + updated + deleted + failed` equals the total number of resources processed (resources in bundle + resources in target not in bundle), and `published` equals the number of assets and data products that were published in the source (listingStatus == "LISTED") and successfully published in the target when skipPublish is false.
+For all import operations, the `CatalogImporter` SHALL return counts `{created, updated, deleted, failed, published}` where `created + updated + deleted + failed` equals the total number of resources processed (resources in bundle + resources in target not in bundle), and `published` equals the number of assets and data products that were published in the source (listingStatus == "ACTIVE") and whose listing was verified as ACTIVE in the target when skipPublish is false.
 
 ### Property 15: Source-State-Based Publishing with skipPublish Override
 **Validates: Requirement 5.13**
 
-For all import operations where `skipPublish` is false (default), the `CatalogImporter` SHALL publish only those assets `A` and data products `D` that had `listingStatus == "LISTED"` in the source project. When `skipPublish` is true, no publish API calls SHALL be made regardless of source state.
+For all import operations where `skipPublish` is false (default), the `CatalogImporter` SHALL publish only those assets `A` and data products `D` that had `listingStatus == "ACTIVE"` in the source project, and SHALL verify the listing status becomes ACTIVE in the target by polling `get_asset` or `get_data_product` after calling `create_listing_change_set`. If the listing status is FAILED or verification times out, the publish SHALL be counted as a failure. When `skipPublish` is true, no publish API calls SHALL be made regardless of source state.
 
 ### Property 16: Export Error Propagation
 **Validates: Requirement 7.1**
@@ -432,6 +442,8 @@ For all JSON inputs `J` that are missing any of the required top-level keys `{me
 | ConflictException on create | Treat as existing resource, attempt update instead |
 | Create/update/delete API failure during import | Log error (resource name, type, message), continue with next resource |
 | Publish API failure during import | Log error (resource name, type, message), continue with next resource, increment failed count |
+| Publish listing verification FAILED | Log error indicating listing failed asynchronously, continue with next resource, increment failed count |
+| Publish listing verification timeout | Log error indicating listing did not become ACTIVE within timeout, continue with next resource, increment failed count |
 | All imports fail | Return `False` from import, deploy command reports failure |
 | Malformed catalog_export.json | Raise validation error before any API calls |
 | Missing catalog/catalog_export.json in bundle | Skip silently (backward compatible) |
@@ -448,7 +460,11 @@ Located in `tests/unit/helpers/`:
 
 - `test_catalog_export.py` — Test `CatalogExporter` with mocked DataZone client (boto3 stubber)
   - Verify API routing per resource type
-  - Verify owningProjectIdentifier filter is applied to all queries
+  - Verify `owningProjectIdentifier` parameter is applied to Search API queries
+  - Verify SearchTypes API uses client-side `owningProjectId` filtering (not `owningProjectIdentifier` parameter, which is unsupported)
+  - Verify `_enrich_asset_items` calls `get_asset` per asset to retrieve full details including `formsOutput`
+  - Verify `_enrich_asset_items` falls back to search data on `get_asset` failure
+  - Verify `sourceId` resolution uses `identifier` (Search API) or `id` (GetAsset API) fallback
   - Verify pagination handling
   - Verify --updated-after CLI flag filter construction and application (CLI-only, not manifest)
   - Verify JSON structure output with all resource types

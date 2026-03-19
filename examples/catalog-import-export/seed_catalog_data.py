@@ -69,7 +69,9 @@ def create_form_type(client, domain_id, project_id, name, description, model):
             model={"smithy": model},
             status="ENABLED",
         )
-        print(f"  ✅ Created form type: {name} (revision: {resp.get('revision', 'n/a')})")
+        print(
+            f"  ✅ Created form type: {name} (revision: {resp.get('revision', 'n/a')})"
+        )
         return resp.get("name", name)
     except ClientError as e:
         if e.response["Error"]["Code"] == "ConflictException":
@@ -88,7 +90,9 @@ def create_asset_type(client, domain_id, project_id, name, description, forms_in
             description=description,
             formsInput=forms_input,
         )
-        print(f"  ✅ Created asset type: {name} (revision: {resp.get('revision', 'n/a')})")
+        print(
+            f"  ✅ Created asset type: {name} (revision: {resp.get('revision', 'n/a')})"
+        )
         return resp.get("name", name)
     except ClientError as e:
         if e.response["Error"]["Code"] == "ConflictException":
@@ -141,12 +145,16 @@ def seed(domain_id, project_id, region):
 
     summary = {"created": 0, "skipped": 0, "failed": 0}
 
-    print(f"\n🌱 Seeding catalog data into project {project_id} (domain: {domain_id})\n")
+    print(
+        f"\n🌱 Seeding catalog data into project {project_id} (domain: {domain_id})\n"
+    )
 
     # --- Glossaries ---
     print("📚 Creating glossaries...")
     glossary_id = create_glossary(
-        client, domain_id, project_id,
+        client,
+        domain_id,
+        project_id,
         name="Business Terms",
         description="Core business terminology for the organization",
     )
@@ -159,9 +167,21 @@ def seed(domain_id, project_id, region):
     print("\n📝 Creating glossary terms...")
     if glossary_id:
         terms = [
-            ("Revenue", "Total income generated", "Total income generated from sales of goods and services before expenses are deducted."),
-            ("Customer", "An entity that purchases goods", "An individual or organization that purchases goods or services from the business."),
-            ("Churn Rate", "Rate of customer attrition", "The percentage of customers who stop using a product or service during a given time period."),
+            (
+                "Revenue",
+                "Total income generated",
+                "Total income generated from sales of goods and services before expenses are deducted.",
+            ),
+            (
+                "Customer",
+                "An entity that purchases goods",
+                "An individual or organization that purchases goods or services from the business.",
+            ),
+            (
+                "Churn Rate",
+                "Rate of customer attrition",
+                "The percentage of customers who stop using a product or service during a given time period.",
+            ),
         ]
         for name, short_desc, long_desc in terms:
             term_id = create_glossary_term(
@@ -177,20 +197,24 @@ def seed(domain_id, project_id, region):
 
     # --- Form Types ---
     print("\n📋 Creating form types...")
-    smithy_model = json.dumps({
-        "smithy": "1.0",
-        "shapes": {
-            "com.example#DataQualityForm": {
-                "type": "structure",
-                "members": {
-                    "qualityScore": {"target": "smithy.api#Integer"},
-                    "lastValidated": {"target": "smithy.api#String"},
-                },
-            }
-        },
-    })
+    smithy_model = json.dumps(
+        {
+            "smithy": "1.0",
+            "shapes": {
+                "com.example#DataQualityForm": {
+                    "type": "structure",
+                    "members": {
+                        "qualityScore": {"target": "smithy.api#Integer"},
+                        "lastValidated": {"target": "smithy.api#String"},
+                    },
+                }
+            },
+        }
+    )
     form_name = create_form_type(
-        client, domain_id, project_id,
+        client,
+        domain_id,
+        project_id,
         name="DataQualityForm",
         description="Tracks data quality metrics for assets",
         model=smithy_model,
@@ -209,7 +233,11 @@ def seed(domain_id, project_id, region):
     ]
     for name, description in assets:
         asset_id = create_asset(
-            client, domain_id, project_id, name, description,
+            client,
+            domain_id,
+            project_id,
+            name,
+            description,
             type_identifier="amazon.datazone.RelationalTableAssetType",
         )
         if asset_id:
@@ -234,7 +262,9 @@ def main():
     )
     parser.add_argument("--domain-id", required=True, help="DataZone domain ID")
     parser.add_argument("--project-id", required=True, help="DataZone project ID")
-    parser.add_argument("--region", default="us-east-1", help="AWS region (default: us-east-1)")
+    parser.add_argument(
+        "--region", default="us-east-1", help="AWS region (default: us-east-1)"
+    )
     args = parser.parse_args()
 
     try:

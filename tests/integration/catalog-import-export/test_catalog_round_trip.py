@@ -29,7 +29,6 @@ from botocore.exceptions import ClientError
 
 from tests.integration.base import IntegrationTestBase
 
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -90,7 +89,10 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         region = os.environ.get("DEV_DOMAIN_REGION", "us-east-1")
 
         from smus_cicd.application import ApplicationManifest
-        from smus_cicd.helpers.utils import build_domain_config, get_datazone_project_info
+        from smus_cicd.helpers.utils import (
+            build_domain_config,
+            get_datazone_project_info,
+        )
 
         manifest = ApplicationManifest.from_file(pipeline_file)
         config = build_domain_config(manifest.stages[stage])
@@ -292,7 +294,6 @@ class TestCatalogRoundTrip(IntegrationTestBase):
                     zf.writestr(name, content)
         return bundle_path
 
-
     # ==================================================================
     # 9.1  Full round-trip: export → import → verify resources exist
     # ==================================================================
@@ -366,39 +367,45 @@ class TestCatalogRoundTrip(IntegrationTestBase):
 
         # Verify glossary is in export
         exported_glossary_names = [g["name"] for g in catalog["glossaries"]]
-        assert glossary_name in exported_glossary_names, (
-            f"Glossary '{glossary_name}' not in export. Found: {exported_glossary_names}"
-        )
+        assert (
+            glossary_name in exported_glossary_names
+        ), f"Glossary '{glossary_name}' not in export. Found: {exported_glossary_names}"
 
         # Verify term is in export with termRelations field
         if term:
             exported_term_names = [t["name"] for t in catalog["glossaryTerms"]]
-            assert term_name in exported_term_names, (
-                f"Term '{term_name}' not in export. Found: {exported_term_names}"
-            )
+            assert (
+                term_name in exported_term_names
+            ), f"Term '{term_name}' not in export. Found: {exported_term_names}"
             exported_term = next(
                 t for t in catalog["glossaryTerms"] if t["name"] == term_name
             )
-            assert "termRelations" in exported_term, (
-                "termRelations field should be preserved in export"
-            )
+            assert (
+                "termRelations" in exported_term
+            ), "termRelations field should be preserved in export"
             # Verify cross-reference: term references glossary via glossaryId
-            assert "glossaryId" in exported_term, (
-                "glossaryId cross-reference should be in exported term"
-            )
+            assert (
+                "glossaryId" in exported_term
+            ), "glossaryId cross-reference should be in exported term"
 
         # Verify inputForms field is present on any exported assets
         for asset in catalog.get("assets", []):
-            assert "inputForms" in asset, (
-                "inputForms field should be preserved in exported assets"
-            )
+            assert (
+                "inputForms" in asset
+            ), "inputForms field should be preserved in exported assets"
 
         # 5 — deploy bundle to target project
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"deploy to target failed: {r['output']}"
 
         # 6 — query target project to verify resources exist
@@ -422,9 +429,9 @@ class TestCatalogRoundTrip(IntegrationTestBase):
             target_term_names = [
                 i.get("glossaryTermItem", {}).get("name") for i in target_terms
             ]
-            assert term_name in target_term_names, (
-                f"Term '{term_name}' not found in target. Found: {target_term_names}"
-            )
+            assert (
+                term_name in target_term_names
+            ), f"Term '{term_name}' not found in target. Found: {target_term_names}"
 
             # 7 — verify externalIdentifier-based mapping: source and target IDs differ
             source_glossary_id = glossary["id"]
@@ -446,9 +453,7 @@ class TestCatalogRoundTrip(IntegrationTestBase):
                 if i.get("glossaryTermItem", {}).get("name") == term_name
             )
             target_term_glossary_id = target_term_item.get("glossaryId")
-            assert target_term_glossary_id, (
-                "Target term should reference a glossary"
-            )
+            assert target_term_glossary_id, "Target term should reference a glossary"
             # The term's glossaryId in target should point to the target glossary
             assert target_term_glossary_id == target_glossary_id, (
                 f"Term's glossaryId ({target_term_glossary_id}) should match "
@@ -460,7 +465,6 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         assert "catalog" in out, "Deploy output should mention catalog import"
         for keyword in ["created", "updated", "deleted", "failed"]:
             assert keyword in out, f"Deploy output should report '{keyword}' count"
-
 
     # ==================================================================
     # 9.2  Round-trip with automatic publishing
@@ -517,20 +521,24 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         expected_publishable = num_assets + num_data_products
 
         # 4 — deploy to target with source-state-based publishing
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"deploy with publish failed: {r['output']}"
 
         # 5 — verify deploy output mentions publishing
         out = r["output"]
         out_lower = out.lower()
         assert "catalog" in out_lower, "Deploy output should mention catalog"
-        assert "published" in out_lower, (
-            "Deploy output should report published count"
-        )
+        assert "published" in out_lower, "Deploy output should report published count"
 
         # 6 — verify published count in output
         # The deploy command prints "Published: N"
@@ -551,10 +559,9 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         target_names = [
             i.get("glossaryItem", {}).get("name") for i in target_glossaries
         ]
-        assert glossary_name in target_names, (
-            f"Glossary '{glossary_name}' not found in target after publish deploy"
-        )
-
+        assert (
+            glossary_name in target_names
+        ), f"Glossary '{glossary_name}' not found in target after publish deploy"
 
     # ==================================================================
     # 9.3  Round-trip with --updated-after CLI filter
@@ -610,11 +617,15 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         time.sleep(2)
 
         # 5 — bundle with --updated-after = middle_ts
-        r = self.run_cli_command([
-            "bundle",
-            "--manifest", pf,
-            "--updated-after", middle_ts,
-        ])
+        r = self.run_cli_command(
+            [
+                "bundle",
+                "--manifest",
+                pf,
+                "--updated-after",
+                middle_ts,
+            ]
+        )
         assert r["success"], f"bundle with --updated-after failed: {r['output']}"
 
         bundle = self._find_bundle_zip()
@@ -637,11 +648,17 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         )
 
         # 6 — deploy filtered bundle to target
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"deploy filtered bundle failed: {r['output']}"
 
         # 7 — verify target project
@@ -658,7 +675,6 @@ class TestCatalogRoundTrip(IntegrationTestBase):
             f"Glossary A '{glossary_a_name}' should NOT be in target "
             f"(filtered by --updated-after)"
         )
-
 
     # ==================================================================
     # 9.4  Negative scenarios
@@ -685,11 +701,15 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         assert r["success"], f"deploy dev failed: {r['output']}"
 
         # 2 — bundle with far-future timestamp (simulates empty project)
-        r = self.run_cli_command([
-            "bundle",
-            "--manifest", pf,
-            "--updated-after", "2099-12-31T23:59:59Z",
-        ])
+        r = self.run_cli_command(
+            [
+                "bundle",
+                "--manifest",
+                pf,
+                "--updated-after",
+                "2099-12-31T23:59:59Z",
+            ]
+        )
         assert r["success"], f"bundle failed: {r['output']}"
 
         # 3 — verify valid JSON with empty arrays
@@ -743,11 +763,17 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         bundle_path = self._create_bundle_with_catalog(malformed_catalog)
 
         # 3 — deploy with malformed bundle
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle_path,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle_path,
+                "--manifest",
+                pf,
+            ]
+        )
 
         # Deploy may succeed (with error logged) or fail — either way,
         # the error should be reported in output
@@ -759,9 +785,9 @@ class TestCatalogRoundTrip(IntegrationTestBase):
             or "validation" in out
             or not r["success"]
         )
-        assert has_error, (
-            "Deploy with malformed catalog JSON should report an error or fail"
-        )
+        assert (
+            has_error
+        ), "Deploy with malformed catalog JSON should report an error or fail"
 
         # Clean up temp bundle
         if os.path.exists(bundle_path):
@@ -796,8 +822,12 @@ class TestCatalogRoundTrip(IntegrationTestBase):
                 "sourceDomainId": "nonexistent-domain",
                 "exportTimestamp": datetime.now(timezone.utc).isoformat(),
                 "resourceTypes": [
-                    "glossaries", "glossaryTerms", "formTypes",
-                    "assetTypes", "assets", "dataProducts",
+                    "glossaries",
+                    "glossaryTerms",
+                    "formTypes",
+                    "assetTypes",
+                    "assets",
+                    "dataProducts",
                 ],
             },
             "glossaries": [],
@@ -819,22 +849,24 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         bundle_path = self._create_bundle_with_catalog(failing_catalog)
 
         # 3 — deploy with failing catalog
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle_path,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle_path,
+                "--manifest",
+                pf,
+            ]
+        )
 
         # The deploy should either fail or report failures in output
         out = r["output"].lower()
-        has_failure_report = (
-            "failed" in out
-            or "error" in out
-            or not r["success"]
-        )
-        assert has_failure_report, (
-            "Deploy with all failing imports should report failure"
-        )
+        has_failure_report = "failed" in out or "error" in out or not r["success"]
+        assert (
+            has_failure_report
+        ), "Deploy with all failing imports should report failure"
 
         # Clean up temp bundle
         if os.path.exists(bundle_path):
@@ -859,14 +891,16 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         r = self.run_cli_command(
             [
                 "bundle",
-                "--manifest", pf,
-                "--updated-after", "not-a-valid-timestamp",
+                "--manifest",
+                pf,
+                "--updated-after",
+                "not-a-valid-timestamp",
             ],
             expected_exit_code=1,
         )
 
         # Should fail with helpful error message
         out = r["output"].lower()
-        assert not r["success"] or "error" in out or "invalid" in out, (
-            "Bundle with invalid --updated-after should fail or report error"
-        )
+        assert (
+            not r["success"] or "error" in out or "invalid" in out
+        ), "Bundle with invalid --updated-after should fail or report error"

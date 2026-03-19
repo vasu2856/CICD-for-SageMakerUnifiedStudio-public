@@ -34,7 +34,6 @@ from botocore.exceptions import ClientError
 
 from tests.integration.base import IntegrationTestBase
 
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -91,7 +90,10 @@ class TestCatalogImport(IntegrationTestBase):
         region = os.environ.get("DEV_DOMAIN_REGION", "us-east-1")
 
         from smus_cicd.application import ApplicationManifest
-        from smus_cicd.helpers.utils import build_domain_config, get_datazone_project_info
+        from smus_cicd.helpers.utils import (
+            build_domain_config,
+            get_datazone_project_info,
+        )
 
         manifest = ApplicationManifest.from_file(pipeline_file)
         config = build_domain_config(manifest.stages[stage])
@@ -199,7 +201,11 @@ class TestCatalogImport(IntegrationTestBase):
             for item in resp.get("items", []):
                 t = item.get("glossaryTermItem", {})
                 if t.get("name") == name:
-                    return {"id": t["id"], "name": name, "glossaryId": t.get("glossaryId")}
+                    return {
+                        "id": t["id"],
+                        "name": name,
+                        "glossaryId": t.get("glossaryId"),
+                    }
         except Exception:
             pass
         return None
@@ -299,7 +305,6 @@ class TestCatalogImport(IntegrationTestBase):
             zf.writestr("placeholder.txt", "no catalog data")
         return bundle_path
 
-
     # ==================================================================
     # 8.1  End-to-end catalog import during deploy
     # ==================================================================
@@ -338,7 +343,11 @@ class TestCatalogImport(IntegrationTestBase):
         assert glossary, "Failed to create glossary"
 
         term = self._create_glossary_term(
-            domain_id, glossary["id"], f"ImportTerm-{ts}", "e2e term", region,
+            domain_id,
+            glossary["id"],
+            f"ImportTerm-{ts}",
+            "e2e term",
+            region,
             project_id=project_id,
         )
 
@@ -356,33 +365,33 @@ class TestCatalogImport(IntegrationTestBase):
         assert catalog["metadata"]["sourceProjectId"] == project_id
 
         # 4 — deploy to test
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"deploy test failed: {r['output']}"
 
         # 5 — verify resources in target
         t_domain, t_project, _, _ = self._get_project_info(pf, "test")
         glossaries = self._search_resources(t_domain, t_project, "GLOSSARY", region)
-        names = [
-            i.get("glossaryItem", {}).get("name")
-            for i in glossaries
-        ]
-        assert f"ImportGlossary-{ts}" in names, (
-            f"Glossary not found in target. Found: {names}"
-        )
+        names = [i.get("glossaryItem", {}).get("name") for i in glossaries]
+        assert (
+            f"ImportGlossary-{ts}" in names
+        ), f"Glossary not found in target. Found: {names}"
 
         if term:
             terms = self._search_resources(t_domain, t_project, "GLOSSARY_TERM", region)
-            tnames = [
-                i.get("glossaryTermItem", {}).get("name")
-                for i in terms
-            ]
-            assert f"ImportTerm-{ts}" in tnames, (
-                f"Term not found in target. Found: {tnames}"
-            )
+            tnames = [i.get("glossaryTermItem", {}).get("name") for i in terms]
+            assert (
+                f"ImportTerm-{ts}" in tnames
+            ), f"Term not found in target. Found: {tnames}"
 
         # 6 — verify deploy output mentions catalog and counts
         out = r["output"].lower()
@@ -423,7 +432,9 @@ class TestCatalogImport(IntegrationTestBase):
 
         ts = int(time.time())
         gname = f"IdempotentGlossary-{ts}"
-        glossary = self._create_glossary(domain_id, project_id, gname, "idempotent test", region)
+        glossary = self._create_glossary(
+            domain_id, project_id, gname, "idempotent test", region
+        )
         assert glossary, "Failed to create glossary"
 
         # bundle
@@ -433,11 +444,17 @@ class TestCatalogImport(IntegrationTestBase):
         assert bundle
 
         # first deploy
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"First deploy failed: {r['output']}"
 
         t_domain, t_project, _, _ = self._get_project_info(pf, "test")
@@ -448,24 +465,29 @@ class TestCatalogImport(IntegrationTestBase):
         assert count_first == 1, f"Expected 1 glossary, found {count_first}"
 
         # second deploy (idempotent)
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"Second deploy failed: {r['output']}"
 
         items = self._search_resources(t_domain, t_project, "GLOSSARY", region)
         count_second = sum(
             1 for i in items if i.get("glossaryItem", {}).get("name") == gname
         )
-        assert count_second == 1, (
-            f"Expected 1 glossary after re-deploy, found {count_second} (duplicated)"
-        )
+        assert (
+            count_second == 1
+        ), f"Expected 1 glossary after re-deploy, found {count_second} (duplicated)"
 
         # output should mention catalog
         assert "catalog" in r["output"].lower()
-
 
     # ==================================================================
     # 8.3  Deletion of resources not in bundle
@@ -497,9 +519,15 @@ class TestCatalogImport(IntegrationTestBase):
 
         ts = int(time.time())
         # Create resources A, B, C in source
-        ga = self._create_glossary(domain_id, project_id, f"GlossaryA-{ts}", "A", region)
-        gb = self._create_glossary(domain_id, project_id, f"GlossaryB-{ts}", "B", region)
-        gc = self._create_glossary(domain_id, project_id, f"GlossaryC-{ts}", "C", region)
+        ga = self._create_glossary(
+            domain_id, project_id, f"GlossaryA-{ts}", "A", region
+        )
+        gb = self._create_glossary(
+            domain_id, project_id, f"GlossaryB-{ts}", "B", region
+        )
+        gc = self._create_glossary(
+            domain_id, project_id, f"GlossaryC-{ts}", "C", region
+        )
         assert ga and gb and gc, "Failed to create source glossaries"
 
         # bundle (contains A, B, C)
@@ -509,11 +537,17 @@ class TestCatalogImport(IntegrationTestBase):
         assert bundle
 
         # first deploy to target
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"First deploy failed: {r['output']}"
 
         # get target project info
@@ -525,33 +559,43 @@ class TestCatalogImport(IntegrationTestBase):
         )
 
         if not gd:
-            pytest.skip("Cannot create extra glossary in target — skipping deletion test")
+            pytest.skip(
+                "Cannot create extra glossary in target — skipping deletion test"
+            )
 
         # verify D exists in target
         items = self._search_resources(t_domain, t_project, "GLOSSARY", region)
         d_count = sum(
-            1 for i in items
+            1
+            for i in items
             if i.get("glossaryItem", {}).get("name") == f"GlossaryD-{ts}"
         )
         assert d_count == 1, f"Expected GlossaryD in target, found {d_count}"
 
         # re-deploy same bundle (only A, B, C — D should be deleted)
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"Re-deploy failed: {r['output']}"
 
         # verify D is deleted
         items = self._search_resources(t_domain, t_project, "GLOSSARY", region)
         d_count_after = sum(
-            1 for i in items
+            1
+            for i in items
             if i.get("glossaryItem", {}).get("name") == f"GlossaryD-{ts}"
         )
-        assert d_count_after == 0, (
-            f"GlossaryD should have been deleted, but found {d_count_after}"
-        )
+        assert (
+            d_count_after == 0
+        ), f"GlossaryD should have been deleted, but found {d_count_after}"
 
         # verify deploy output reports deletion count
         out = r["output"].lower()
@@ -600,11 +644,17 @@ class TestCatalogImport(IntegrationTestBase):
         assert bundle, "Bundle ZIP not found"
 
         # deploy with source-state-based publishing (skipPublish defaults to false)
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"Deploy with publish failed: {r['output']}"
 
         # verify output reports published count
@@ -652,19 +702,24 @@ class TestCatalogImport(IntegrationTestBase):
         assert bundle
 
         # deploy with publish: false (default)
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"Deploy failed: {r['output']}"
 
         # verify output reports Published: 0
         out = r["output"]
-        assert "Published: 0" in out or "published: 0" in out.lower(), (
-            "Deploy output should report Published: 0 when publish is disabled"
-        )
-
+        assert (
+            "Published: 0" in out or "published: 0" in out.lower()
+        ), "Deploy output should report Published: 0 when publish is disabled"
 
     # ==================================================================
     # 8.6  Publish failures are logged but don't block
@@ -703,7 +758,11 @@ class TestCatalogImport(IntegrationTestBase):
 
         ts = int(time.time())
         glossary = self._create_glossary(
-            domain_id, project_id, f"PublishFailGlossary-{ts}", "publish-fail test", region
+            domain_id,
+            project_id,
+            f"PublishFailGlossary-{ts}",
+            "publish-fail test",
+            region,
         )
         assert glossary, "Failed to create glossary"
 
@@ -717,14 +776,20 @@ class TestCatalogImport(IntegrationTestBase):
 
         # deploy with publishing enabled — glossaries are not publishable so
         # the publish step may fail for them, but deploy should still succeed
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
-        assert r["success"], (
-            f"Deploy should succeed even when some publishes fail: {r['output']}"
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
+        assert r[
+            "success"
+        ], f"Deploy should succeed even when some publishes fail: {r['output']}"
 
         # output should still mention catalog import completion
         out = r["output"].lower()
@@ -760,7 +825,9 @@ class TestCatalogImport(IntegrationTestBase):
 
         ts = int(time.time())
         gname = f"DisabledGlossary-{ts}"
-        glossary = self._create_glossary(domain_id, project_id, gname, "disabled test", region)
+        glossary = self._create_glossary(
+            domain_id, project_id, gname, "disabled test", region
+        )
         assert glossary, "Failed to create glossary"
 
         # bundle
@@ -774,11 +841,17 @@ class TestCatalogImport(IntegrationTestBase):
         assert catalog, "Bundle should contain catalog_export.json"
 
         # deploy to test-disabled (catalog.disable: true)
-        r = self.run_cli_command([
-            "deploy", "--targets", "test-disabled",
-            "--bundle-archive-path", bundle,
-            "--manifest", pf,
-        ])
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test-disabled",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
+        )
         assert r["success"], f"Deploy failed: {r['output']}"
 
         # verify no catalog resources created
@@ -787,15 +860,15 @@ class TestCatalogImport(IntegrationTestBase):
         disabled_count = sum(
             1 for i in items if i.get("glossaryItem", {}).get("name") == gname
         )
-        assert disabled_count == 0, (
-            f"Expected 0 glossaries when disabled, found {disabled_count}"
-        )
+        assert (
+            disabled_count == 0
+        ), f"Expected 0 glossaries when disabled, found {disabled_count}"
 
         # verify output indicates skip
         out = r["output"].lower()
-        assert "catalog" in out and ("disabled" in out or "skip" in out), (
-            "Deploy output should indicate catalog import was skipped/disabled"
-        )
+        assert "catalog" in out and (
+            "disabled" in out or "skip" in out
+        ), "Deploy output should indicate catalog import was skipped/disabled"
 
     # ==================================================================
     # 8.8  Deploy with bundle missing catalog_export.json
@@ -837,7 +910,9 @@ class TestCatalogImport(IntegrationTestBase):
             shutil.copytree(source_code, dest_code)
 
         # bundle without catalog
-        r = self.run_cli_command(["bundle", "--targets", "dev", "--manifest", tmp_manifest])
+        r = self.run_cli_command(
+            ["bundle", "--targets", "dev", "--manifest", tmp_manifest]
+        )
         assert r["success"], f"Bundle failed: {r['output']}"
 
         bundle = self._find_bundle_zip()
@@ -848,14 +923,20 @@ class TestCatalogImport(IntegrationTestBase):
         assert catalog is None, "Bundle should NOT contain catalog_export.json"
 
         # deploy — should succeed silently
-        r = self.run_cli_command([
-            "deploy", "--targets", "test",
-            "--bundle-archive-path", bundle,
-            "--manifest", tmp_manifest,
-        ])
-        assert r["success"], (
-            f"Deploy should succeed without catalog_export.json: {r['output']}"
+        r = self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                tmp_manifest,
+            ]
         )
+        assert r[
+            "success"
+        ], f"Deploy should succeed without catalog_export.json: {r['output']}"
 
         # no catalog-related errors
         out = r["output"].lower()

@@ -20,7 +20,6 @@ import yaml
 
 from tests.integration.base import IntegrationTestBase
 
-
 REQUIRED_TOP_LEVEL_KEYS = [
     "metadata",
     "glossaries",
@@ -271,13 +270,15 @@ class TestCatalogExport(IntegrationTestBase):
         time.sleep(2)
 
         # Bundle with --updated-after = ts_before (recent)
-        r = self.run_cli_command([
-            "bundle",
-            "--manifest",
-            pf,
-            "--updated-after",
-            ts_before,
-        ])
+        r = self.run_cli_command(
+            [
+                "bundle",
+                "--manifest",
+                pf,
+                "--updated-after",
+                ts_before,
+            ]
+        )
         assert r["success"], f"Bundle failed: {r['output']}"
 
         zp = self._find_bundle_zip()
@@ -293,13 +294,15 @@ class TestCatalogExport(IntegrationTestBase):
         os.remove(zp)
 
         # Bundle with far-future --updated-after => empty arrays
-        r = self.run_cli_command([
-            "bundle",
-            "--manifest",
-            pf,
-            "--updated-after",
-            "2099-01-01T00:00:00Z",
-        ])
+        r = self.run_cli_command(
+            [
+                "bundle",
+                "--manifest",
+                pf,
+                "--updated-after",
+                "2099-01-01T00:00:00Z",
+            ]
+        )
         assert r["success"]
 
         zp = self._find_bundle_zip()
@@ -329,13 +332,15 @@ class TestCatalogExport(IntegrationTestBase):
         assert r["success"], f"Deploy failed: {r['output']}"
 
         # Use far-future timestamp to simulate empty project
-        r = self.run_cli_command([
-            "bundle",
-            "--manifest",
-            pf,
-            "--updated-after",
-            "2099-12-31T23:59:59Z",
-        ])
+        r = self.run_cli_command(
+            [
+                "bundle",
+                "--manifest",
+                pf,
+                "--updated-after",
+                "2099-12-31T23:59:59Z",
+            ]
+        )
         assert r["success"], f"Bundle failed: {r['output']}"
 
         zp = self._find_bundle_zip()

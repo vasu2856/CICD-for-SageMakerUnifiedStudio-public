@@ -46,8 +46,8 @@ When you run the `deploy` command, the CLI:
 2. Builds an identifier mapping between source and target projects using `externalIdentifier` (with normalization) or name as fallback
 3. Creates, updates, or deletes resources in the target project in dependency order
 4. Resolves cross-references (e.g., GlossaryTerm → Glossary, Asset → AssetType)
-5. Publishes assets and data products that were published in the source project (unless `skipPublish: true` is configured)
-6. Reports a summary of created, updated, deleted, and failed resources
+5. Publishes assets and data products that were published in the source project (unless `skipPublish: true` is configured), verifying each listing becomes ACTIVE before counting it as published
+6. Reports a summary of created, updated, deleted, published, and failed resources
 
 ## Configuration
 
@@ -61,7 +61,7 @@ The manifest `content.catalog` section is intentionally simple — it only suppo
 
 No filter options (`include`, `names`, `assetTypes`, `updatedAfter`, etc.) exist in the manifest. When enabled, ALL project-owned catalog resources are exported. To filter by date, use the `--updated-after` CLI flag on the bundle command.
 
-Publishing behavior: By default, assets and data products are published during import only if they were published (`listingStatus == "LISTED"`) in the source project. This preserves the source publish state across environments. Set `skipPublish: true` to skip all publishing.
+Publishing behavior: By default, assets and data products are published during import only if they were published (`listingStatus == "ACTIVE"`) in the source project. This preserves the source publish state across environments. After calling the asynchronous publish API (`create_listing_change_set`), the importer polls the resource to verify the listing becomes ACTIVE before counting it as published. If the listing fails (e.g., the underlying physical resource doesn't exist in the target), it is counted as a publish failure. Set `skipPublish: true` to skip all publishing.
 
 ```yaml
 content:
@@ -288,6 +288,8 @@ The exported `catalog/catalog_export.json` file has the following structure:
 | Missing catalog file | Silently skipped (backward compatible) |
 | Catalog disabled for stage | Skipped with log message |
 | Publish API failure | Logs error, continues with remaining resources |
+| Publish listing verification FAILED | Listing failed asynchronously (e.g., missing physical resource); logged as publish failure |
+| Publish listing verification timeout | Listing did not become ACTIVE within timeout; logged as publish failure |
 | Deletion failure | Logs error, continues with remaining resources |
 
 ### Partial Failures
@@ -501,6 +503,15 @@ A `Failed` count greater than zero indicates some resources could not be importe
 ### Problem: Permission denied during export or import
 
 **Cause**: Insufficient DataZone permissions
+
+### Problem: Published count is 0 even though source assets were published
+
+**Cause**: The `create_listing_change_set` API is asynchronous. The import process polls the resource after publishing to verify the listing becomes ACTIVE. If the underlying physical resource (e.g., Glue Table) doesn't exist in the target environment, the listing will fail asynchronously and be counted as a publish failure rather than a success.
+
+**Solution**:
+- Verify the physical resources (Glue Tables, S3 buckets, etc.) exist in the target environment with the same names as in the source
+- Check the deploy logs for "Listing FAILED" or "Listing verification timed out" messages
+- If the physical resources can't be created in the target, use `skipPublish: true` in the manifest to skip publishing
 
 **Solution**:
 - Verify your IAM role has DataZone permissions:

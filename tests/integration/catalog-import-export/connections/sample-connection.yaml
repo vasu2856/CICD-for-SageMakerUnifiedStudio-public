@@ -1,0 +1,5 @@
+name: sample-connection
+description: Minimal connection for testing catalog import/export
+props:
+  athenaProperties:
+    workgroupName: primary

@@ -6,44 +6,59 @@ Feature: datazone-catalog-import-export
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from smus_cicd.helpers.catalog_import import (
+    CREATION_ORDER,
+    DELETION_ORDER,
+    REQUIRED_TOP_LEVEL_KEYS,
     _build_identifier_map,
     _normalize_external_identifier,
     _resolve_cross_references,
     _validate_catalog_json,
     import_catalog,
-    CREATION_ORDER,
-    DELETION_ORDER,
-    REQUIRED_TOP_LEVEL_KEYS,
 )
 
-
 # --- Strategies ---
+
 
 @st.composite
 def resource_name_strategy(draw):
     """Generate a valid resource name."""
-    return draw(st.text(
-        min_size=1, max_size=30,
-        alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="-_")
-    ))
+    return draw(
+        st.text(
+            min_size=1,
+            max_size=30,
+            alphabet=st.characters(
+                whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="-_"
+            ),
+        )
+    )
 
 
 @st.composite
 def aws_account_id_strategy(draw):
     """Generate a 12-digit AWS account ID."""
-    return draw(st.from_regex(r'\d{12}', fullmatch=True))
+    return draw(st.from_regex(r"\d{12}", fullmatch=True))
 
 
 @st.composite
 def aws_region_strategy(draw):
     """Generate a valid AWS region string."""
-    return draw(st.sampled_from([
-        "us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1",
-        "sa-east-1", "ca-central-1", "me-south-1",
-    ]))
+    return draw(
+        st.sampled_from(
+            [
+                "us-east-1",
+                "us-west-2",
+                "eu-west-1",
+                "ap-southeast-1",
+                "sa-east-1",
+                "ca-central-1",
+                "me-south-1",
+            ]
+        )
+    )
 
 
 @st.composite
@@ -52,11 +67,15 @@ def external_identifier_strategy(draw):
     account = draw(aws_account_id_strategy())
     region = draw(aws_region_strategy())
     resource_name = draw(resource_name_strategy())
-    pattern = draw(st.sampled_from([
-        f"arn:aws:s3:{region}:{account}:bucket/{resource_name}",
-        f"resource-{account}-{region}-{resource_name}",
-        f"{resource_name}",  # no AWS info
-    ]))
+    pattern = draw(
+        st.sampled_from(
+            [
+                f"arn:aws:s3:{region}:{account}:bucket/{resource_name}",
+                f"resource-{account}-{region}-{resource_name}",
+                f"{resource_name}",  # no AWS info
+            ]
+        )
+    )
     return pattern
 
 
@@ -67,23 +86,38 @@ def catalog_resource_strategy(draw, resource_type):
     source_id = f"source-{draw(st.integers(min_value=1, max_value=10000))}"
 
     if resource_type == "glossaries":
-        return {"sourceId": source_id, "name": name, "description": "desc", "status": "ENABLED"}
+        return {
+            "sourceId": source_id,
+            "name": name,
+            "description": "desc",
+            "status": "ENABLED",
+        }
     elif resource_type == "glossaryTerms":
         return {
-            "sourceId": source_id, "name": name,
-            "shortDescription": "short", "longDescription": "long",
+            "sourceId": source_id,
+            "name": name,
+            "shortDescription": "short",
+            "longDescription": "long",
             "glossaryId": f"glossary-{draw(st.integers(min_value=1, max_value=100))}",
-            "status": "ENABLED", "termRelations": {},
+            "status": "ENABLED",
+            "termRelations": {},
         }
     elif resource_type == "formTypes":
         return {"sourceId": source_id, "name": name, "description": "desc", "model": {}}
     elif resource_type == "assetTypes":
-        return {"sourceId": source_id, "name": name, "description": "desc", "formsInput": {}}
+        return {
+            "sourceId": source_id,
+            "name": name,
+            "description": "desc",
+            "formsInput": {},
+        }
     elif resource_type == "assets":
         return {
-            "sourceId": source_id, "name": name, "description": "desc",
+            "sourceId": source_id,
+            "name": name,
+            "description": "desc",
             "typeIdentifier": f"type-{draw(st.integers(min_value=1, max_value=100))}",
-            "formsInput": [], "inputForms": [],
+            "formsInput": [],
         }
     elif resource_type == "dataProducts":
         return {"sourceId": source_id, "name": name, "description": "desc", "items": []}
@@ -100,14 +134,21 @@ def catalog_data_strategy(draw):
             "exportTimestamp": "2025-01-01T00:00:00Z",
             "resourceTypes": list(CREATION_ORDER),
         },
-        "glossaries": draw(st.lists(catalog_resource_strategy("glossaries"), max_size=3)),
-        "glossaryTerms": draw(st.lists(catalog_resource_strategy("glossaryTerms"), max_size=3)),
+        "glossaries": draw(
+            st.lists(catalog_resource_strategy("glossaries"), max_size=3)
+        ),
+        "glossaryTerms": draw(
+            st.lists(catalog_resource_strategy("glossaryTerms"), max_size=3)
+        ),
         "formTypes": draw(st.lists(catalog_resource_strategy("formTypes"), max_size=3)),
-        "assetTypes": draw(st.lists(catalog_resource_strategy("assetTypes"), max_size=3)),
+        "assetTypes": draw(
+            st.lists(catalog_resource_strategy("assetTypes"), max_size=3)
+        ),
         "assets": draw(st.lists(catalog_resource_strategy("assets"), max_size=3)),
-        "dataProducts": draw(st.lists(catalog_resource_strategy("dataProducts"), max_size=3)),
+        "dataProducts": draw(
+            st.lists(catalog_resource_strategy("dataProducts"), max_size=3)
+        ),
     }
-
 
 
 class TestProperty9ExternalIdentifierMapping(unittest.TestCase):
@@ -128,13 +169,20 @@ class TestProperty9ExternalIdentifierMapping(unittest.TestCase):
         ext_id=external_identifier_strategy(),
         resource_name=resource_name_strategy(),
     )
-    def test_external_identifier_normalization_removes_aws_info(self, ext_id, resource_name):
+    def test_external_identifier_normalization_removes_aws_info(
+        self, ext_id, resource_name
+    ):
         """Normalized externalIdentifier should not contain 12-digit account IDs or region strings."""
         normalized = _normalize_external_identifier(ext_id)
         # Should not contain any 12-digit number
         import re
-        account_matches = re.findall(r'\b\d{12}\b', normalized)
-        self.assertEqual(len(account_matches), 0, f"Normalized ID still contains account ID: {normalized}")
+
+        account_matches = re.findall(r"\b\d{12}\b", normalized)
+        self.assertEqual(
+            len(account_matches),
+            0,
+            f"Normalized ID still contains account ID: {normalized}",
+        )
 
     @settings(max_examples=100)
     @given(
@@ -142,7 +190,9 @@ class TestProperty9ExternalIdentifierMapping(unittest.TestCase):
         region=aws_region_strategy(),
         resource_name=resource_name_strategy(),
     )
-    def test_same_resource_different_accounts_normalize_equal(self, account, region, resource_name):
+    def test_same_resource_different_accounts_normalize_equal(
+        self, account, region, resource_name
+    ):
         """Two externalIdentifiers for the same resource in different accounts should normalize to the same value."""
         ext_id_1 = f"arn:aws:s3:{region}:{account}:bucket/{resource_name}"
         ext_id_2 = f"arn:aws:s3:{region}:999888777666:bucket/{resource_name}"
@@ -161,9 +211,18 @@ class TestProperty9ExternalIdentifierMapping(unittest.TestCase):
         mock_client.search_types.return_value = {"items": []}
 
         catalog_data = {
-            "metadata": {"sourceProjectId": "sp", "sourceDomainId": "sd", "exportTimestamp": "t", "resourceTypes": []},
+            "metadata": {
+                "sourceProjectId": "sp",
+                "sourceDomainId": "sd",
+                "exportTimestamp": "t",
+                "resourceTypes": [],
+            },
             "glossaries": [{"sourceId": "src-g1", "name": resource_name}],
-            "glossaryTerms": [], "formTypes": [], "assetTypes": [], "assets": [], "dataProducts": [],
+            "glossaryTerms": [],
+            "formTypes": [],
+            "assetTypes": [],
+            "assets": [],
+            "dataProducts": [],
         }
 
         id_map = _build_identifier_map(mock_client, "d1", "p1", catalog_data)
@@ -179,14 +238,22 @@ class TestProperty9ExternalIdentifierMapping(unittest.TestCase):
         mock_client.search_types.return_value = {"items": []}
 
         catalog_data = {
-            "metadata": {"sourceProjectId": "sp", "sourceDomainId": "sd", "exportTimestamp": "t", "resourceTypes": []},
+            "metadata": {
+                "sourceProjectId": "sp",
+                "sourceDomainId": "sd",
+                "exportTimestamp": "t",
+                "resourceTypes": [],
+            },
             "glossaries": [{"sourceId": "src-g1", "name": resource_name}],
-            "glossaryTerms": [], "formTypes": [], "assetTypes": [], "assets": [], "dataProducts": [],
+            "glossaryTerms": [],
+            "formTypes": [],
+            "assetTypes": [],
+            "assets": [],
+            "dataProducts": [],
         }
 
         id_map = _build_identifier_map(mock_client, "d1", "p1", catalog_data)
         self.assertNotIn("src-g1", id_map["glossaries"])
-
 
 
 class TestProperty10CrossReferenceResolution(unittest.TestCase):
@@ -201,44 +268,78 @@ class TestProperty10CrossReferenceResolution(unittest.TestCase):
 
     @settings(max_examples=100)
     @given(
-        source_glossary_id=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"))),
-        target_glossary_id=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"))),
+        source_glossary_id=st.text(
+            min_size=1,
+            max_size=50,
+            alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd")),
+        ),
+        target_glossary_id=st.text(
+            min_size=1,
+            max_size=50,
+            alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd")),
+        ),
     )
-    def test_glossary_term_glossary_id_resolved(self, source_glossary_id, target_glossary_id):
+    def test_glossary_term_glossary_id_resolved(
+        self, source_glossary_id, target_glossary_id
+    ):
         """GlossaryTerm.glossaryId should be replaced with target glossary ID."""
         term = {"sourceId": "t1", "name": "Term1", "glossaryId": source_glossary_id}
         id_map = {
             "glossaries": {source_glossary_id: target_glossary_id},
-            "glossaryTerms": {}, "formTypes": {}, "assetTypes": {}, "assets": {}, "dataProducts": {},
+            "glossaryTerms": {},
+            "formTypes": {},
+            "assetTypes": {},
+            "assets": {},
+            "dataProducts": {},
         }
         resolved = _resolve_cross_references(term, "glossaryTerms", id_map)
         self.assertEqual(resolved["glossaryId"], target_glossary_id)
 
     @settings(max_examples=100)
     @given(
-        source_type_id=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"))),
-        target_type_id=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"))),
+        source_type_id=st.text(
+            min_size=1,
+            max_size=50,
+            alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd")),
+        ),
+        target_type_id=st.text(
+            min_size=1,
+            max_size=50,
+            alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd")),
+        ),
     )
     def test_asset_type_identifier_resolved(self, source_type_id, target_type_id):
         """Asset.typeIdentifier should be replaced with target asset type ID."""
         asset = {"sourceId": "a1", "name": "Asset1", "typeIdentifier": source_type_id}
         id_map = {
-            "glossaries": {}, "glossaryTerms": {}, "formTypes": {},
-            "assetTypes": {source_type_id: target_type_id}, "assets": {}, "dataProducts": {},
+            "glossaries": {},
+            "glossaryTerms": {},
+            "formTypes": {},
+            "assetTypes": {source_type_id: target_type_id},
+            "assets": {},
+            "dataProducts": {},
         }
         resolved = _resolve_cross_references(asset, "assets", id_map)
         self.assertEqual(resolved["typeIdentifier"], target_type_id)
 
     @settings(max_examples=100)
     @given(
-        source_id=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"))),
+        source_id=st.text(
+            min_size=1,
+            max_size=50,
+            alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd")),
+        ),
     )
     def test_unmapped_reference_preserved(self, source_id):
         """When no mapping exists, original reference should be preserved."""
         term = {"sourceId": "t1", "name": "Term1", "glossaryId": source_id}
         id_map = {
             "glossaries": {},  # No mapping
-            "glossaryTerms": {}, "formTypes": {}, "assetTypes": {}, "assets": {}, "dataProducts": {},
+            "glossaryTerms": {},
+            "formTypes": {},
+            "assetTypes": {},
+            "assets": {},
+            "dataProducts": {},
         }
         resolved = _resolve_cross_references(term, "glossaryTerms", id_map)
         self.assertEqual(resolved["glossaryId"], source_id)
@@ -264,27 +365,45 @@ class TestProperty11DependencyOrderedCreation(unittest.TestCase):
         client.search_types.return_value = {"items": []}
 
         call_order = []
-        client.create_glossary.side_effect = lambda **kw: (call_order.append("glossaries"), {"id": "g"})[1]
-        client.create_glossary_term.side_effect = lambda **kw: (call_order.append("glossaryTerms"), {"id": "t"})[1]
-        client.create_form_type.side_effect = lambda **kw: (call_order.append("formTypes"), {"revision": "ft"})[1]
-        client.create_asset_type.side_effect = lambda **kw: (call_order.append("assetTypes"), {"revision": "at"})[1]
-        client.create_asset.side_effect = lambda **kw: (call_order.append("assets"), {"id": "a"})[1]
-        client.create_data_product.side_effect = lambda **kw: (call_order.append("dataProducts"), {"id": "dp"})[1]
+        client.create_glossary.side_effect = lambda **kw: (
+            call_order.append("glossaries"),
+            {"id": "g"},
+        )[1]
+        client.create_glossary_term.side_effect = lambda **kw: (
+            call_order.append("glossaryTerms"),
+            {"id": "t"},
+        )[1]
+        client.create_form_type.side_effect = lambda **kw: (
+            call_order.append("formTypes"),
+            {"revision": "ft"},
+        )[1]
+        client.create_asset_type.side_effect = lambda **kw: (
+            call_order.append("assetTypes"),
+            {"revision": "at"},
+        )[1]
+        client.create_asset.side_effect = lambda **kw: (
+            call_order.append("assets"),
+            {"id": "a"},
+        )[1]
+        client.create_data_product.side_effect = lambda **kw: (
+            call_order.append("dataProducts"),
+            {"id": "dp"},
+        )[1]
 
         import_catalog("d1", "p1", catalog_data, "us-east-1")
 
         # Verify: for any two resource types, the one earlier in CREATION_ORDER
         # should have all its entries before the later one's first entry
         for i, rt_early in enumerate(CREATION_ORDER):
-            for rt_late in CREATION_ORDER[i + 1:]:
+            for rt_late in CREATION_ORDER[i + 1 :]:
                 early_indices = [j for j, t in enumerate(call_order) if t == rt_early]
                 late_indices = [j for j, t in enumerate(call_order) if t == rt_late]
                 if early_indices and late_indices:
                     self.assertLess(
-                        max(early_indices), min(late_indices),
-                        f"All {rt_early} must be created before any {rt_late}"
+                        max(early_indices),
+                        min(late_indices),
+                        f"All {rt_early} must be created before any {rt_late}",
                     )
-
 
 
 class TestProperty12DependencyOrderedDeletion(unittest.TestCase):
@@ -304,15 +423,26 @@ class TestProperty12DependencyOrderedDeletion(unittest.TestCase):
         has_asset=st.booleans(),
     )
     @patch("smus_cicd.helpers.catalog_import._get_datazone_client")
-    def test_deletion_order_respected(self, mock_get_client, has_glossary, has_term, has_asset):
+    def test_deletion_order_respected(
+        self, mock_get_client, has_glossary, has_term, has_asset
+    ):
         client = MagicMock()
         mock_get_client.return_value = client
 
         # Empty bundle means everything in target gets deleted
         catalog_data = {
-            "metadata": {"sourceProjectId": "sp", "sourceDomainId": "sd", "exportTimestamp": "t", "resourceTypes": list(CREATION_ORDER)},
-            "glossaries": [], "glossaryTerms": [], "formTypes": [],
-            "assetTypes": [], "assets": [], "dataProducts": [],
+            "metadata": {
+                "sourceProjectId": "sp",
+                "sourceDomainId": "sd",
+                "exportTimestamp": "t",
+                "resourceTypes": list(CREATION_ORDER),
+            },
+            "glossaries": [],
+            "glossaryTerms": [],
+            "formTypes": [],
+            "assetTypes": [],
+            "assets": [],
+            "dataProducts": [],
         }
 
         def search_side_effect(**kwargs):
@@ -329,21 +459,26 @@ class TestProperty12DependencyOrderedDeletion(unittest.TestCase):
         client.search_types.return_value = {"items": []}
 
         delete_order = []
-        client.delete_glossary.side_effect = lambda **kw: delete_order.append("glossaries")
-        client.delete_glossary_term.side_effect = lambda **kw: delete_order.append("glossaryTerms")
+        client.delete_glossary.side_effect = lambda **kw: delete_order.append(
+            "glossaries"
+        )
+        client.delete_glossary_term.side_effect = lambda **kw: delete_order.append(
+            "glossaryTerms"
+        )
         client.delete_asset.side_effect = lambda **kw: delete_order.append("assets")
 
         import_catalog("d1", "p1", catalog_data, "us-east-1")
 
         # Verify reverse dependency order for deletions
         for i, rt_early in enumerate(DELETION_ORDER):
-            for rt_late in DELETION_ORDER[i + 1:]:
+            for rt_late in DELETION_ORDER[i + 1 :]:
                 early_indices = [j for j, t in enumerate(delete_order) if t == rt_early]
                 late_indices = [j for j, t in enumerate(delete_order) if t == rt_late]
                 if early_indices and late_indices:
                     self.assertLess(
-                        max(early_indices), min(late_indices),
-                        f"All {rt_early} must be deleted before any {rt_late}"
+                        max(early_indices),
+                        min(late_indices),
+                        f"All {rt_early} must be deleted before any {rt_late}",
                     )
 
 
@@ -363,7 +498,9 @@ class TestProperty13ImportErrorResilience(unittest.TestCase):
         num_failures=st.integers(min_value=0, max_value=8),
     )
     @patch("smus_cicd.helpers.catalog_import._get_datazone_client")
-    def test_all_resources_attempted_despite_failures(self, mock_get_client, num_resources, num_failures):
+    def test_all_resources_attempted_despite_failures(
+        self, mock_get_client, num_resources, num_failures
+    ):
         num_failures = min(num_failures, num_resources)
         client = MagicMock()
         mock_get_client.return_value = client
@@ -381,12 +518,21 @@ class TestProperty13ImportErrorResilience(unittest.TestCase):
         client.create_glossary.side_effect = create_with_failures
 
         catalog_data = {
-            "metadata": {"sourceProjectId": "sp", "sourceDomainId": "sd", "exportTimestamp": "t", "resourceTypes": ["glossaries"]},
+            "metadata": {
+                "sourceProjectId": "sp",
+                "sourceDomainId": "sd",
+                "exportTimestamp": "t",
+                "resourceTypes": ["glossaries"],
+            },
             "glossaries": [
                 {"sourceId": f"g{i}", "name": f"G{i}", "status": "ENABLED"}
                 for i in range(num_resources)
             ],
-            "glossaryTerms": [], "formTypes": [], "assetTypes": [], "assets": [], "dataProducts": [],
+            "glossaryTerms": [],
+            "formTypes": [],
+            "assetTypes": [],
+            "assets": [],
+            "dataProducts": [],
         }
 
         result = import_catalog("d1", "p1", catalog_data, "us-east-1")
@@ -395,7 +541,6 @@ class TestProperty13ImportErrorResilience(unittest.TestCase):
         self.assertEqual(call_count[0], num_resources)
         self.assertEqual(result["failed"], num_failures)
         self.assertEqual(result["created"], num_resources - num_failures)
-
 
 
 class TestProperty14ImportSummaryCounts(unittest.TestCase):
@@ -424,6 +569,7 @@ class TestProperty14ImportSummaryCounts(unittest.TestCase):
                 if hash(name) % 4 == 0:
                     raise Exception("API Error")
                 return {id_key: f"new-{name}"}
+
             return side_effect
 
         client.create_glossary.side_effect = make_create_side_effect("id")
@@ -439,12 +585,24 @@ class TestProperty14ImportSummaryCounts(unittest.TestCase):
 
         # created + updated + failed >= total_in_bundle (deleted adds to total too)
         self.assertEqual(
-            result["created"] + result["updated"] + result["deleted"] + result["failed"],
-            total_in_bundle + result["deleted"]  # deleted resources come from target, not bundle
+            result["created"]
+            + result["updated"]
+            + result["deleted"]
+            + result["failed"],
+            total_in_bundle
+            + result["deleted"],  # deleted resources come from target, not bundle
         )
         # More specifically: created + updated + failed (from bundle) = total_in_bundle
         # and deleted count is separate
-        bundle_processed = result["created"] + result["updated"] + (result["failed"] - result["deleted"] if result["deleted"] == 0 else result["failed"])
+        _bundle_processed = (  # noqa: F841
+            result["created"]
+            + result["updated"]
+            + (
+                result["failed"] - result["deleted"]
+                if result["deleted"] == 0
+                else result["failed"]
+            )
+        )
         # Simpler check: all counts are non-negative
         self.assertGreaterEqual(result["created"], 0)
         self.assertGreaterEqual(result["updated"], 0)
@@ -469,8 +627,11 @@ class TestProperty15AutomaticPublishing(unittest.TestCase):
         num_assets=st.integers(min_value=0, max_value=5),
         num_data_products=st.integers(min_value=0, max_value=5),
     )
+    @patch("smus_cicd.helpers.catalog_import.time.sleep", return_value=None)
     @patch("smus_cicd.helpers.catalog_import._get_datazone_client")
-    def test_publish_called_for_listed_resources(self, mock_get_client, num_assets, num_data_products):
+    def test_publish_called_for_listed_resources(
+        self, mock_get_client, mock_sleep, num_assets, num_data_products
+    ):
         client = MagicMock()
         mock_get_client.return_value = client
         client.search.return_value = {"items": []}
@@ -478,17 +639,41 @@ class TestProperty15AutomaticPublishing(unittest.TestCase):
 
         # All creates succeed
         client.create_asset.side_effect = lambda **kw: {"id": f"a-{kw.get('name')}"}
-        client.create_data_product.side_effect = lambda **kw: {"id": f"dp-{kw.get('name')}"}
+        client.create_data_product.side_effect = lambda **kw: {
+            "id": f"dp-{kw.get('name')}"
+        }
+        # Publish verification returns ACTIVE
+        client.get_asset.return_value = {"listing": {"listingStatus": "ACTIVE"}}
+        client.get_data_product.return_value = {"listing": {"listingStatus": "ACTIVE"}}
 
         catalog_data = {
-            "metadata": {"sourceProjectId": "sp", "sourceDomainId": "sd", "exportTimestamp": "t", "resourceTypes": ["assets", "dataProducts"]},
-            "glossaries": [], "glossaryTerms": [], "formTypes": [], "assetTypes": [],
+            "metadata": {
+                "sourceProjectId": "sp",
+                "sourceDomainId": "sd",
+                "exportTimestamp": "t",
+                "resourceTypes": ["assets", "dataProducts"],
+            },
+            "glossaries": [],
+            "glossaryTerms": [],
+            "formTypes": [],
+            "assetTypes": [],
             "assets": [
-                {"sourceId": f"a{i}", "name": f"Asset{i}", "typeIdentifier": "t1", "formsInput": [], "listingStatus": "LISTED"}
+                {
+                    "sourceId": f"a{i}",
+                    "name": f"Asset{i}",
+                    "typeIdentifier": "t1",
+                    "formsInput": [],
+                    "listingStatus": "ACTIVE",
+                }
                 for i in range(num_assets)
             ],
             "dataProducts": [
-                {"sourceId": f"dp{i}", "name": f"DP{i}", "items": [], "listingStatus": "LISTED"}
+                {
+                    "sourceId": f"dp{i}",
+                    "name": f"DP{i}",
+                    "items": [],
+                    "listingStatus": "ACTIVE",
+                }
                 for i in range(num_data_products)
             ],
         }
@@ -496,7 +681,9 @@ class TestProperty15AutomaticPublishing(unittest.TestCase):
         result = import_catalog("d1", "p1", catalog_data, "us-east-1")
 
         expected_publish_calls = num_assets + num_data_products
-        self.assertEqual(client.create_listing_change_set.call_count, expected_publish_calls)
+        self.assertEqual(
+            client.create_listing_change_set.call_count, expected_publish_calls
+        )
         self.assertEqual(result["published"], expected_publish_calls)
 
     @settings(max_examples=100)
@@ -511,16 +698,32 @@ class TestProperty15AutomaticPublishing(unittest.TestCase):
         client.create_asset.side_effect = lambda **kw: {"id": f"a-{kw.get('name')}"}
 
         catalog_data = {
-            "metadata": {"sourceProjectId": "sp", "sourceDomainId": "sd", "exportTimestamp": "t", "resourceTypes": ["assets"]},
-            "glossaries": [], "glossaryTerms": [], "formTypes": [], "assetTypes": [],
+            "metadata": {
+                "sourceProjectId": "sp",
+                "sourceDomainId": "sd",
+                "exportTimestamp": "t",
+                "resourceTypes": ["assets"],
+            },
+            "glossaries": [],
+            "glossaryTerms": [],
+            "formTypes": [],
+            "assetTypes": [],
             "assets": [
-                {"sourceId": f"a{i}", "name": f"Asset{i}", "typeIdentifier": "t1", "formsInput": [], "listingStatus": "LISTED"}
+                {
+                    "sourceId": f"a{i}",
+                    "name": f"Asset{i}",
+                    "typeIdentifier": "t1",
+                    "formsInput": [],
+                    "listingStatus": "ACTIVE",
+                }
                 for i in range(num_assets)
             ],
             "dataProducts": [],
         }
 
-        result = import_catalog("d1", "p1", catalog_data, "us-east-1", skip_publish=True)
+        result = import_catalog(
+            "d1", "p1", catalog_data, "us-east-1", skip_publish=True
+        )
 
         client.create_listing_change_set.assert_not_called()
         self.assertEqual(result["published"], 0)
@@ -537,10 +740,23 @@ class TestProperty15AutomaticPublishing(unittest.TestCase):
         client.create_asset.side_effect = lambda **kw: {"id": f"a-{kw.get('name')}"}
 
         catalog_data = {
-            "metadata": {"sourceProjectId": "sp", "sourceDomainId": "sd", "exportTimestamp": "t", "resourceTypes": ["assets"]},
-            "glossaries": [], "glossaryTerms": [], "formTypes": [], "assetTypes": [],
+            "metadata": {
+                "sourceProjectId": "sp",
+                "sourceDomainId": "sd",
+                "exportTimestamp": "t",
+                "resourceTypes": ["assets"],
+            },
+            "glossaries": [],
+            "glossaryTerms": [],
+            "formTypes": [],
+            "assetTypes": [],
             "assets": [
-                {"sourceId": f"a{i}", "name": f"Asset{i}", "typeIdentifier": "t1", "formsInput": []}
+                {
+                    "sourceId": f"a{i}",
+                    "name": f"Asset{i}",
+                    "typeIdentifier": "t1",
+                    "formsInput": [],
+                }
                 for i in range(num_assets)
             ],
             "dataProducts": [],
@@ -563,15 +779,22 @@ class TestProperty17MalformedJsonValidation(unittest.TestCase):
     """
 
     @settings(max_examples=100)
-    @given(
-        missing_key=st.sampled_from(list(REQUIRED_TOP_LEVEL_KEYS))
-    )
+    @given(missing_key=st.sampled_from(list(REQUIRED_TOP_LEVEL_KEYS)))
     def test_missing_top_level_key_raises(self, missing_key):
         """Missing any required top-level key should raise ValueError."""
         catalog_data = {
-            "metadata": {"sourceProjectId": "p", "sourceDomainId": "d", "exportTimestamp": "t", "resourceTypes": []},
-            "glossaries": [], "glossaryTerms": [], "formTypes": [],
-            "assetTypes": [], "assets": [], "dataProducts": [],
+            "metadata": {
+                "sourceProjectId": "p",
+                "sourceDomainId": "d",
+                "exportTimestamp": "t",
+                "resourceTypes": [],
+            },
+            "glossaries": [],
+            "glossaryTerms": [],
+            "formTypes": [],
+            "assetTypes": [],
+            "assets": [],
+            "dataProducts": [],
         }
         del catalog_data[missing_key]
 
@@ -580,14 +803,25 @@ class TestProperty17MalformedJsonValidation(unittest.TestCase):
 
     @settings(max_examples=100)
     @given(
-        missing_key=st.sampled_from(["sourceProjectId", "sourceDomainId", "exportTimestamp", "resourceTypes"])
+        missing_key=st.sampled_from(
+            ["sourceProjectId", "sourceDomainId", "exportTimestamp", "resourceTypes"]
+        )
     )
     def test_missing_metadata_key_raises(self, missing_key):
         """Missing any required metadata key should raise ValueError."""
         catalog_data = {
-            "metadata": {"sourceProjectId": "p", "sourceDomainId": "d", "exportTimestamp": "t", "resourceTypes": []},
-            "glossaries": [], "glossaryTerms": [], "formTypes": [],
-            "assetTypes": [], "assets": [], "dataProducts": [],
+            "metadata": {
+                "sourceProjectId": "p",
+                "sourceDomainId": "d",
+                "exportTimestamp": "t",
+                "resourceTypes": [],
+            },
+            "glossaries": [],
+            "glossaryTerms": [],
+            "formTypes": [],
+            "assetTypes": [],
+            "assets": [],
+            "dataProducts": [],
         }
         del catalog_data["metadata"][missing_key]
 
@@ -595,15 +829,22 @@ class TestProperty17MalformedJsonValidation(unittest.TestCase):
             _validate_catalog_json(catalog_data)
 
     @settings(max_examples=100)
-    @given(
-        missing_key=st.sampled_from(list(REQUIRED_TOP_LEVEL_KEYS))
-    )
+    @given(missing_key=st.sampled_from(list(REQUIRED_TOP_LEVEL_KEYS)))
     def test_import_catalog_rejects_before_api_calls(self, missing_key):
         """import_catalog should raise before making any API calls."""
         catalog_data = {
-            "metadata": {"sourceProjectId": "p", "sourceDomainId": "d", "exportTimestamp": "t", "resourceTypes": []},
-            "glossaries": [], "glossaryTerms": [], "formTypes": [],
-            "assetTypes": [], "assets": [], "dataProducts": [],
+            "metadata": {
+                "sourceProjectId": "p",
+                "sourceDomainId": "d",
+                "exportTimestamp": "t",
+                "resourceTypes": [],
+            },
+            "glossaries": [],
+            "glossaryTerms": [],
+            "formTypes": [],
+            "assetTypes": [],
+            "assets": [],
+            "dataProducts": [],
         }
         del catalog_data[missing_key]
 

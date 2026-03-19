@@ -10,7 +10,7 @@ When `content.catalog.enabled` is set to `true` in the manifest, the `bundle` co
 
 ### Source-State-Based Publishing
 
-By default, the deploy command publishes imported assets and data products only if they were published (`listingStatus == "LISTED"`) in the source project. This preserves the source publish state across environments. To skip all publishing regardless of source state, set `skipPublish: true` in the manifest.
+By default, the deploy command publishes imported assets and data products only if they were published (`listingStatus == "ACTIVE"`) in the source project. After calling the asynchronous publish API, the importer verifies the listing becomes ACTIVE before counting it as published. This preserves the source publish state across environments. To skip all publishing regardless of source state, set `skipPublish: true` in the manifest.
 
 ### Manifest Configuration
 

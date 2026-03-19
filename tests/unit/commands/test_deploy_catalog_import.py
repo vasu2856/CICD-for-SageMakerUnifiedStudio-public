@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 import zipfile
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -92,7 +92,7 @@ def create_bundle_without_catalog():
     temp_dir = tempfile.mkdtemp()
     bundle_path = os.path.join(temp_dir, "test-bundle.zip")
 
-    with zipfile.ZipFile(bundle_path, "w") as zip_ref:
+    with zipfile.ZipFile(bundle_path, "w") as _zip_ref:  # noqa: F841
         # Create an empty bundle
         pass
 
@@ -146,6 +146,7 @@ def test_import_catalog_from_bundle_success(
             assert call_args[1]["skip_publish"] is False
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)
 
 
@@ -162,6 +163,7 @@ def test_import_catalog_from_bundle_missing_file(mock_target_config, mock_config
         assert result is True
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)
 
 
@@ -183,6 +185,7 @@ def test_import_catalog_from_bundle_disabled(
         assert result is True
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)
 
 
@@ -219,6 +222,7 @@ def test_import_catalog_from_bundle_all_failed(
             assert result is False
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)
 
 
@@ -255,6 +259,7 @@ def test_import_catalog_from_bundle_partial_failure(
             assert result is True
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)
 
 
@@ -283,6 +288,7 @@ def test_import_catalog_from_bundle_malformed_json(mock_target_config, mock_conf
         assert result is False
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)
 
 
@@ -310,6 +316,7 @@ def test_import_catalog_from_bundle_project_not_found(
             assert result is False
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)
 
 
@@ -346,6 +353,7 @@ def test_import_catalog_from_bundle_deletion_counts_reported(
             assert "Deleted: 3" in captured.out
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)
 
 
@@ -375,7 +383,9 @@ def test_import_catalog_from_bundle_published_counts_with_skip_publish_false(
             }
 
             result = _import_catalog_from_bundle(
-                bundle_path, mock_target_config, mock_config,
+                bundle_path,
+                mock_target_config,
+                mock_config,
                 manifest=manifest,
             )
 
@@ -389,6 +399,7 @@ def test_import_catalog_from_bundle_published_counts_with_skip_publish_false(
             assert "Published: 2" in captured.out
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)
 
 
@@ -422,7 +433,9 @@ def test_import_catalog_from_bundle_skip_publish_false_by_default(
             }
 
             result = _import_catalog_from_bundle(
-                bundle_path, mock_target_config, mock_config,
+                bundle_path,
+                mock_target_config,
+                mock_config,
                 manifest=manifest,
             )
 
@@ -432,6 +445,7 @@ def test_import_catalog_from_bundle_skip_publish_false_by_default(
             assert call_args[1]["skip_publish"] is False
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)
 
 
@@ -470,4 +484,5 @@ def test_import_catalog_from_bundle_skip_publish_false_no_manifest(
             assert call_args[1]["skip_publish"] is False
     finally:
         import shutil
+
         shutil.rmtree(temp_dir)

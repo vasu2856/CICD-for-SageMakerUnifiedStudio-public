@@ -145,8 +145,20 @@ stages:
         manifest_path = f.name
 
     try:
-        with patch("boto3.client") as mock_boto3_client:
-            result = runner.invoke(app, ["describe", "--manifest", manifest_path])
+        # Remove env vars that substitute_env_vars falls back to when
+        # resolve_aws_pseudo_vars=False, so the ${VAR:default} defaults are used.
+        keys_to_remove = [
+            "AWS_ACCOUNT_ID",
+            "STS_ACCOUNT_ID",
+            "STS_REGION",
+            "AWS_DEFAULT_REGION",
+        ]
+        saved = {k: os.environ.pop(k) for k in keys_to_remove if k in os.environ}
+        try:
+            with patch("boto3.client") as mock_boto3_client:
+                result = runner.invoke(app, ["describe", "--manifest", manifest_path])
+        finally:
+            os.environ.update(saved)
 
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.output}"
         assert "Pipeline: NoCredsPipeline" in result.stdout

@@ -76,7 +76,10 @@ def display_bundle_tree(zip_path: str, output: str):
 
 
 def bundle_command(
-    targets: Optional[str], manifest_file: str, output_dir: str, output: str,
+    targets: Optional[str],
+    manifest_file: str,
+    output_dir: str,
+    output: str,
     updated_after: Optional[str] = None,
 ):
     """Create bundle zip files by downloading from S3 connection locations."""
@@ -409,20 +412,34 @@ def bundle_command(
                                 )
 
             # Export catalog resources if enabled (simplified: boolean flag only)
-            if manifest.content and manifest.content.catalog and manifest.content.catalog.enabled:
+            if (
+                manifest.content
+                and manifest.content.catalog
+                and manifest.content.catalog.enabled
+            ):
                 try:
                     from ..helpers.catalog_export import export_catalog
 
                     typer.echo("")
-                    typer.echo("⚠️  NOTE: Catalog import/export assumes that physical resources (e.g., Glue Tables,")
-                    typer.echo("   S3 buckets) have the SAME NAME across all environments. If resource names differ")
-                    typer.echo("   between stages, asset matching will fail during deploy.")
+                    typer.echo(
+                        "⚠️  NOTE: Catalog import/export assumes that physical resources (e.g., Glue Tables,"
+                    )
+                    typer.echo(
+                        "   S3 buckets) have the SAME NAME across all environments. If resource names differ"
+                    )
+                    typer.echo(
+                        "   between stages, asset matching will fail during deploy."
+                    )
                     typer.echo("")
                     typer.echo("Exporting catalog resources...")
 
                     # Get domain_id and project_id from project_info
-                    domain_id = project_info.get("domain_id") or project_info.get("domainId")
-                    project_id = project_info.get("project_id") or project_info.get("id")
+                    domain_id = project_info.get("domain_id") or project_info.get(
+                        "domainId"
+                    )
+                    project_id = project_info.get("project_id") or project_info.get(
+                        "id"
+                    )
 
                     if not domain_id or not project_id:
                         typer.echo(

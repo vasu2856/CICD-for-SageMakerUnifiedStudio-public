@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement catalog resource export during `bundle` and import during `deploy` by adding new helper modules, extending the manifest schema, and wiring into existing command flows. The simplified approach exports ALL catalog resources when enabled via a boolean flag, uses externalIdentifier (with normalization) or name for mapping, and supports full synchronization including deletion of resources missing from the bundle. The manifest `content.catalog` section only supports `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array for subscription requests) — no filter options of any kind. Publishing is source-state-based: assets and data products are published only if they were published (listingStatus == "LISTED") in the source project, unless `skipPublish` is set to true. The `--updated-after` timestamp is purely a CLI flag on the bundle command that filters ALL resource types uniformly.
+Implement catalog resource export during `bundle` and import during `deploy` by adding new helper modules, extending the manifest schema, and wiring into existing command flows. The simplified approach exports ALL catalog resources when enabled via a boolean flag, uses externalIdentifier (with normalization) or name for mapping, and supports full synchronization including deletion of resources missing from the bundle. The manifest `content.catalog` section only supports `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array for subscription requests) — no filter options of any kind. Publishing is source-state-based: assets and data products are published only if they were published (listingStatus == "ACTIVE") in the source project, unless `skipPublish` is set to true. After calling the asynchronous publish API, the importer polls to verify the listing becomes ACTIVE before counting it as published. The `--updated-after` timestamp is purely a CLI flag on the bundle command that filters ALL resource types uniformly.
 
 ## Tasks
 
@@ -38,10 +38,12 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - Implement `export_catalog(domain_id, project_id, region, updated_after=None)` returning catalog JSON dict
     - The `updated_after` parameter comes exclusively from the `--updated-after` CLI flag, NOT from any manifest field
     - Export ALL resource types owned by the project: Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, Data Products
-    - Apply `owningProjectIdentifier=project_id` filter to ALL search queries (CRITICAL)
-    - Implement `_search_resources()` for Search API with pagination and optional updatedAfter filter (from CLI flag only)
-    - Implement `_search_type_resources()` for SearchTypes API with pagination and optional updatedAfter filter (from CLI flag only)
-    - Implement `_serialize_resource()` to extract name, user-configurable fields, sourceId, and externalIdentifier (when present)
+    - Apply `owningProjectIdentifier=project_id` filter to Search API queries (Search API supports this parameter)
+    - For SearchTypes API, use client-side filtering by `owningProjectId` on response items (SearchTypes API does NOT support `owningProjectIdentifier` parameter)
+    - Implement `_search_resources()` for Search API with pagination, `owningProjectIdentifier`, and optional updatedAfter filter (from CLI flag only)
+    - Implement `_search_type_resources()` for SearchTypes API with pagination, client-side `owningProjectId` filtering, and optional updatedAfter filter (from CLI flag only)
+    - Implement `_enrich_asset_items()` to call `get_asset` per asset to retrieve full details including `formsOutput` (Search API only returns summary data)
+    - Implement `_serialize_resource()` to extract name, user-configurable fields, sourceId (using `identifier` or `id` fallback for assets), and externalIdentifier (when present)
     - Export `inputForms` field for assets
     - Export `termRelations` field for glossary terms
     - Use sort by updatedAt DESC for all queries
@@ -50,7 +52,11 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
   - [x] 2.2 Write unit tests for CatalogExporter
     - Mock DataZone client with boto3 stubber
     - Test API routing per resource type
-    - Test owningProjectIdentifier filter is applied to all queries
+    - Test owningProjectIdentifier parameter is applied to Search API queries
+    - Test SearchTypes API uses client-side owningProjectId filtering (not owningProjectIdentifier parameter)
+    - Test `_enrich_asset_items` calls get_asset per asset to retrieve formsOutput
+    - Test `_enrich_asset_items` falls back to search data on get_asset failure
+    - Test `sourceId` resolution uses `identifier` (Search API) or `id` (GetAsset API) fallback
     - Test pagination handling
     - Test `--updated-after` CLI flag filter construction and application (CLI-only, not manifest-based)
     - Test that updatedAfter filter is applied uniformly to ALL resource types when provided via CLI
@@ -254,7 +260,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - _Requirements: 5.4, 5.5, 5.12_
   - [x] 8.4 Write integration test: source-state-based publishing
     - Deploy with `skipPublish: false` (default) in manifest
-    - Verify only assets and data products with listingStatus == "LISTED" in source are published
+    - Verify only assets and data products with listingStatus == "ACTIVE" in source are published
     - Verify publish API is called for each asset and data product
     - Verify published count is reported in deploy output
     - _Requirements: 5.13, 5.14, 6.3_
@@ -368,7 +374,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
 
 2. **Export all resources**: When `enabled: true`, export ALL catalog resources from the source project without any manifest-based filtering.
 
-3. **Project ownership emphasis**: All export operations explicitly filter by `owningProjectIdentifier=project_id` to ensure ONLY resources owned by the source project are exported.
+3. **Project ownership emphasis**: All export operations filter by project ownership. The Search API uses `owningProjectIdentifier=project_id` as a request parameter for server-side filtering. The SearchTypes API does NOT support `owningProjectIdentifier` — ownership filtering is done client-side by checking `owningProjectId` on response items.
 
 4. **CLI-only `--updated-after` filter**: The `--updated-after` flag is purely a CLI option on the bundle command (not a manifest field). It accepts an ISO 8601 timestamp and filters ALL resource types uniformly by modification timestamp.
 
@@ -376,8 +382,10 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
 
 6. **Enhanced identifier mapping**: Use `externalIdentifier` (with normalization to remove AWS account/region) as primary mapping key, fallback to `name` when externalIdentifier doesn't exist.
 
-7. **Additional fields**: Export and import `inputForms` for assets and `termRelations` for glossary terms.
+7. **Additional fields**: Export and import `formsOutput` (serialized as `formsInput`) for assets and `termRelations` for glossary terms.
 
-8. **Deletion support**: Deploy command now deletes resources in target project that are missing from the bundle, using reverse dependency order.
+8. **Asset enrichment via GetAsset API**: The Search API only returns summary data for assets without `formsOutput`. The `_enrich_asset_items()` function calls `get_asset` per asset to retrieve full details. The GetAsset API returns `id` instead of `identifier`, so `_serialize_resource` handles both via `identifier` or `id` fallback for the `sourceId` field.
 
-9. **Updated dependency graph**: Assets and FormTypes can reference GlossaryTerms, and Data Products can reference Assets, so dependency order is: Glossaries → GlossaryTerms → (FormTypes, AssetTypes can reference terms) → Assets → Data Products.
+9. **Deletion support**: Deploy command now deletes resources in target project that are missing from the bundle, using reverse dependency order.
+
+10. **Updated dependency graph**: Assets and FormTypes can reference GlossaryTerms, and Data Products can reference Assets, so dependency order is: Glossaries → GlossaryTerms → (FormTypes, AssetTypes can reference terms) → Assets → Data Products.

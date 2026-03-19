@@ -167,7 +167,6 @@ def _search_type_resources(
         "domainIdentifier": domain_id,
         "searchScope": search_scope,
         "managed": False,
-        "owningProjectIdentifier": project_id,
         "sort": SORT_CLAUSE,
     }
 
@@ -200,9 +199,7 @@ def _search_type_resources(
     return resources
 
 
-def _serialize_resource(
-    resource: Dict[str, Any], resource_type: str
-) -> Dict[str, Any]:
+def _serialize_resource(resource: Dict[str, Any], resource_type: str) -> Dict[str, Any]:
     """
     Serialize a resource by extracting name, user-configurable fields, sourceId,
     and externalIdentifier (when present).
@@ -257,19 +254,22 @@ def _serialize_resource(
     elif resource_type == "assets":
         asset = resource.get("assetItem", {})
         serialized = {
-            "sourceId": asset.get("identifier"),
+            "sourceId": asset.get("identifier") or asset.get("id"),
             "name": asset.get("name"),
             "description": asset.get("description"),
             "typeIdentifier": asset.get("typeIdentifier"),
             "formsInput": asset.get("formsOutput", []),
-            "inputForms": asset.get("inputForms", []),
         }
         # Include externalIdentifier when present
         if asset.get("externalIdentifier"):
             serialized["externalIdentifier"] = asset["externalIdentifier"]
         # Capture listing status to determine publish state during import
-        if asset.get("listingStatus"):
-            serialized["listingStatus"] = asset["listingStatus"]
+        # GetAsset nests it under listing.listingStatus; Search API may have it at top level
+        listing_status = asset.get("listingStatus") or (
+            asset.get("listing", {}).get("listingStatus")
+        )
+        if listing_status:
+            serialized["listingStatus"] = listing_status
         return serialized
 
     elif resource_type == "dataProducts":
@@ -281,11 +281,90 @@ def _serialize_resource(
             "items": data_product.get("items", []),
         }
         # Capture listing status to determine publish state during import
-        if data_product.get("listingStatus"):
-            serialized["listingStatus"] = data_product["listingStatus"]
+        # GetDataProduct may nest it under listing.listingStatus like GetAsset
+        listing_status = data_product.get("listingStatus") or (
+            data_product.get("listing", {}).get("listingStatus")
+        )
+        if listing_status:
+            serialized["listingStatus"] = listing_status
         return serialized
 
     return {}
+
+
+def _enrich_asset_items(
+    client, domain_id: str, items: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Enrich asset search results with full details from GetAsset API.
+
+    The Search API returns summary data without formsOutput. This function
+    calls GetAsset for each item to retrieve the complete asset including
+    form data, description, and listing status.
+
+    Args:
+        client: DataZone boto3 client
+        domain_id: DataZone domain identifier
+        items: Asset items from search results
+
+    Returns:
+        List of enriched asset items wrapped in {"assetItem": ...} format
+    """
+    enriched = []
+    for item in items:
+        asset_summary = item.get("assetItem", {})
+        asset_id = asset_summary.get("identifier")
+        if not asset_id:
+            enriched.append(item)
+            continue
+        try:
+            detail = client.get_asset(domainIdentifier=domain_id, identifier=asset_id)
+            # Remove ResponseMetadata from boto3 response
+            detail.pop("ResponseMetadata", None)
+            enriched.append({"assetItem": detail})
+        except Exception as e:
+            logger.warning("Failed to get asset %s: %s, using search data", asset_id, e)
+            enriched.append(item)
+    return enriched
+
+
+def _enrich_data_product_items(
+    client, domain_id: str, items: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Enrich data product search results with full details from GetDataProduct API.
+
+    The Search API's DataProductResultItem does not include the `items` field
+    (data assets of the product). This function calls GetDataProduct for each
+    item to retrieve the complete data product including its items list.
+
+    Args:
+        client: DataZone boto3 client
+        domain_id: DataZone domain identifier
+        items: Data product items from search results
+
+    Returns:
+        List of enriched data product items wrapped in {"dataProductItem": ...} format
+    """
+    enriched = []
+    for item in items:
+        dp_summary = item.get("dataProductItem", {})
+        dp_id = dp_summary.get("id")
+        if not dp_id:
+            enriched.append(item)
+            continue
+        try:
+            detail = client.get_data_product(
+                domainIdentifier=domain_id, identifier=dp_id
+            )
+            detail.pop("ResponseMetadata", None)
+            enriched.append({"dataProductItem": detail})
+        except Exception as e:
+            logger.warning(
+                "Failed to get data product %s: %s, using search data", dp_id, e
+            )
+            enriched.append(item)
+    return enriched
 
 
 def export_catalog(
@@ -322,7 +401,7 @@ def export_catalog(
     """
     client = _get_datazone_client(region)
 
-    result = {
+    result: Dict[str, Any] = {
         "metadata": {
             "sourceProjectId": project_id,
             "sourceDomainId": domain_id,
@@ -342,6 +421,12 @@ def export_catalog(
         items = _search_resources(
             client, domain_id, project_id, search_scope, updated_after
         )
+        # Enrich assets with full details (search API doesn't return formsOutput)
+        if resource_type == "assets" and items:
+            items = _enrich_asset_items(client, domain_id, items)
+        # Enrich data products with full details (search API doesn't return items)
+        if resource_type == "dataProducts" and items:
+            items = _enrich_data_product_items(client, domain_id, items)
         result[resource_type] = [
             _serialize_resource(item, resource_type) for item in items
         ]
@@ -355,9 +440,7 @@ def export_catalog(
             _serialize_resource(item, resource_type) for item in items
         ]
 
-    total_resources = sum(
-        len(result[rt]) for rt in ALL_RESOURCE_TYPES
-    )
+    total_resources = sum(len(result[rt]) for rt in ALL_RESOURCE_TYPES)
     if total_resources == 0:
         logger.info(
             "No catalog resources found for project %s in domain %s",

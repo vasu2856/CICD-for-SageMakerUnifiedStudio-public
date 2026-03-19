@@ -8,9 +8,11 @@ or name as fallback. Supports deletion of resources missing from the bundle and
 automatic publishing of assets and data products.
 """
 
+import json
 import logging
 import os
 import re
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
@@ -53,11 +55,11 @@ DELETION_ORDER = list(reversed(CREATION_ORDER))
 PUBLISHABLE_TYPES = {"assets", "dataProducts"}
 
 # Patterns for normalizing externalIdentifier
-_AWS_ACCOUNT_PATTERN = re.compile(r'\b\d{12}\b')
+_AWS_ACCOUNT_PATTERN = re.compile(r"\b\d{12}\b")
 _AWS_REGION_PATTERN = re.compile(
-    r'\b(us|eu|ap|sa|ca|me|af|il)-(north|south|east|west|central|northeast|southeast|northwest|southwest)-\d\b'
+    r"\b(us|eu|ap|sa|ca|me|af|il)-(north|south|east|west|central|northeast|southeast|northwest|southwest)-\d\b"
 )
-_ARN_PREFIX_PATTERN = re.compile(r'arn:aws[^:]*:[^:]*:[^:]*:\d{12}:')
+_ARN_PREFIX_PATTERN = re.compile(r"arn:aws[^:]*:[^:]*:[^:]*:\d{12}:")
 
 
 def _get_datazone_client(region: str):
@@ -77,7 +79,6 @@ def _get_datazone_client(region: str):
     if endpoint_url:
         return boto3.client("datazone", region_name=region, endpoint_url=endpoint_url)
     return boto3.client("datazone", region_name=region)
-
 
 
 def _validate_catalog_json(catalog_data: Dict[str, Any]) -> None:
@@ -104,6 +105,77 @@ def _validate_catalog_json(catalog_data: Dict[str, Any]) -> None:
         )
 
 
+# DataZone policy grants required for full catalog import
+_REQUIRED_POLICY_GRANTS = [
+    "CREATE_GLOSSARY",
+    "CREATE_FORM_TYPE",
+    "CREATE_ASSET_TYPE",
+]
+
+# Prefix for managed/system form types that cannot be used in custom asset types
+_MANAGED_FORM_TYPE_PREFIX = "amazon.datazone."
+
+
+def _is_managed_resource(name: str) -> bool:
+    """Return True if the resource name belongs to a managed/system type."""
+    return name.startswith(_MANAGED_FORM_TYPE_PREFIX) if name else False
+
+
+def _check_import_permissions(
+    client, domain_id: str, project_id: str
+) -> List[str]:
+    """
+    Check whether the project's domain unit has the policy grants needed for
+    catalog import by calling ListPolicyGrants for each required policy type.
+
+    Args:
+        client: DataZone boto3 client
+        domain_id: Target domain identifier
+        project_id: Target project identifier
+
+    Returns:
+        List of missing policy type names. Empty list means all permissions
+        are present.
+    """
+    # Resolve the project's domain unit — grants live on the domain unit,
+    # not on the project itself.
+    try:
+        project = client.get_project(
+            domainIdentifier=domain_id, identifier=project_id
+        )
+        domain_unit_id = project.get("domainUnitId")
+    except Exception as e:
+        logger.warning("Could not resolve domain unit for project %s: %s", project_id, e)
+        # Can't verify — let the import proceed and fail naturally
+        return []
+
+    if not domain_unit_id:
+        logger.warning("Project %s has no domainUnitId, skipping permission check", project_id)
+        return []
+
+    missing = []
+    for policy_type in _REQUIRED_POLICY_GRANTS:
+        try:
+            resp = client.list_policy_grants(
+                domainIdentifier=domain_id,
+                entityType="DOMAIN_UNIT",
+                entityIdentifier=domain_unit_id,
+                policyType=policy_type,
+            )
+            if not resp.get("grantList"):
+                missing.append(policy_type)
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "AccessDeniedException":
+                # Can't even list grants — treat as missing
+                missing.append(policy_type)
+            else:
+                logger.warning("Error checking %s grant: %s", policy_type, e)
+        except Exception as e:
+            logger.warning("Error checking %s grant: %s", policy_type, e)
+
+    return missing
+
+
 def _normalize_external_identifier(external_id: str) -> str:
     """
     Normalize an externalIdentifier by removing AWS account ID and region information.
@@ -121,20 +193,22 @@ def _normalize_external_identifier(external_id: str) -> str:
         return external_id
 
     # Strip ARN prefix pattern
-    normalized = _ARN_PREFIX_PATTERN.sub('', external_id)
+    normalized = _ARN_PREFIX_PATTERN.sub("", external_id)
     # Remove 12-digit account IDs
-    normalized = _AWS_ACCOUNT_PATTERN.sub('', normalized)
+    normalized = _AWS_ACCOUNT_PATTERN.sub("", normalized)
     # Remove region strings
-    normalized = _AWS_REGION_PATTERN.sub('', normalized)
+    normalized = _AWS_REGION_PATTERN.sub("", normalized)
     # Clean up any resulting double separators
-    normalized = re.sub(r'[:/_-]{2,}', lambda m: m.group(0)[0], normalized)
+    normalized = re.sub(r"[:/_-]{2,}", lambda m: m.group(0)[0], normalized)
     # Strip leading/trailing separators
-    normalized = normalized.strip(':/_-')
+    normalized = normalized.strip(":/_-")
 
     return normalized
 
 
-def _search_target_resources(client, domain_id: str, project_id: str, search_scope: str) -> List[Dict[str, Any]]:
+def _search_target_resources(
+    client, domain_id: str, project_id: str, search_scope: str
+) -> List[Dict[str, Any]]:
     """Search target project for existing resources of a given type."""
     resources = []
     next_token = None
@@ -157,7 +231,9 @@ def _search_target_resources(client, domain_id: str, project_id: str, search_sco
     return resources
 
 
-def _search_target_type_resources(client, domain_id: str, project_id: str, search_scope: str) -> List[Dict[str, Any]]:
+def _search_target_type_resources(
+    client, domain_id: str, project_id: str, search_scope: str
+) -> List[Dict[str, Any]]:
     """Search target project for existing type resources (FormTypes, AssetTypes)."""
     resources = []
     next_token = None
@@ -166,7 +242,6 @@ def _search_target_type_resources(client, domain_id: str, project_id: str, searc
         "domainIdentifier": domain_id,
         "searchScope": search_scope,
         "managed": False,
-        "owningProjectIdentifier": project_id,
     }
 
     while True:
@@ -212,10 +287,12 @@ def _build_identifier_map(
     Returns:
         Dict mapping resource types to {source_id: target_id} mappings
     """
-    id_map = {rt: {} for rt in CREATION_ORDER}
+    id_map: Dict[str, Dict[str, str]] = {rt: {} for rt in CREATION_ORDER}
 
     # Helper to match by normalized externalIdentifier or name
-    def _find_match(source_resource, target_items, item_key, id_field, has_external_id=False):
+    def _find_match(
+        source_resource, target_items, item_key, id_field, has_external_id=False
+    ):
         source_ext_id = source_resource.get("externalIdentifier")
         source_name = source_resource.get("name")
 
@@ -225,7 +302,9 @@ def _build_identifier_map(
             if source_ext_id and has_external_id:
                 target_ext_id = target_item.get("externalIdentifier")
                 if target_ext_id:
-                    if _normalize_external_identifier(source_ext_id) == _normalize_external_identifier(target_ext_id):
+                    if _normalize_external_identifier(
+                        source_ext_id
+                    ) == _normalize_external_identifier(target_ext_id):
                         return target_item.get(id_field)
             # Fallback to name match
             if source_name and target_item.get("name") == source_name:
@@ -234,7 +313,9 @@ def _build_identifier_map(
 
     # Map glossaries by name (no externalIdentifier)
     try:
-        target_glossaries = _search_target_resources(client, domain_id, project_id, "GLOSSARY")
+        target_glossaries = _search_target_resources(
+            client, domain_id, project_id, "GLOSSARY"
+        )
     except Exception as e:
         logger.warning(f"Failed to search target glossaries: {e}")
         target_glossaries = []
@@ -249,7 +330,9 @@ def _build_identifier_map(
 
     # Map glossary terms by name
     try:
-        target_terms = _search_target_resources(client, domain_id, project_id, "GLOSSARY_TERM")
+        target_terms = _search_target_resources(
+            client, domain_id, project_id, "GLOSSARY_TERM"
+        )
     except Exception as e:
         logger.warning(f"Failed to search target glossary terms: {e}")
         target_terms = []
@@ -264,7 +347,9 @@ def _build_identifier_map(
 
     # Map form types by name
     try:
-        target_form_types = _search_target_type_resources(client, domain_id, project_id, "FORM_TYPE")
+        target_form_types = _search_target_type_resources(
+            client, domain_id, project_id, "FORM_TYPE"
+        )
     except Exception as e:
         logger.warning(f"Failed to search target form types: {e}")
         target_form_types = []
@@ -273,13 +358,17 @@ def _build_identifier_map(
         source_id = form_type.get("sourceId")
         if not source_id:
             continue
-        target_id = _find_match(form_type, target_form_types, "formTypeItem", "revision")
+        target_id = _find_match(
+            form_type, target_form_types, "formTypeItem", "revision"
+        )
         if target_id:
             id_map["formTypes"][source_id] = target_id
 
     # Map asset types by name
     try:
-        target_asset_types = _search_target_type_resources(client, domain_id, project_id, "ASSET_TYPE")
+        target_asset_types = _search_target_type_resources(
+            client, domain_id, project_id, "ASSET_TYPE"
+        )
     except Exception as e:
         logger.warning(f"Failed to search target asset types: {e}")
         target_asset_types = []
@@ -288,7 +377,9 @@ def _build_identifier_map(
         source_id = asset_type.get("sourceId")
         if not source_id:
             continue
-        target_id = _find_match(asset_type, target_asset_types, "assetTypeItem", "revision")
+        target_id = _find_match(
+            asset_type, target_asset_types, "assetTypeItem", "revision"
+        )
         if target_id:
             id_map["assetTypes"][source_id] = target_id
 
@@ -303,13 +394,17 @@ def _build_identifier_map(
         source_id = asset.get("sourceId")
         if not source_id:
             continue
-        target_id = _find_match(asset, target_assets, "assetItem", "identifier", has_external_id=True)
+        target_id = _find_match(
+            asset, target_assets, "assetItem", "identifier", has_external_id=True
+        )
         if target_id:
             id_map["assets"][source_id] = target_id
 
     # Map data products by name
     try:
-        target_data_products = _search_target_resources(client, domain_id, project_id, "DATA_PRODUCT")
+        target_data_products = _search_target_resources(
+            client, domain_id, project_id, "DATA_PRODUCT"
+        )
     except Exception as e:
         logger.warning(f"Failed to search target data products: {e}")
         target_data_products = []
@@ -323,7 +418,6 @@ def _build_identifier_map(
             id_map["dataProducts"][source_id] = target_id
 
     return id_map
-
 
 
 def _resolve_cross_references(
@@ -350,13 +444,298 @@ def _resolve_cross_references(
         if source_glossary_id and source_glossary_id in id_map.get("glossaries", {}):
             resolved["glossaryId"] = id_map["glossaries"][source_glossary_id]
 
+        # Resolve termRelations — each relation type maps to a list of term IDs
+        term_relations = resource.get("termRelations")
+        if term_relations and isinstance(term_relations, dict):
+            resolved_relations: Dict[str, Any] = {}
+            term_map = id_map.get("glossaryTerms", {})
+            for relation_type, term_ids in term_relations.items():
+                if isinstance(term_ids, list):
+                    resolved_ids = [
+                        term_map.get(tid, tid) for tid in term_ids
+                    ]
+                    resolved_relations[relation_type] = resolved_ids
+                else:
+                    resolved_relations[relation_type] = term_ids
+            resolved["termRelations"] = resolved_relations
+
     elif resource_type == "assets":
         # Resolve typeIdentifier reference
         source_type_id = resource.get("typeIdentifier")
         if source_type_id and source_type_id in id_map.get("assetTypes", {}):
             resolved["typeIdentifier"] = id_map["assetTypes"][source_type_id]
 
+    elif resource_type == "dataProducts":
+        # Resolve asset identifiers and glossary term IDs inside items
+        items = resource.get("items")
+        if items and isinstance(items, list):
+            asset_map = id_map.get("assets", {})
+            term_map = id_map.get("glossaryTerms", {})
+            resolved_items = []
+            for item in items:
+                item_copy = dict(item)
+                src_id = item_copy.get("identifier")
+                if src_id and src_id in asset_map:
+                    item_copy["identifier"] = asset_map[src_id]
+                glossary_terms = item_copy.get("glossaryTerms")
+                if glossary_terms and isinstance(glossary_terms, list):
+                    item_copy["glossaryTerms"] = [
+                        term_map.get(tid, tid) for tid in glossary_terms
+                    ]
+                resolved_items.append(item_copy)
+            resolved["items"] = resolved_items
+
     return resolved
+
+
+def _get_form_type_revision(client, domain_id: str, form_type_name: str) -> Optional[str]:
+    """Return the current revision of a form type in the target domain."""
+    try:
+        resp = client.get_form_type(
+            domainIdentifier=domain_id,
+            formTypeIdentifier=form_type_name,
+        )
+        return resp.get("revision")
+    except Exception:
+        return None
+
+
+def _resolve_target_data_source(
+    client,
+    domain_id: str,
+    project_id: str,
+    source_ds_type: str,
+    database_name: Optional[str] = None,
+) -> Optional[Dict[str, str]]:
+    """
+    Find a data source in the target project that matches the source type and
+    covers the asset's database.
+
+    Matching strategy (in priority order):
+    1. Same type + Glue filter covers the asset's databaseName
+    2. Same type + wildcard ("*") database filter (catch-all data source)
+    3. Same type (fallback when no database_name provided or no filter match)
+
+    Args:
+        client: DataZone boto3 client
+        domain_id: Target domain identifier
+        project_id: Target project identifier
+        source_ds_type: Data source type from the source (e.g. GLUE, SAGEMAKER)
+        database_name: Database name from the asset's GlueTableForm (optional)
+
+    Returns:
+        Dict with 'dataSourceId' and 'dataSourceRunId' if found, else None.
+    """
+    try:
+        resp = client.list_data_sources(
+            domainIdentifier=domain_id,
+            projectIdentifier=project_id,
+            maxResults=25,
+        )
+        candidates = [
+            ds
+            for ds in resp.get("items", [])
+            if ds.get("type") == source_ds_type
+            and ds.get("status") in ("READY", "RUNNING")
+        ]
+
+        if not candidates:
+            return None
+
+        def _get_latest_run_id(ds_id: str) -> Optional[str]:
+            runs = client.list_data_source_runs(
+                domainIdentifier=domain_id,
+                dataSourceIdentifier=ds_id,
+                maxResults=1,
+            )
+            for run in runs.get("items", []):
+                if run.get("status") == "SUCCESS":
+                    return run.get("id")
+            return None
+
+        def _build_result(ds_id: str) -> Dict[str, str]:
+            return {
+                "dataSourceId": ds_id,
+                "dataSourceRunId": _get_latest_run_id(ds_id),
+            }
+
+        # If no database_name, just return the first candidate
+        if not database_name:
+            return _build_result(candidates[0]["dataSourceId"])
+
+        # Score candidates by how well their filter config matches
+        exact_match = None
+        wildcard_match = None
+
+        for ds in candidates:
+            ds_id = ds["dataSourceId"]
+            try:
+                detail = client.get_data_source(
+                    domainIdentifier=domain_id, identifier=ds_id
+                )
+            except Exception:
+                continue
+
+            config = detail.get("configuration", {})
+            glue_config = config.get("glueRunConfiguration", {})
+            filters = glue_config.get("relationalFilterConfigurations", [])
+
+            for filt in filters:
+                db_filter = filt.get("databaseName", "")
+                if db_filter == database_name:
+                    exact_match = ds_id
+                    break
+                if db_filter == "*":
+                    wildcard_match = ds_id
+            if exact_match:
+                break
+
+        matched_id = exact_match or wildcard_match or candidates[0]["dataSourceId"]
+        return _build_result(matched_id)
+
+    except Exception as e:
+        logger.warning(
+            f"Failed to resolve target data source (type={source_ds_type}): {e}"
+        )
+    return None
+
+
+def _normalize_forms_input_for_api(
+    forms_input, resource_type: str, client=None, domain_id: str = "", project_id: str = ""
+):
+    """
+    Normalize formsInput fields for DataZone Create/Update APIs.
+
+    The export captures formsOutput from Get* APIs which uses 'typeName',
+    but the Create/Update APIs expect 'typeIdentifier' instead.
+
+    Source-domain typeRevision values are remapped to the current revision
+    in the target domain so the API can resolve the form type correctly.
+
+    For asset formsInput (list of dicts): rename typeName → typeIdentifier
+    For assetType formsInput (dict of dicts): rename typeName → typeIdentifier
+
+    Args:
+        forms_input: The formsInput value from the exported resource
+        resource_type: Type of resource (assets, assetTypes)
+        client: Optional DataZone boto3 client for revision lookup
+        domain_id: Target domain identifier for revision lookup
+
+    Returns:
+        Normalized formsInput suitable for the Create/Update API
+    """
+    if not forms_input:
+        return forms_input
+
+    # Cache looked-up revisions to avoid repeated API calls
+    revision_cache: Dict[str, Optional[str]] = {}
+
+    def _resolve_revision(form_name: str, original_revision: Optional[str]) -> Optional[str]:
+        """Look up the target-domain revision for a form type."""
+        if not client or not domain_id:
+            return original_revision
+        if form_name not in revision_cache:
+            revision_cache[form_name] = _get_form_type_revision(
+                client, domain_id, form_name
+            )
+        return revision_cache[form_name] or original_revision
+
+    # Cache for resolved target data sources keyed by (type, databaseName)
+    _ds_cache: Dict[str, Optional[Dict[str, str]]] = {}
+
+    def _extract_database_name(all_forms: list) -> Optional[str]:
+        """Extract databaseName from the asset's GlueTableForm if present."""
+        for f in all_forms:
+            type_id = f.get("typeIdentifier") or f.get("typeName", "")
+            if "GlueTableFormType" in type_id:
+                try:
+                    content = json.loads(f.get("content", "{}"))
+                    return content.get("databaseName")
+                except (json.JSONDecodeError, KeyError):
+                    pass
+        return None
+
+    if resource_type == "assets" and isinstance(forms_input, list):
+        # Pre-extract database name for data source matching
+        db_name = _extract_database_name(forms_input)
+
+        normalized = []
+        for form in forms_input:
+            form_copy = dict(form)
+            # Rename typeName → typeIdentifier if present
+            if "typeName" in form_copy and "typeIdentifier" not in form_copy:
+                form_copy["typeIdentifier"] = form_copy.pop("typeName")
+
+            # Remap DataSourceReferenceForm to target domain's data source
+            form_type = form_copy.get("typeIdentifier", "")
+            if (
+                form_type == "amazon.datazone.DataSourceReferenceFormType"
+                and client
+                and domain_id
+                and project_id
+            ):
+                try:
+                    content = json.loads(form_copy.get("content", "{}"))
+                    source_ds_type = content.get("dataSourceType", "GLUE")
+                    cache_key = f"{source_ds_type}:{db_name or '*'}"
+
+                    if cache_key not in _ds_cache:
+                        _ds_cache[cache_key] = _resolve_target_data_source(
+                            client, domain_id, project_id, source_ds_type,
+                            database_name=db_name,
+                        )
+                    target_ds = _ds_cache[cache_key]
+
+                    if target_ds:
+                        content["dataSourceIdentifier"] = {
+                            "id": target_ds["dataSourceId"],
+                            "version": "latest",
+                        }
+                        content["filterableDataSourceId"] = target_ds["dataSourceId"]
+                        if target_ds.get("dataSourceRunId"):
+                            content["dataSourceRunId"] = target_ds["dataSourceRunId"]
+                        form_copy["content"] = json.dumps(content)
+                        logger.info(
+                            f"Remapped DataSourceReferenceForm to target data source "
+                            f"{target_ds['dataSourceId']} (db={db_name})"
+                        )
+                    else:
+                        logger.warning(
+                            f"No matching {source_ds_type} data source in target project "
+                            f"(db={db_name}), stripping DataSourceReferenceForm"
+                        )
+                        continue
+                except (json.JSONDecodeError, KeyError) as e:
+                    logger.warning(
+                        f"Failed to remap DataSourceReferenceForm, stripping: {e}"
+                    )
+                    continue
+
+            # Remap typeRevision to the target domain's current revision
+            form_id = form_copy.get("typeIdentifier", "")
+            if "typeRevision" in form_copy:
+                resolved = _resolve_revision(form_id, form_copy["typeRevision"])
+                if resolved:
+                    form_copy["typeRevision"] = resolved
+            normalized.append(form_copy)
+        return normalized
+
+    if resource_type == "assetTypes" and isinstance(forms_input, dict):
+        normalized = {}
+        for form_name, form_config in forms_input.items():
+            config_copy = dict(form_config)
+            if "typeName" in config_copy and "typeIdentifier" not in config_copy:
+                config_copy["typeIdentifier"] = config_copy.pop("typeName")
+            # Remap typeRevision to the target domain's current revision
+            form_id = config_copy.get("typeIdentifier", form_name)
+            if "typeRevision" in config_copy:
+                resolved = _resolve_revision(form_id, config_copy["typeRevision"])
+                if resolved:
+                    config_copy["typeRevision"] = resolved
+            normalized[form_name] = config_copy
+        return normalized
+
+    return forms_input
 
 
 def _import_resource(
@@ -450,12 +829,17 @@ def _import_resource(
                     kwargs["longDescription"] = resolved["longDescription"]
                 if resolved.get("status"):
                     kwargs["status"] = resolved["status"]
-                if resolved.get("termRelations"):
-                    kwargs["termRelations"] = resolved["termRelations"]
+                # Skip termRelations during initial creation — other terms
+                # may not exist yet.  A second pass in import_catalog will
+                # update them once all terms have been created and mapped.
                 response = client.create_glossary_term(**kwargs)
                 id_map["glossaryTerms"][source_id] = response.get("id")
 
         elif resource_type == "formTypes":
+            # Skip managed/system form types — they already exist in every domain
+            if _is_managed_resource(name):
+                logger.info(f"Skipping managed FormType {name}")
+                return True, False
             if is_update:
                 logger.info(f"FormType {name} already exists, skipping (no update API)")
                 return True, True
@@ -464,6 +848,7 @@ def _import_resource(
                     "domainIdentifier": domain_id,
                     "owningProjectIdentifier": project_id,
                     "name": resolved.get("name"),
+                    "status": "ENABLED",
                 }
                 if resolved.get("description"):
                     kwargs["description"] = resolved["description"]
@@ -473,8 +858,14 @@ def _import_resource(
                 id_map["formTypes"][source_id] = response.get("revision")
 
         elif resource_type == "assetTypes":
+            # Skip managed/system asset types — they already exist in every domain
+            if _is_managed_resource(name):
+                logger.info(f"Skipping managed AssetType {name}")
+                return True, False
             if is_update:
-                logger.info(f"AssetType {name} already exists, skipping (no update API)")
+                logger.info(
+                    f"AssetType {name} already exists, skipping (no update API)"
+                )
                 return True, True
             else:
                 kwargs = {
@@ -485,12 +876,73 @@ def _import_resource(
                 if resolved.get("description"):
                     kwargs["description"] = resolved["description"]
                 if resolved.get("formsInput"):
-                    kwargs["formsInput"] = resolved["formsInput"]
+                    normalized = _normalize_forms_input_for_api(
+                        resolved["formsInput"], "assetTypes",
+                        client=client, domain_id=domain_id,
+                    )
+                    # Filter out managed/system forms that cannot be used
+                    # in custom asset type creation
+                    if isinstance(normalized, dict):
+                        normalized = {
+                            k: v
+                            for k, v in normalized.items()
+                            if not (
+                                v.get("typeIdentifier", "").startswith(
+                                    _MANAGED_FORM_TYPE_PREFIX
+                                )
+                                or v.get("typeName", "").startswith(
+                                    _MANAGED_FORM_TYPE_PREFIX
+                                )
+                            )
+                        }
+                    if normalized:
+                        kwargs["formsInput"] = normalized
                 response = client.create_asset_type(**kwargs)
                 id_map["assetTypes"][source_id] = response.get("revision")
 
         elif resource_type == "assets":
+            # Normalize formsInput: typeName → typeIdentifier for API compatibility
+            normalized_forms = None
+            if resolved.get("formsInput"):
+                normalized_forms = _normalize_forms_input_for_api(
+                    resolved["formsInput"], "assets",
+                    client=client, domain_id=domain_id,
+                    project_id=project_id,
+                )
             if is_update:
+                # For asset revisions, merge exported forms with existing
+                # managed forms from the target asset.  The API requires
+                # all required forms (e.g. GlueTableForm) to be present.
+                existing_forms = []
+                try:
+                    existing_asset = client.get_asset(
+                        domainIdentifier=domain_id,
+                        identifier=existing_id,
+                    )
+                    for form in existing_asset.get("formsOutput", []):
+                        existing_forms.append({
+                            "formName": form.get("formName"),
+                            "typeIdentifier": form.get("typeName"),
+                            "typeRevision": form.get("typeRevision"),
+                            "content": form.get("content"),
+                        })
+                except Exception:
+                    pass
+
+                # Build a set of form names we already have from the export
+                export_form_names = set()
+                if normalized_forms:
+                    for f in normalized_forms:
+                        export_form_names.add(
+                            f.get("formName") or f.get("typeIdentifier", "")
+                        )
+
+                # Merge: keep existing managed forms that aren't in the export
+                merged = list(normalized_forms) if normalized_forms else []
+                for ef in existing_forms:
+                    if ef.get("formName") not in export_form_names:
+                        merged.append(ef)
+
                 kwargs = {
                     "domainIdentifier": domain_id,
                     "identifier": existing_id,
@@ -498,9 +950,10 @@ def _import_resource(
                 }
                 if resolved.get("description"):
                     kwargs["description"] = resolved["description"]
-                if resolved.get("formsInput"):
-                    kwargs["formsInput"] = resolved["formsInput"]
-                client.update_asset(**kwargs)
+                if merged:
+                    kwargs["formsInput"] = merged
+                # DataZone has no update_asset; use create_asset_revision instead
+                client.create_asset_revision(**kwargs)
             else:
                 kwargs = {
                     "domainIdentifier": domain_id,
@@ -511,8 +964,8 @@ def _import_resource(
                     kwargs["description"] = resolved["description"]
                 if resolved.get("typeIdentifier"):
                     kwargs["typeIdentifier"] = resolved["typeIdentifier"]
-                if resolved.get("formsInput"):
-                    kwargs["formsInput"] = resolved["formsInput"]
+                if normalized_forms:
+                    kwargs["formsInput"] = normalized_forms
                 if resolved.get("externalIdentifier"):
                     kwargs["externalIdentifier"] = resolved["externalIdentifier"]
                 response = client.create_asset(**kwargs)
@@ -529,7 +982,8 @@ def _import_resource(
                     kwargs["description"] = resolved["description"]
                 if resolved.get("items") is not None:
                     kwargs["items"] = resolved["items"]
-                client.update_data_product(**kwargs)
+                # DataZone has no update_data_product; use create_data_product_revision
+                client.create_data_product_revision(**kwargs)
             else:
                 kwargs = {
                     "domainIdentifier": domain_id,
@@ -547,7 +1001,9 @@ def _import_resource(
 
     except ClientError as e:
         if e.response["Error"]["Code"] == "ConflictException":
-            logger.info(f"Resource {name} already exists (ConflictException), treating as update")
+            logger.info(
+                f"Resource {name} already exists (ConflictException), treating as update"
+            )
             return True, True
         else:
             logger.error(f"Failed to import {resource_type} {name}: {e}")
@@ -575,16 +1031,20 @@ def _identify_resources_to_delete(
     Returns:
         Dict mapping resource types to lists of {id, name} dicts to delete
     """
-    to_delete = {rt: [] for rt in DELETION_ORDER}
+    to_delete: Dict[str, List[Dict[str, str]]] = {rt: [] for rt in DELETION_ORDER}
 
     # Build sets of names from bundle for each resource type
     bundle_names = {}
     for rt in CREATION_ORDER:
-        bundle_names[rt] = {r.get("name") for r in catalog_data.get(rt, []) if r.get("name")}
+        bundle_names[rt] = {
+            r.get("name") for r in catalog_data.get(rt, []) if r.get("name")
+        }
 
     # Check glossaries
     try:
-        target_glossaries = _search_target_resources(client, domain_id, project_id, "GLOSSARY")
+        target_glossaries = _search_target_resources(
+            client, domain_id, project_id, "GLOSSARY"
+        )
         for item in target_glossaries:
             g = item.get("glossaryItem", {})
             if g.get("name") and g["name"] not in bundle_names["glossaries"]:
@@ -594,31 +1054,43 @@ def _identify_resources_to_delete(
 
     # Check glossary terms
     try:
-        target_terms = _search_target_resources(client, domain_id, project_id, "GLOSSARY_TERM")
+        target_terms = _search_target_resources(
+            client, domain_id, project_id, "GLOSSARY_TERM"
+        )
         for item in target_terms:
             t = item.get("glossaryTermItem", {})
             if t.get("name") and t["name"] not in bundle_names["glossaryTerms"]:
-                to_delete["glossaryTerms"].append({"id": t.get("id"), "name": t["name"]})
+                to_delete["glossaryTerms"].append(
+                    {"id": t.get("id"), "name": t["name"]}
+                )
     except Exception as e:
         logger.warning(f"Failed to search target glossary terms for deletion: {e}")
 
     # Check form types
     try:
-        target_form_types = _search_target_type_resources(client, domain_id, project_id, "FORM_TYPE")
+        target_form_types = _search_target_type_resources(
+            client, domain_id, project_id, "FORM_TYPE"
+        )
         for item in target_form_types:
             ft = item.get("formTypeItem", {})
             if ft.get("name") and ft["name"] not in bundle_names["formTypes"]:
-                to_delete["formTypes"].append({"id": ft.get("revision"), "name": ft["name"]})
+                to_delete["formTypes"].append(
+                    {"id": ft.get("revision"), "name": ft["name"]}
+                )
     except Exception as e:
         logger.warning(f"Failed to search target form types for deletion: {e}")
 
     # Check asset types
     try:
-        target_asset_types = _search_target_type_resources(client, domain_id, project_id, "ASSET_TYPE")
+        target_asset_types = _search_target_type_resources(
+            client, domain_id, project_id, "ASSET_TYPE"
+        )
         for item in target_asset_types:
             at = item.get("assetTypeItem", {})
             if at.get("name") and at["name"] not in bundle_names["assetTypes"]:
-                to_delete["assetTypes"].append({"id": at.get("revision"), "name": at["name"]})
+                to_delete["assetTypes"].append(
+                    {"id": at.get("revision"), "name": at["name"]}
+                )
     except Exception as e:
         logger.warning(f"Failed to search target asset types for deletion: {e}")
 
@@ -628,22 +1100,27 @@ def _identify_resources_to_delete(
         for item in target_assets:
             a = item.get("assetItem", {})
             if a.get("name") and a["name"] not in bundle_names["assets"]:
-                to_delete["assets"].append({"id": a.get("identifier"), "name": a["name"]})
+                to_delete["assets"].append(
+                    {"id": a.get("identifier"), "name": a["name"]}
+                )
     except Exception as e:
         logger.warning(f"Failed to search target assets for deletion: {e}")
 
     # Check data products
     try:
-        target_dps = _search_target_resources(client, domain_id, project_id, "DATA_PRODUCT")
+        target_dps = _search_target_resources(
+            client, domain_id, project_id, "DATA_PRODUCT"
+        )
         for item in target_dps:
             dp = item.get("dataProductItem", {})
             if dp.get("name") and dp["name"] not in bundle_names["dataProducts"]:
-                to_delete["dataProducts"].append({"id": dp.get("id"), "name": dp["name"]})
+                to_delete["dataProducts"].append(
+                    {"id": dp.get("id"), "name": dp["name"]}
+                )
     except Exception as e:
         logger.warning(f"Failed to search target data products for deletion: {e}")
 
     return to_delete
-
 
 
 def _delete_resource(
@@ -670,19 +1147,28 @@ def _delete_resource(
         if resource_type == "glossaries":
             client.delete_glossary(domainIdentifier=domain_id, identifier=resource_id)
         elif resource_type == "glossaryTerms":
-            client.delete_glossary_term(domainIdentifier=domain_id, identifier=resource_id)
+            client.delete_glossary_term(
+                domainIdentifier=domain_id, identifier=resource_id
+            )
         elif resource_type == "formTypes":
-            client.delete_form_type(domainIdentifier=domain_id, formTypeIdentifier=resource_id)
+            client.delete_form_type(
+                domainIdentifier=domain_id, formTypeIdentifier=resource_id
+            )
         elif resource_type == "assetTypes":
-            client.delete_asset_type(domainIdentifier=domain_id, assetTypeIdentifier=resource_id)
+            client.delete_asset_type(
+                domainIdentifier=domain_id, assetTypeIdentifier=resource_id
+            )
         elif resource_type == "assets":
             client.delete_asset(domainIdentifier=domain_id, identifier=resource_id)
         elif resource_type == "dataProducts":
-            client.delete_data_product(domainIdentifier=domain_id, identifier=resource_id)
+            client.delete_data_product(
+                domainIdentifier=domain_id, identifier=resource_id
+            )
         return True
     except Exception as e:
         logger.error(f"Failed to delete {resource_type} {resource_id}: {e}")
         return False
+
 
 
 def _publish_resource(
@@ -690,41 +1176,90 @@ def _publish_resource(
     domain_id: str,
     resource_id: str,
     resource_type: str,
+    max_wait_seconds: int = 30,
+    poll_interval: float = 2.0,
 ) -> bool:
     """
-    Publish an asset or data product.
+    Publish an asset or data product and verify the listing becomes ACTIVE.
+
+    The create_listing_change_set API is asynchronous — it returns success even
+    if the listing ultimately fails (e.g. missing Glue table). This function
+    polls the resource after the publish call to verify the listing status.
 
     Args:
         client: DataZone boto3 client
         domain_id: Target domain identifier
         resource_id: Resource identifier to publish
         resource_type: Type of resource (assets or dataProducts)
+        max_wait_seconds: Maximum seconds to wait for listing to become ACTIVE
+        poll_interval: Seconds between polling attempts
 
     Returns:
-        True if publish succeeded, False otherwise
+        True if listing status is ACTIVE, False otherwise
     """
     if resource_type not in PUBLISHABLE_TYPES:
         return False
 
     try:
         if resource_type == "assets":
-            client.create_listing_change_set(
-                domainIdentifier=domain_id,
-                entityIdentifier=resource_id,
-                entityType="ASSET",
-                action="PUBLISH",
-            )
+            entity_type = "ASSET"
         elif resource_type == "dataProducts":
-            client.create_listing_change_set(
-                domainIdentifier=domain_id,
-                entityIdentifier=resource_id,
-                entityType="DATA_PRODUCT",
-                action="PUBLISH",
-            )
-        return True
+            entity_type = "DATA_PRODUCT"
+        else:
+            return False
+
+        client.create_listing_change_set(
+            domainIdentifier=domain_id,
+            entityIdentifier=resource_id,
+            entityType=entity_type,
+            action="PUBLISH",
+        )
     except Exception as e:
         logger.error(f"Failed to publish {resource_type} {resource_id}: {e}")
         return False
+
+    # Poll to verify listing status
+    elapsed = 0.0
+    while elapsed < max_wait_seconds:
+        time.sleep(poll_interval)
+        elapsed += poll_interval
+        try:
+            if resource_type == "assets":
+                resp = client.get_asset(
+                    domainIdentifier=domain_id,
+                    identifier=resource_id,
+                )
+            else:
+                resp = client.get_data_product(
+                    domainIdentifier=domain_id,
+                    identifier=resource_id,
+                )
+
+            listing = resp.get("listing", {})
+            listing_status = listing.get("listingStatus") or listing.get("status")
+
+            if listing_status == "ACTIVE":
+                logger.info(
+                    f"Listing verified ACTIVE for {resource_type} {resource_id}"
+                )
+                return True
+            elif listing_status == "FAILED":
+                logger.error(
+                    f"Listing FAILED for {resource_type} {resource_id}"
+                )
+                return False
+            # Still CREATING / PENDING — keep polling
+        except Exception as e:
+            logger.warning(
+                f"Error polling listing status for {resource_type} {resource_id}: {e}"
+            )
+
+    logger.error(
+        f"Listing verification timed out after {max_wait_seconds}s "
+        f"for {resource_type} {resource_id}"
+    )
+    return False
+
 
 
 def import_catalog(
@@ -741,7 +1276,7 @@ def import_catalog(
     order → optionally publish → return summary.
 
     Publishing behavior: By default, assets and data products are published only
-    if they were published (listingStatus == "LISTED") in the source project.
+    if they were published (listingStatus == "ACTIVE") in the source project.
     Set skip_publish=True to skip all publishing regardless of source state.
 
     Args:
@@ -760,6 +1295,19 @@ def import_catalog(
     # Initialize client
     client = _get_datazone_client(region)
 
+    # Pre-flight permission check: verify the project's domain unit has the
+    # required policy grants (CREATE_GLOSSARY, CREATE_FORM_TYPE, CREATE_ASSET_TYPE).
+    # Short-circuit before making any mutating API calls.
+    missing_grants = _check_import_permissions(client, domain_id, project_id)
+    if missing_grants:
+        missing_str = ", ".join(missing_grants)
+        raise PermissionError(
+            f"Catalog import aborted — the project's domain unit is missing "
+            f"required policy grants: {missing_str}. "
+            f"Add these grants in the DataZone console under the domain unit's "
+            f"policy grants before retrying."
+        )
+
     # Build identifier mapping
     id_map = _build_identifier_map(client, domain_id, project_id, catalog_data)
 
@@ -771,7 +1319,7 @@ def import_catalog(
     published = 0
 
     # Track successfully imported resource IDs for publishing
-    imported_resource_ids = {rt: [] for rt in PUBLISHABLE_TYPES}
+    imported_resource_ids: Dict[str, List[str]] = {rt: [] for rt in PUBLISHABLE_TYPES}
 
     # Create/update in dependency order
     for resource_type in CREATION_ORDER:
@@ -784,23 +1332,63 @@ def import_catalog(
                     updated += 1
                 else:
                     created += 1
-                # Track for publishing only if source was published (LISTED)
+                # Track for publishing only if source was published (ACTIVE)
                 if resource_type in PUBLISHABLE_TYPES:
                     source_id = resource.get("sourceId")
                     target_id = id_map.get(resource_type, {}).get(source_id)
                     listing_status = resource.get("listingStatus")
-                    if target_id and listing_status == "LISTED":
+                    if target_id and listing_status == "ACTIVE":
                         imported_resource_ids[resource_type].append(target_id)
             else:
                 failed += 1
 
+    # Second pass: update glossary terms with termRelations now that all
+    # terms have been created and their IDs are in id_map.
+    for term in catalog_data.get("glossaryTerms", []):
+        term_relations = term.get("termRelations")
+        if not term_relations or not any(term_relations.values()):
+            continue
+        source_id = term.get("sourceId")
+        target_id = id_map.get("glossaryTerms", {}).get(source_id)
+        if not target_id:
+            continue
+        # Resolve term relation IDs from source → target
+        resolved_relations: Dict[str, Any] = {}
+        term_map = id_map.get("glossaryTerms", {})
+        for relation_type, term_ids in term_relations.items():
+            if isinstance(term_ids, list):
+                resolved_relations[relation_type] = [
+                    term_map.get(tid, tid) for tid in term_ids
+                ]
+            else:
+                resolved_relations[relation_type] = term_ids
+        # Resolve glossaryId
+        glossary_id = term.get("glossaryId")
+        target_glossary_id = id_map.get("glossaries", {}).get(glossary_id, glossary_id)
+        try:
+            client.update_glossary_term(
+                domainIdentifier=domain_id,
+                identifier=target_id,
+                glossaryIdentifier=target_glossary_id,
+                name=term.get("name"),
+                termRelations=resolved_relations,
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to update termRelations for %s: %s", term.get("name"), e
+            )
+
     # Identify and delete resources not in bundle (reverse dependency order)
-    to_delete = _identify_resources_to_delete(client, domain_id, project_id, catalog_data)
+    to_delete = _identify_resources_to_delete(
+        client, domain_id, project_id, catalog_data
+    )
     for resource_type in DELETION_ORDER:
         for resource_info in to_delete.get(resource_type, []):
             resource_id = resource_info.get("id")
             if resource_id:
-                if _delete_resource(client, domain_id, project_id, resource_id, resource_type):
+                if _delete_resource(
+                    client, domain_id, project_id, resource_id, resource_type
+                ):
                     deleted += 1
                 else:
                     failed += 1

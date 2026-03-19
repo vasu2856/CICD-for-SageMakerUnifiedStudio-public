@@ -114,11 +114,14 @@ def test_form_types_exist(datazone_client, domain_id, project_id):
         items = resp.get("items", [])
         # Filter to project-owned form types
         project_forms = [
-            item for item in items
+            item
+            for item in items
             if item.get("formTypeItem", {}).get("owningProjectId") == project_id
         ]
         if project_forms:
-            print(f"✅ Found {len(project_forms)} custom form type(s) in target project")
+            print(
+                f"✅ Found {len(project_forms)} custom form type(s) in target project"
+            )
         else:
             print("ℹ️  No custom form types found (may not have been seeded)")
     except Exception as e:

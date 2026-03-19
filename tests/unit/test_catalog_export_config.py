@@ -43,9 +43,7 @@ class TestSimplifiedCatalogConfig(unittest.TestCase):
 
     def test_parse_catalog_enabled_true(self):
         """Test parsing with enabled: true exports all catalog resources."""
-        manifest = ApplicationManifest.from_dict(
-            _make_manifest_data({"enabled": True})
-        )
+        manifest = ApplicationManifest.from_dict(_make_manifest_data({"enabled": True}))
         self.assertIsNotNone(manifest.content.catalog)
         self.assertTrue(manifest.content.catalog.enabled)
 
@@ -86,9 +84,7 @@ class TestSimplifiedCatalogConfig(unittest.TestCase):
 
     def test_parse_catalog_skip_publish_omitted_defaults_false(self):
         """Test that skipPublish defaults to false when omitted."""
-        manifest = ApplicationManifest.from_dict(
-            _make_manifest_data({"enabled": True})
-        )
+        manifest = ApplicationManifest.from_dict(_make_manifest_data({"enabled": True}))
         self.assertFalse(manifest.content.catalog.skipPublish)
 
     # --- connectionName field tests ---
@@ -102,9 +98,7 @@ class TestSimplifiedCatalogConfig(unittest.TestCase):
 
     def test_parse_catalog_connection_name_omitted(self):
         """Test that connectionName defaults to None when omitted."""
-        manifest = ApplicationManifest.from_dict(
-            _make_manifest_data({"enabled": True})
-        )
+        manifest = ApplicationManifest.from_dict(_make_manifest_data({"enabled": True}))
         self.assertIsNone(manifest.content.catalog.connectionName)
 
     # --- assets.access tests (subscription requests) ---
@@ -199,9 +193,7 @@ class TestSimplifiedCatalogConfig(unittest.TestCase):
 
     def test_parse_catalog_no_assets_section(self):
         """Test parsing without assets section."""
-        manifest = ApplicationManifest.from_dict(
-            _make_manifest_data({"enabled": True})
-        )
+        manifest = ApplicationManifest.from_dict(_make_manifest_data({"enabled": True}))
         self.assertIsNone(manifest.content.catalog.assets)
 
     # --- backward compatibility ---
@@ -228,9 +220,7 @@ class TestSimplifiedCatalogConfig(unittest.TestCase):
 
     def test_backward_compatibility_access_assets_empty(self):
         """Test accessAssets returns empty list when no assets configured."""
-        manifest = ApplicationManifest.from_dict(
-            _make_manifest_data({"enabled": True})
-        )
+        manifest = ApplicationManifest.from_dict(_make_manifest_data({"enabled": True}))
         self.assertEqual(manifest.content.catalog.accessAssets, [])
 
     def test_backward_compatibility_old_access_assets_field(self):

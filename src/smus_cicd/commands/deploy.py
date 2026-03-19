@@ -233,7 +233,7 @@ def deploy_command(
                 target_config,
                 manifest,
                 config,
-                bundle,
+                bundle_path,
                 stage_name,
                 emitter,
                 metadata,
@@ -432,7 +432,7 @@ def _deploy_bundle_to_target(
 
     # Check if we have a bundle file for catalog import
     has_bundle_for_catalog = bundle_file is not None
-    
+
     # Only require storage/git config if we're not just importing catalog from bundle
     if not storage_configs and not git_configs and not has_bundle_for_catalog:
         handle_error(
@@ -599,8 +599,12 @@ def _deploy_bundle_to_target(
     )
 
     # Import catalog resources from bundle if present
+    # Use bundle_path if available (set when has_bundle_items), otherwise fall back
+    # to the original bundle_file argument (covers catalog-only bundles with no
+    # storage/git items).
+    effective_bundle_path = bundle_path or bundle_file
     catalog_import_success = _import_catalog_from_bundle(
-        bundle_path, target_config, config, emitter, metadata, manifest=manifest
+        effective_bundle_path, target_config, config, emitter, metadata, manifest=manifest
     )
 
     # Return overall success - storage must succeed, git is optional
@@ -1384,7 +1388,9 @@ def _import_catalog_from_bundle(
         return True
 
     # Ensure bundle is available locally
-    local_bundle_path = ensure_bundle_local(bundle_path, config.get("region", "us-east-1"))
+    local_bundle_path = ensure_bundle_local(
+        bundle_path, config.get("region", "us-east-1")
+    )
 
     try:
         # Check if catalog_export.json exists in bundle
@@ -1395,7 +1401,9 @@ def _import_catalog_from_bundle(
                 # Extract to temp directory
                 with tempfile.TemporaryDirectory() as temp_dir:
                     zip_ref.extract("catalog/catalog_export.json", temp_dir)
-                    catalog_json_path = os.path.join(temp_dir, "catalog", "catalog_export.json")
+                    catalog_json_path = os.path.join(
+                        temp_dir, "catalog", "catalog_export.json"
+                    )
 
                     # Read and parse JSON
                     with open(catalog_json_path, "r") as f:
@@ -1404,33 +1412,42 @@ def _import_catalog_from_bundle(
                     typer.echo("📋 Importing catalog resources from bundle...")
 
                     # Get domain and project IDs
-                    from ..helpers.datazone import get_domain_from_target_config, get_project_id_by_name
+                    from ..helpers.datazone import (
+                        get_domain_from_target_config,
+                        get_project_id_by_name,
+                    )
 
                     region = target_config.domain.region
-                    domain_id, domain_name = get_domain_from_target_config(target_config, region)
+                    domain_id, domain_name = get_domain_from_target_config(
+                        target_config, region
+                    )
                     project_name = target_config.project.name
                     project_id = get_project_id_by_name(project_name, domain_id, region)
 
                     if not project_id:
-                        typer.echo(f"❌ Could not find project ID for project: {project_name}")
+                        typer.echo(
+                            f"❌ Could not find project ID for project: {project_name}"
+                        )
                         return False
 
                     # Get skipPublish flag from manifest (default: False)
                     skip_publish = False
-                    if (
-                        manifest
-                        and manifest.content
-                        and manifest.content.catalog
-                    ):
+                    if manifest and manifest.content and manifest.content.catalog:
                         skip_publish = manifest.content.catalog.skipPublish
 
                     # Import catalog resources
                     from ..helpers.catalog_import import import_catalog
 
-                    summary = import_catalog(domain_id, project_id, catalog_data, region, skip_publish=skip_publish)
+                    summary = import_catalog(
+                        domain_id,
+                        project_id,
+                        catalog_data,
+                        region,
+                        skip_publish=skip_publish,
+                    )
 
                     # Report summary
-                    typer.echo(f"✅ Catalog import completed:")
+                    typer.echo("✅ Catalog import completed:")
                     typer.echo(f"   Created: {summary['created']}")
                     typer.echo(f"   Updated: {summary['updated']}")
                     typer.echo(f"   Deleted: {summary['deleted']}")
@@ -1439,10 +1456,12 @@ def _import_catalog_from_bundle(
 
                     # Return False if all imports failed
                     total_attempted = (
-                        summary['created'] + summary['updated']
-                        + summary['deleted'] + summary['failed']
+                        summary["created"]
+                        + summary["updated"]
+                        + summary["deleted"]
+                        + summary["failed"]
                     )
-                    if total_attempted > 0 and summary['failed'] == total_attempted:
+                    if total_attempted > 0 and summary["failed"] == total_attempted:
                         typer.echo("❌ All catalog imports failed")
                         return False
 
@@ -1496,7 +1515,11 @@ def _process_catalog_assets(
         return True
 
     # Check if catalog assets are configured
-    if not manifest.content.catalog or not manifest.content.catalog.assets or not manifest.content.catalog.assets.access:
+    if (
+        not manifest.content.catalog
+        or not manifest.content.catalog.assets
+        or not manifest.content.catalog.assets.access
+    ):
         typer.echo("📋 No catalog assets configured")
         return True
 

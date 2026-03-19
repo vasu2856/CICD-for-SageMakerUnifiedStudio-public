@@ -1,0 +1,9 @@
+name: SampleWorkflow
+description: Minimal workflow for testing catalog import/export
+definition:
+  Comment: A minimal workflow for testing
+  StartAt: Pass
+  States:
+    Pass:
+      Type: Pass
+      End: true

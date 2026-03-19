@@ -3,7 +3,7 @@
 Feature: datazone-catalog-import-export
 
 Tests the simplified CatalogExporter that exports ALL project-owned catalog
-resources when enabled, with support for externalIdentifier, inputForms,
+resources when enabled, with support for externalIdentifier, formsOutput→formsInput,
 termRelations, and optional --updated-after CLI flag.
 
 Uses hypothesis library with @settings(max_examples=100).
@@ -11,22 +11,19 @@ Uses hypothesis library with @settings(max_examples=100).
 
 import json
 import unittest
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
-from hypothesis import given, settings, strategies as st, assume
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from smus_cicd.helpers.catalog_export import (
     ALL_RESOURCE_TYPES,
-    SEARCH_API_RESOURCE_TYPES,
-    SEARCH_TYPES_API_RESOURCE_TYPES,
-    SORT_CLAUSE,
     _serialize_resource,
     export_catalog,
 )
 
-
 # ── Hypothesis strategies ──────────────────────────────────────────────────
+
 
 def _safe_text(min_size=1, max_size=50):
     """Generate safe text without null bytes for JSON compatibility."""
@@ -56,10 +53,14 @@ def glossary_item_strategy(draw):
 @st.composite
 def glossary_term_item_strategy(draw):
     """Generate a mock glossary term search result item."""
-    term_relations = draw(st.fixed_dictionaries({
-        "isA": st.lists(_safe_text(1, 20), max_size=3),
-        "hasA": st.lists(_safe_text(1, 20), max_size=3),
-    }))
+    term_relations = draw(
+        st.fixed_dictionaries(
+            {
+                "isA": st.lists(_safe_text(1, 20), max_size=3),
+                "hasA": st.lists(_safe_text(1, 20), max_size=3),
+            }
+        )
+    )
     return {
         "glossaryTermItem": {
             "id": draw(_safe_text(1, 30)),
@@ -82,18 +83,12 @@ def asset_item_strategy(draw):
             "name": draw(_safe_text(1, 30)),
             "description": draw(_safe_text(0, 50)),
             "typeIdentifier": draw(_safe_text(1, 30)),
-            "formsOutput": draw(st.lists(
-                st.fixed_dictionaries({"formName": _safe_text(1, 20)}),
-                max_size=3,
-            )),
-            "inputForms": draw(st.lists(
-                st.fixed_dictionaries({
-                    "formName": _safe_text(1, 20),
-                    "typeIdentifier": _safe_text(1, 20),
-                    "content": st.just("{}"),
-                }),
-                max_size=3,
-            )),
+            "formsOutput": draw(
+                st.lists(
+                    st.fixed_dictionaries({"formName": _safe_text(1, 20)}),
+                    max_size=3,
+                )
+            ),
         }
     }
     # Optionally add externalIdentifier
@@ -110,10 +105,12 @@ def data_product_item_strategy(draw):
             "id": draw(_safe_text(1, 30)),
             "name": draw(_safe_text(1, 30)),
             "description": draw(_safe_text(0, 50)),
-            "items": draw(st.lists(
-                st.fixed_dictionaries({"assetId": _safe_text(1, 20)}),
-                max_size=3,
-            )),
+            "items": draw(
+                st.lists(
+                    st.fixed_dictionaries({"assetId": _safe_text(1, 20)}),
+                    max_size=3,
+                )
+            ),
         }
     }
 
@@ -140,9 +137,13 @@ def asset_type_item_strategy(draw, project_id="project-456"):
             "revision": draw(_safe_text(1, 30)),
             "name": draw(_safe_text(1, 30)),
             "description": draw(_safe_text(0, 50)),
-            "formsOutput": draw(st.fixed_dictionaries({
-                "form1": st.just({}),
-            })),
+            "formsOutput": draw(
+                st.fixed_dictionaries(
+                    {
+                        "form1": st.just({}),
+                    }
+                )
+            ),
             "owningProjectId": project_id,
         }
     }
@@ -254,15 +255,21 @@ class TestProperty2ExportAllProjectOwnedResources(unittest.TestCase):
     )
     @patch("smus_cicd.helpers.catalog_export._get_datazone_client")
     def test_all_resource_types_queried_with_ownership_filter(
-        self, mock_get_client, project_id, domain_id,
-        glossary_items, asset_items, form_type_items,
+        self,
+        mock_get_client,
+        project_id,
+        domain_id,
+        glossary_items,
+        asset_items,
+        form_type_items,
     ):
         """
         Property 2: Export All Project-Owned Resources
 
         **Validates: Requirements 2.1, 2.2, 2.3**
 
-        All resource types are queried with owningProjectIdentifier=project_id.
+        Search API calls use owningProjectIdentifier=project_id (server-side).
+        SearchTypes API calls use client-side owningProjectId filtering.
         """
         # Ensure form_type_items have the correct owningProjectId
         for item in form_type_items:
@@ -275,20 +282,23 @@ class TestProperty2ExportAllProjectOwnedResources(unittest.TestCase):
         )
         mock_get_client.return_value = mock_client
 
-        result = export_catalog(domain_id, project_id, "us-east-1")
+        result = export_catalog(domain_id, project_id, "us-east-1")  # noqa: F841
 
-        # Verify ALL Search API calls used owningProjectIdentifier
+        # Verify ALL Search API calls used owningProjectIdentifier (server-side filtering)
         for c in mock_client.search.call_args_list:
             self.assertEqual(
-                c[1]["owningProjectIdentifier"], project_id,
+                c[1]["owningProjectIdentifier"],
+                project_id,
                 "owningProjectIdentifier not set on Search API call",
             )
 
-        # Verify ALL SearchTypes API calls used owningProjectIdentifier
+        # Verify SearchTypes API calls do NOT use owningProjectIdentifier
+        # (it's not a supported parameter — client-side filtering by owningProjectId is used instead)
         for c in mock_client.search_types.call_args_list:
-            self.assertEqual(
-                c[1]["owningProjectIdentifier"], project_id,
-                "owningProjectIdentifier not set on SearchTypes API call",
+            self.assertNotIn(
+                "owningProjectIdentifier",
+                c[1],
+                "owningProjectIdentifier should NOT be passed to SearchTypes API",
             )
 
         # Verify all 6 resource types were queried
@@ -325,7 +335,9 @@ class TestProperty3UpdatedAfterFilterCorrectness(unittest.TestCase):
         mock_get_client.return_value = mock_client
 
         export_catalog(
-            "domain-1", "proj-1", "us-east-1",
+            "domain-1",
+            "proj-1",
+            "us-east-1",
             updated_after=updated_after,
         )
 
@@ -334,10 +346,12 @@ class TestProperty3UpdatedAfterFilterCorrectness(unittest.TestCase):
             if updated_after:
                 self.assertIn("filters", c[1])
                 self.assertEqual(
-                    c[1]["filters"]["filter"]["value"], updated_after,
+                    c[1]["filters"]["filter"]["value"],
+                    updated_after,
                 )
                 self.assertEqual(
-                    c[1]["filters"]["filter"]["attribute"], "updatedAt",
+                    c[1]["filters"]["filter"]["attribute"],
+                    "updatedAt",
                 )
             else:
                 self.assertNotIn("filters", c[1])
@@ -347,7 +361,8 @@ class TestProperty3UpdatedAfterFilterCorrectness(unittest.TestCase):
             if updated_after:
                 self.assertIn("filters", c[1])
                 self.assertEqual(
-                    c[1]["filters"]["filter"]["value"], updated_after,
+                    c[1]["filters"]["filter"]["value"],
+                    updated_after,
                 )
             else:
                 self.assertNotIn("filters", c[1])
@@ -370,9 +385,7 @@ class TestProperty6ExportJsonStructureInvariant(unittest.TestCase):
         project_id=_safe_text(5, 30),
     )
     @patch("smus_cicd.helpers.catalog_export._get_datazone_client")
-    def test_json_structure_invariant(
-        self, mock_get_client, domain_id, project_id
-    ):
+    def test_json_structure_invariant(self, mock_get_client, domain_id, project_id):
         """
         Property 6: Export JSON Structure Invariant
 
@@ -385,15 +398,22 @@ class TestProperty6ExportJsonStructureInvariant(unittest.TestCase):
 
         # Verify top-level keys
         expected_top_keys = {
-            "metadata", "glossaries", "glossaryTerms",
-            "formTypes", "assetTypes", "assets", "dataProducts",
+            "metadata",
+            "glossaries",
+            "glossaryTerms",
+            "formTypes",
+            "assetTypes",
+            "assets",
+            "dataProducts",
         }
         self.assertEqual(set(result.keys()), expected_top_keys)
 
         # Verify metadata keys
         expected_meta_keys = {
-            "sourceProjectId", "sourceDomainId",
-            "exportTimestamp", "resourceTypes",
+            "sourceProjectId",
+            "sourceDomainId",
+            "exportTimestamp",
+            "resourceTypes",
         }
         self.assertEqual(set(result["metadata"].keys()), expected_meta_keys)
 
@@ -418,7 +438,7 @@ class TestProperty7FieldPreservation(unittest.TestCase):
 
     For all resources exported, the serialized JSON SHALL preserve the name field,
     externalIdentifier (when present), all user-configurable attributes, and sourceId.
-    For assets, inputForms SHALL be preserved. For glossary terms, termRelations
+    For assets, formsOutput SHALL be mapped to formsInput. For glossary terms, termRelations
     SHALL be preserved. For form types, the complete model SHALL be preserved.
     """
 
@@ -471,9 +491,9 @@ class TestProperty7FieldPreservation(unittest.TestCase):
 
     @settings(max_examples=100)
     @given(item=asset_item_strategy())
-    def test_asset_field_preservation_with_input_forms_and_external_id(self, item):
+    def test_asset_field_preservation_with_forms_and_external_id(self, item):
         """
-        Property 7: Field Preservation - Assets with inputForms and externalIdentifier
+        Property 7: Field Preservation - Assets with formsOutput→formsInput and externalIdentifier
 
         **Validates: Requirements 3.3, 3.5**
         """
@@ -482,7 +502,8 @@ class TestProperty7FieldPreservation(unittest.TestCase):
 
         self.assertEqual(result["sourceId"], original["identifier"])
         self.assertEqual(result["name"], original["name"])
-        self.assertEqual(result["inputForms"], original["inputForms"])
+        self.assertEqual(result["formsInput"], original["formsOutput"])
+        self.assertNotIn("inputForms", result)
 
         if "externalIdentifier" in original:
             self.assertEqual(
@@ -544,9 +565,14 @@ class TestProperty8CatalogExportJsonRoundTrip(unittest.TestCase):
     )
     @patch("smus_cicd.helpers.catalog_export._get_datazone_client")
     def test_json_round_trip(
-        self, mock_get_client,
-        glossary_items, glossary_term_items, asset_items,
-        data_product_items, form_type_items, asset_type_items,
+        self,
+        mock_get_client,
+        glossary_items,
+        glossary_term_items,
+        asset_items,
+        data_product_items,
+        form_type_items,
+        asset_type_items,
     ):
         """
         Property 8: Catalog Export JSON Round-Trip
