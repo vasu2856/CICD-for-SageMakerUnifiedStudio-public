@@ -7,7 +7,7 @@ from botocore.exceptions import ClientError
 
 from smus_cicd.helpers.catalog_import import (
     _build_identifier_map,
-    _check_import_permissions,
+    _ensure_import_permissions,
     _delete_resource,
     _get_form_type_revision,
     _identify_resources_to_delete,
@@ -773,8 +773,8 @@ class TestImportCatalog(unittest.TestCase):
             import_catalog("d1", "p1", {"metadata": {}}, "us-east-1")
 
 
-class TestCheckImportPermissions(unittest.TestCase):
-    """Test _check_import_permissions function."""
+class TestEnsureImportPermissions(unittest.TestCase):
+    """Test _ensure_import_permissions function."""
 
     def test_all_grants_present(self):
         """Returns empty list when all required grants exist."""
@@ -784,24 +784,24 @@ class TestCheckImportPermissions(unittest.TestCase):
             "grantList": [{"principal": {"domainUnit": {"id": "du-1"}}}]
         }
 
-        missing = _check_import_permissions(mock_client, "domain-1", "proj-1")
-        self.assertEqual(missing, [])
+        failed = _ensure_import_permissions(mock_client, "domain-1", "proj-1")
+        self.assertEqual(failed, [])
         self.assertEqual(mock_client.list_policy_grants.call_count, 3)
+        mock_client.add_policy_grant.assert_not_called()
 
-    def test_no_grants_returns_all_missing(self):
-        """Returns all three policy types when no grants exist."""
+    def test_missing_grants_are_added(self):
+        """Adds missing grants and returns empty list on success."""
         mock_client = MagicMock()
         mock_client.get_project.return_value = {"domainUnitId": "du-1"}
         mock_client.list_policy_grants.return_value = {"grantList": []}
+        mock_client.add_policy_grant.return_value = {}
 
-        missing = _check_import_permissions(mock_client, "domain-1", "proj-1")
-        self.assertEqual(
-            missing,
-            ["CREATE_GLOSSARY", "CREATE_FORM_TYPE", "CREATE_ASSET_TYPE"],
-        )
+        failed = _ensure_import_permissions(mock_client, "domain-1", "proj-1")
+        self.assertEqual(failed, [])
+        self.assertEqual(mock_client.add_policy_grant.call_count, 3)
 
-    def test_partial_grants(self):
-        """Returns only the missing policy types."""
+    def test_partial_grants_adds_only_missing(self):
+        """Only adds grants that are missing."""
         mock_client = MagicMock()
         mock_client.get_project.return_value = {"domainUnitId": "du-1"}
         # CREATE_GLOSSARY has grants, the other two don't
@@ -810,46 +810,64 @@ class TestCheckImportPermissions(unittest.TestCase):
             {"grantList": []},
             {"grantList": []},
         ]
+        mock_client.add_policy_grant.return_value = {}
 
-        missing = _check_import_permissions(mock_client, "domain-1", "proj-1")
-        self.assertEqual(missing, ["CREATE_FORM_TYPE", "CREATE_ASSET_TYPE"])
+        failed = _ensure_import_permissions(mock_client, "domain-1", "proj-1")
+        self.assertEqual(failed, [])
+        self.assertEqual(mock_client.add_policy_grant.call_count, 2)
 
-    def test_access_denied_on_list_grants(self):
-        """Treats AccessDeniedException on list_policy_grants as missing."""
+    def test_add_grant_failure_returns_failed(self):
+        """Returns policy types that could not be added."""
+        mock_client = MagicMock()
+        mock_client.get_project.return_value = {"domainUnitId": "du-1"}
+        mock_client.list_policy_grants.return_value = {"grantList": []}
+        mock_client.add_policy_grant.side_effect = Exception("AccessDenied")
+
+        failed = _ensure_import_permissions(mock_client, "domain-1", "proj-1")
+        self.assertEqual(
+            failed,
+            ["CREATE_GLOSSARY", "CREATE_FORM_TYPE", "CREATE_ASSET_TYPE"],
+        )
+
+    def test_access_denied_on_list_then_add_succeeds(self):
+        """When list_policy_grants raises AccessDeniedException, tries to add grant."""
         mock_client = MagicMock()
         mock_client.get_project.return_value = {"domainUnitId": "du-1"}
         mock_client.list_policy_grants.side_effect = ClientError(
             {"Error": {"Code": "AccessDeniedException", "Message": "denied"}},
             "ListPolicyGrants",
         )
+        mock_client.add_policy_grant.return_value = {}
 
-        missing = _check_import_permissions(mock_client, "domain-1", "proj-1")
-        self.assertEqual(len(missing), 3)
+        failed = _ensure_import_permissions(mock_client, "domain-1", "proj-1")
+        self.assertEqual(failed, [])
+        self.assertEqual(mock_client.add_policy_grant.call_count, 3)
 
     def test_get_project_failure_returns_empty(self):
         """Returns empty list (no blocking) when get_project fails."""
         mock_client = MagicMock()
         mock_client.get_project.side_effect = Exception("NetworkError")
 
-        missing = _check_import_permissions(mock_client, "domain-1", "proj-1")
-        self.assertEqual(missing, [])
+        failed = _ensure_import_permissions(mock_client, "domain-1", "proj-1")
+        self.assertEqual(failed, [])
 
     def test_no_domain_unit_id_returns_empty(self):
         """Returns empty list when project has no domainUnitId."""
         mock_client = MagicMock()
         mock_client.get_project.return_value = {}
 
-        missing = _check_import_permissions(mock_client, "domain-1", "proj-1")
-        self.assertEqual(missing, [])
+        failed = _ensure_import_permissions(mock_client, "domain-1", "proj-1")
+        self.assertEqual(failed, [])
         mock_client.list_policy_grants.assert_not_called()
 
     @patch("smus_cicd.helpers.catalog_import._get_datazone_client")
-    def test_import_catalog_aborts_on_missing_grants(self, mock_get_client):
-        """import_catalog raises PermissionError when grants are missing."""
+    def test_import_catalog_aborts_when_grants_cannot_be_added(self, mock_get_client):
+        """import_catalog raises PermissionError when grants cannot be added."""
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
         mock_client.get_project.return_value = {"domainUnitId": "du-1"}
         mock_client.list_policy_grants.return_value = {"grantList": []}
+        mock_client.add_policy_grant.side_effect = Exception("Forbidden")
 
         catalog_data = {
             "metadata": {
@@ -1514,28 +1532,33 @@ class TestIdentifyResourcesToDeleteAllTypes(unittest.TestCase):
             self.assertEqual(len(to_delete[rt]), 0)
 
 
-class TestCheckImportPermissionsNonAccessDenied(unittest.TestCase):
-    """Cover the non-AccessDeniedException ClientError branch in _check_import_permissions."""
+class TestEnsureImportPermissionsEdgeCases(unittest.TestCase):
+    """Cover edge cases in _ensure_import_permissions."""
 
-    def test_non_access_denied_client_error_logs_warning(self):
-        """Non-AccessDeniedException ClientError should log warning, not append to missing."""
+    def test_non_access_denied_client_error_tries_add(self):
+        """Non-AccessDeniedException ClientError on list still tries to add grant."""
         mock_client = MagicMock()
         mock_client.get_project.return_value = {"domainUnitId": "du-1"}
         mock_client.list_policy_grants.side_effect = ClientError(
             {"Error": {"Code": "ThrottlingException", "Message": "throttled"}},
             "ListPolicyGrants",
         )
-        missing = _check_import_permissions(mock_client, "domain-1", "proj-1")
-        # ThrottlingException is not AccessDeniedException, so it should NOT be in missing
-        self.assertEqual(missing, [])
+        mock_client.add_policy_grant.return_value = {}
 
-    def test_generic_exception_logs_warning(self):
-        """Generic Exception should log warning, not append to missing."""
+        failed = _ensure_import_permissions(mock_client, "domain-1", "proj-1")
+        # ThrottlingException means we couldn't confirm — grant is not confirmed present,
+        # so add_policy_grant should NOT be called (grant status unknown, not missing)
+        self.assertEqual(failed, [])
+
+    def test_generic_exception_on_list_tries_add(self):
+        """Generic Exception on list still tries to add grant."""
         mock_client = MagicMock()
         mock_client.get_project.return_value = {"domainUnitId": "du-1"}
         mock_client.list_policy_grants.side_effect = Exception("Network timeout")
-        missing = _check_import_permissions(mock_client, "domain-1", "proj-1")
-        self.assertEqual(missing, [])
+        mock_client.add_policy_grant.return_value = {}
+
+        failed = _ensure_import_permissions(mock_client, "domain-1", "proj-1")
+        self.assertEqual(failed, [])
 
 
 class TestBuildIdentifierMapAllTypes(unittest.TestCase):

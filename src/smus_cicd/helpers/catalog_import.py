@@ -112,6 +112,13 @@ _REQUIRED_POLICY_GRANTS = [
     "CREATE_ASSET_TYPE",
 ]
 
+# Mapping from policyType enum to the detail key expected by add_policy_grant
+_POLICY_DETAIL_KEY = {
+    "CREATE_GLOSSARY": "createGlossary",
+    "CREATE_FORM_TYPE": "createFormType",
+    "CREATE_ASSET_TYPE": "createAssetType",
+}
+
 # Prefix for managed/system form types that cannot be used in custom asset types
 _MANAGED_FORM_TYPE_PREFIX = "amazon.datazone."
 
@@ -121,10 +128,10 @@ def _is_managed_resource(name: str) -> bool:
     return name.startswith(_MANAGED_FORM_TYPE_PREFIX) if name else False
 
 
-def _check_import_permissions(client, domain_id: str, project_id: str) -> List[str]:
+def _ensure_import_permissions(client, domain_id: str, project_id: str) -> List[str]:
     """
-    Check whether the project's domain unit has the policy grants needed for
-    catalog import by calling ListPolicyGrants for each required policy type.
+    Ensure the project's domain unit has the policy grants needed for catalog
+    import.  Missing grants are created automatically via AddPolicyGrant.
 
     Args:
         client: DataZone boto3 client
@@ -132,8 +139,8 @@ def _check_import_permissions(client, domain_id: str, project_id: str) -> List[s
         project_id: Target project identifier
 
     Returns:
-        List of missing policy type names. Empty list means all permissions
-        are present.
+        List of policy type names that could not be added. Empty list means
+        all permissions are present.
     """
     # Resolve the project's domain unit — grants live on the domain unit,
     # not on the project itself.
@@ -153,8 +160,10 @@ def _check_import_permissions(client, domain_id: str, project_id: str) -> List[s
         )
         return []
 
-    missing = []
+    failed = []
     for policy_type in _REQUIRED_POLICY_GRANTS:
+        # Check if grant already exists
+        already_granted = False
         try:
             resp = client.list_policy_grants(
                 domainIdentifier=domain_id,
@@ -162,18 +171,46 @@ def _check_import_permissions(client, domain_id: str, project_id: str) -> List[s
                 entityIdentifier=domain_unit_id,
                 policyType=policy_type,
             )
-            if not resp.get("grantList"):
-                missing.append(policy_type)
+            if resp.get("grantList"):
+                already_granted = True
         except ClientError as e:
-            if e.response["Error"]["Code"] == "AccessDeniedException":
-                # Can't even list grants — treat as missing
-                missing.append(policy_type)
-            else:
+            if e.response["Error"]["Code"] != "AccessDeniedException":
                 logger.warning("Error checking %s grant: %s", policy_type, e)
         except Exception as e:
             logger.warning("Error checking %s grant: %s", policy_type, e)
 
-    return missing
+        if already_granted:
+            continue
+
+        # Grant is missing — warn and attempt to add it
+        logger.warning(
+            "Policy grant %s is missing on domain unit %s",
+            policy_type, domain_unit_id,
+        )
+        logger.info(
+            "Attempting to add %s grant for project %s...",
+            policy_type, project_id,
+        )
+        try:
+            client.add_policy_grant(
+                domainIdentifier=domain_id,
+                entityType="DOMAIN_UNIT",
+                entityIdentifier=domain_unit_id,
+                policyType=policy_type,
+                principal={
+                    "project": {
+                        "projectDesignation": "OWNER",
+                        "projectIdentifier": project_id,
+                    }
+                },
+                detail={_POLICY_DETAIL_KEY[policy_type]: {}},
+            )
+            logger.info("Added %s policy grant for project %s", policy_type, project_id)
+        except Exception as e:
+            logger.error("Failed to add %s policy grant: %s", policy_type, e)
+            failed.append(policy_type)
+
+    return failed
 
 
 def _normalize_external_identifier(external_id: str) -> str:
@@ -1306,17 +1343,17 @@ def import_catalog(
     # Initialize client
     client = _get_datazone_client(region)
 
-    # Pre-flight permission check: verify the project's domain unit has the
+    # Pre-flight permission check: ensure the project's domain unit has the
     # required policy grants (CREATE_GLOSSARY, CREATE_FORM_TYPE, CREATE_ASSET_TYPE).
-    # Short-circuit before making any mutating API calls.
-    missing_grants = _check_import_permissions(client, domain_id, project_id)
-    if missing_grants:
-        missing_str = ", ".join(missing_grants)
+    # Missing grants are added automatically. Short-circuit only if grants
+    # could not be added.
+    failed_grants = _ensure_import_permissions(client, domain_id, project_id)
+    if failed_grants:
+        failed_str = ", ".join(failed_grants)
         raise PermissionError(
-            f"Catalog import aborted — the project's domain unit is missing "
-            f"required policy grants: {missing_str}. "
-            f"Add these grants in the DataZone console under the domain unit's "
-            f"policy grants before retrying."
+            f"Catalog import aborted — could not add required policy grants: "
+            f"{failed_str}. Add these grants manually in the DataZone console "
+            f"under the domain unit's policy grants before retrying."
         )
 
     # Build identifier mapping
