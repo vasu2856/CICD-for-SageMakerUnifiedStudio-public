@@ -79,6 +79,12 @@ app = typer.Typer(
 LOG_LEVEL = None
 
 
+def _version_callback(value: bool):
+    if value:
+        console.print(f"aws-smus-cicd-cli {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
 def main(
     ctx: typer.Context,
@@ -88,10 +94,26 @@ def main(
         help="Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
         case_sensitive=False,
     ),
+    show_version: bool = typer.Option(
+        None,
+        "--version",
+        "-v",
+        help="Show the CLI version and exit.",
+        is_eager=True,
+        callback=_version_callback,
+    ),
 ):
     """SMUS CI/CD CLI - Manage SageMaker Unified Studio CI/CD pipelines."""
     global LOG_LEVEL
     LOG_LEVEL = log_level
+
+
+@app.command(
+    "version", help="Show the CLI version.", rich_help_panel="Pipeline Commands"
+)
+def version():
+    """Show the installed version of aws-smus-cicd-cli."""
+    console.print(f"aws-smus-cicd-cli {__version__}")
 
 
 # Register commands with proper ordering

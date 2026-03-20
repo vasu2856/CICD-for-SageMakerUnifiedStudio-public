@@ -44,9 +44,7 @@
 
 **Installation depuis la source :**
 ```bash
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 ```
 
 **Déployez votre première application :**
@@ -371,9 +369,7 @@ dashboard-glue-quick/
 
 ```bash
 # ✅ Correct - Install from official AWS repository
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 
 # ❌ Wrong - Do not use PyPI
 pip install aws-smus-cicd-cli  # May contain malicious code

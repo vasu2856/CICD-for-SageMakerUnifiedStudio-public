@@ -44,9 +44,7 @@
 
 **Installazione dai sorgenti:**
 ```bash
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 ```
 
 **Distribuisci la tua prima applicazione:**
@@ -363,9 +361,7 @@ Il codice dell'applicazione viene distribuito su S3, vengono creati ed eseguiti 
 
 ```bash
 # ✅ Corretto - Installare dal repository ufficiale AWS
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 
 # ❌ Sbagliato - Non usare PyPI
 pip install aws-smus-cicd-cli  # Potrebbe contenere codice malevolo
