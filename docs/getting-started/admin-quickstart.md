@@ -438,7 +438,6 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Install SMUS CI/CD CLI
-        run: pip install aws-smus-cicd-cli- name: Install SMUS CI/CD CLI
         run: pip install aws-smus-cicd-cli
       
       - name: Configure AWS Credentials
