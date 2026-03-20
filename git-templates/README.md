@@ -201,7 +201,7 @@ jobs:
 ### Tests failing
 - Check application code and manifest
 - Review test logs in workflow output
-- Run `smus-cicd-cli test` locally to debug
+- Run `aws-smus-cicd-cli test` locally to debug
 
 ## Migration from Old Workflows
 
@@ -209,8 +209,8 @@ If you have existing workflows that directly call AWS APIs:
 
 1. **Identify AWS API calls** in your workflow
 2. **Replace with SMUS CI/CD CLI commands**:
-   - AWS API → `smus-cicd-cli deploy`
-   - Custom scripts → `smus-cicd-cli test`
+   - AWS API → `aws-smus-cicd-cli deploy`
+   - Custom scripts → `aws-smus-cicd-cli test`
 3. **Use reusable workflow** instead of custom logic
 4. **Configure parameters** for your application
 

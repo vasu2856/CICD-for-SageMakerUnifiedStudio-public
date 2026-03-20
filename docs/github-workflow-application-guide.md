@@ -334,7 +334,7 @@ jobs:
       manifest_path: 'model/manifest.yaml'
       test_branch: 'ml-model-test-branch'
       prod_branch: 'ml-model-prod-branch'
-      smus_cli_path: 'tools/smus-cicd-cli'  # Custom path
+      smus_cli_path: 'tools/aws-smus-cicd-cli'  # Custom path
     secrets:
       AWS_ROLE_ARN_TEST: ${{ secrets.AWS_ROLE_ARN_ML_TEST }}
       AWS_ROLE_ARN_PROD: ${{ secrets.AWS_ROLE_ARN_ML_PROD }}

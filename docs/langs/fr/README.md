@@ -8,6 +8,9 @@
 
 # SMUS CI/CD Pipeline CLI
 
+← [Back to Main README](../../../README.md)
+
+
 [![en](https://img.shields.io/badge/lang-en-brightgreen.svg?style=for-the-badge)](README.md)
 [![pt](https://img.shields.io/badge/lang-pt-gray.svg)](docs/langs/pt/README.md)
 [![fr](https://img.shields.io/badge/lang-fr-gray.svg)](docs/langs/fr/README.md)
@@ -52,16 +55,16 @@ pip install -e .
 **Déployez votre première application :**
 ```bash
 # Validate configuration
-smus-cicd-cli describe --manifest manifest.yaml --connect
+aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # Create deployment bundle (optional)
-smus-cicd-cli bundle --manifest manifest.yaml
+aws-smus-cicd-cli bundle --manifest manifest.yaml
 
 # Deploy to test environment
-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run validation tests
-smus-cicd-cli test --manifest manifest.yaml --targets test
+aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 **Voir en action :** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
@@ -90,7 +93,7 @@ smus-cicd-cli test --manifest manifest.yaml --targets test
 → **[Guide Administrateur](docs/getting-started/admin-quickstart.md)** - Configurez l'infrastructure et les pipelines en 15 minutes  
 → **[GitHub Workflow Templates](git-templates/)** - Modèles de workflow génériques et réutilisables pour le déploiement automatisé
 
-**The CLI is your abstraction layer: You just call `smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic.** (Le CLI est votre couche d'abstraction : Vous appelez simplement `smus-cicd-cli deploy` - le CLI gère toutes les interactions avec les services AWS. Vos workflows restent simples et génériques.)
+**The CLI is your abstraction layer: You just call `aws-smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic.** (Le CLI est votre couche d'abstraction : Vous appelez simplement `aws-smus-cicd-cli deploy` - le CLI gère toutes les interactions avec les services AWS. Vos workflows restent simples et génériques.)
 
 ---
 
@@ -162,7 +165,7 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 1. DevOps Team                 2. Data Team                    3. SMUS CI/CD CLI (The Abstraction)
    ↓                               ↓                              ↓
 Defines the PROCESS            Defines the CONTENT            Workflow calls:
-- Test on merge                - Glue jobs                    smus-cicd-cli deploy --manifest manifest.yaml
+- Test on merge                - Glue jobs                    aws-smus-cicd-cli deploy --manifest manifest.yaml
 - Approval for prod            - SageMaker training             ↓
 - Security scans               - Athena queries               CLI handles ALL AWS complexity:
 - Notification rules           - File structure               - DataZone APIs
@@ -201,7 +204,7 @@ service knowledge needed!
 - La logique métier
 
 **Résultat :**
-- **Les équipes DevOps n'appellent jamais directement les API AWS** - elles appellent simplement `smus-cicd-cli deploy`
+- **Les équipes DevOps n'appellent jamais directement les API AWS** - elles appellent simplement `aws-smus-cicd-cli deploy`
 - **Les workflows CI/CD sont génériques** - le même workflow fonctionne pour les applications Glue, SageMaker ou Bedrock
 - Les équipes de données ne touchent jamais aux configurations CI/CD
 - Les deux équipes travaillent indépendamment en utilisant leur expertise
@@ -286,7 +289,7 @@ cd CICD-for-SageMakerUnifiedStudio
 pip install -e .
 
 # ❌ Wrong - Do not use PyPI
-pip install smus-cicd-cli  # May contain malicious code
+pip install aws-smus-cicd-cli  # May contain malicious code
 ```
 
 ---

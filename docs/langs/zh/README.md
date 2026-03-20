@@ -8,6 +8,9 @@
 
 # SMUS CI/CD Pipeline CLI
 
+← [Back to Main README](../../../README.md)
+
+
 [![en](https://img.shields.io/badge/lang-en-brightgreen.svg?style=for-the-badge)](README.md)
 [![pt](https://img.shields.io/badge/lang-pt-gray.svg)](docs/langs/pt/README.md)
 [![fr](https://img.shields.io/badge/lang-fr-gray.svg)](docs/langs/fr/README.md)
@@ -62,16 +65,16 @@ pip install -e .
 **部署你的第一个应用：**
 ```bash
 # Validate configuration
-smus-cicd-cli describe --manifest manifest.yaml --connect
+aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # Create deployment bundle (optional)
-smus-cicd-cli bundle --manifest manifest.yaml
+aws-smus-cicd-cli bundle --manifest manifest.yaml
 
 # Deploy to test environment
-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run validation tests
-smus-cicd-cli test --manifest manifest.yaml --targets test
+aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 **查看实际运行效果：** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
@@ -100,7 +103,7 @@ smus-cicd-cli test --manifest manifest.yaml --targets test
 → **[管理员指南](docs/getting-started/admin-quickstart.md)** - 15分钟内配置基础设施和 pipeline  
 → **[GitHub Workflow 模板](git-templates/)** - 用于自动部署的通用、可重用 workflow 模板
 
-"The CLI is your abstraction layer: You just call `smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic." (CLI 是您的抽象层：您只需调用 `smus-cicd-cli deploy` - CLI 会处理所有 AWS 服务交互。您的 workflow 保持简单和通用。)
+"The CLI is your abstraction layer: You just call `aws-smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic." (CLI 是您的抽象层：您只需调用 `aws-smus-cicd-cli deploy` - CLI 会处理所有 AWS 服务交互。您的 workflow 保持简单和通用。)
 
 ---
 
@@ -172,7 +175,7 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 1. DevOps Team                 2. Data Team                    3. SMUS CI/CD CLI (The Abstraction)
    ↓                               ↓                              ↓
 Defines the PROCESS            Defines the CONTENT            Workflow calls:
-- Test on merge                - Glue jobs                    smus-cicd-cli deploy --manifest manifest.yaml
+- Test on merge                - Glue jobs                    aws-smus-cicd-cli deploy --manifest manifest.yaml
 - Approval for prod            - SageMaker training             ↓
 - Security scans               - Athena queries               CLI handles ALL AWS complexity:
 - Notification rules           - File structure               - DataZone APIs
@@ -211,7 +214,7 @@ service knowledge needed!
 - Business logic
 
 **结果：**
-- DevOps 团队从不直接调用 AWS API - 他们只需调用 `smus-cicd-cli deploy`
+- DevOps 团队从不直接调用 AWS API - 他们只需调用 `aws-smus-cicd-cli deploy`
 - CI/CD workflow 是通用的 - 同样的工作流适用于 Glue、SageMaker 或 Bedrock 应用
 - 数据团队从不接触 CI/CD 配置
 - 两个团队都能独立运用各自的专业知识工作
@@ -285,19 +288,19 @@ service knowledge needed!
 - 执行安全和合规策略
 - 示例：`.github/workflows/deploy.yml`
 
-**关键见解：**DevOps 团队创建适用于任何应用的通用、可重用 workflow。他们不需要知道应用是使用 Glue、SageMaker 还是 Bedrock - CLI 处理所有 AWS 服务交互。workflow 只需调用 `smus-cicd-cli deploy`，CLI 就会完成其余工作。
+**关键见解：**DevOps 团队创建适用于任何应用的通用、可重用 workflow。他们不需要知道应用是使用 Glue、SageMaker 还是 Bedrock - CLI 处理所有 AWS 服务交互。workflow 只需调用 `aws-smus-cicd-cli deploy`，CLI 就会完成其余工作。
 
 ### Deployment Modes
 
 **Bundle-based (Artifact):** (基于包的（制品）：)
 - 创建版本化归档 → 将归档部署到各阶段
 - 适用于：审计跟踪、回滚能力、合规性
-- 命令：`smus-cicd-cli bundle` 然后 `smus-cicd-cli deploy --manifest app.tar.gz`
+- 命令：`aws-smus-cicd-cli bundle` 然后 `aws-smus-cicd-cli deploy --manifest app.tar.gz`
 
 **Direct (Git-based):** (直接（基于 Git）：)
 - 直接从源代码部署，无中间制品
 - 适用于：更简单的工作流、快速迭代、git 作为真实来源
-- 命令：`smus-cicd-cli deploy --manifest manifest.yaml --stage test`
+- 命令：`aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test`
 
 这两种模式都适用于任何存储和 git 内容源的组合。
 
@@ -433,7 +436,7 @@ cd CICD-for-SageMakerUnifiedStudio
 pip install -e .
 
 # ❌ 错误 - 不要使用 PyPI
-pip install smus-cicd-cli  # 可能包含恶意代码
+pip install aws-smus-cicd-cli  # 可能包含恶意代码
 ```
 
 ---

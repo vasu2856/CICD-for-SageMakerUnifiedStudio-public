@@ -119,7 +119,7 @@ jobs:
         id: create
         run: |
           echo "📦 Creating bundle..."
-          smus-cicd-cli bundle \
+          aws-smus-cicd-cli bundle \
             --manifest ${{ inputs.manifest_path }} \
             --bundles-dir ./bundles \
             --version ${{ steps.version.outputs.bundle-version }}
@@ -192,7 +192,7 @@ jobs:
       - name: Deploy bundle to test
         run: |
           echo "🚀 Deploying bundle to test environment..."
-          smus-cicd-cli deploy \
+          aws-smus-cicd-cli deploy \
             --manifest ${{ inputs.manifest_path }} \
             --bundle ./bundle.tar.gz \
             test
@@ -205,7 +205,7 @@ jobs:
         id: run-tests
         run: |
           echo "🧪 Running tests in test..."
-          smus-cicd-cli test \
+          aws-smus-cicd-cli test \
             --manifest ${{ inputs.manifest_path }} \
             test
           echo "✅ Tests passed"
@@ -270,7 +270,7 @@ jobs:
       - name: Deploy bundle to production
         run: |
           echo "🚀 Deploying bundle to production environment..."
-          smus-cicd-cli deploy \
+          aws-smus-cicd-cli deploy \
             --manifest ${{ inputs.manifest_path }} \
             --bundle ./bundle.tar.gz \
             prod
@@ -282,7 +282,7 @@ jobs:
       - name: Run smoke tests
         run: |
           echo "🧪 Running smoke tests in production..."
-          smus-cicd-cli test \
+          aws-smus-cicd-cli test \
             --manifest ${{ inputs.manifest_path }} \
             prod
           echo "✅ Smoke tests passed"

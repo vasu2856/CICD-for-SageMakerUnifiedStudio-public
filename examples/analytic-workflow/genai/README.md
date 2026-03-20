@@ -41,10 +41,10 @@ genai/
 
 ```bash
 # Deploy to test environment
-smus-cicd-cli deploy test --manifest genai/manifest.yaml
+aws-smus-cicd-cli deploy test --manifest genai/manifest.yaml
 
 # Run workflow
-smus-cicd-cli run --workflow genai_dev_workflow --targets test --manifest genai/manifest.yaml
+aws-smus-cicd-cli run --workflow genai_dev_workflow --targets test --manifest genai/manifest.yaml
 ```
 # Trigger workflow
 

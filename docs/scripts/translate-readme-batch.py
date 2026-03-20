@@ -33,7 +33,7 @@ CRITICAL REQUIREMENTS:
 
 2. DO NOT translate:
    - Code blocks (bash, yaml, python, etc.) - keep 100% identical
-   - Command names: smus-cicd-cli, git, pip, etc.
+   - Command names: aws-smus-cicd-cli, git, pip, etc.
    - File names: manifest.yaml, README.md, etc.
    - URLs and links
    - AWS service names: SageMaker, Glue, Athena, DataZone, S3, etc.

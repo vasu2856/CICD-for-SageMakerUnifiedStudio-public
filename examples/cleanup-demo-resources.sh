@@ -19,8 +19,8 @@ echo "Project Name: $PROJECT_NAME"
 echo ""
 
 # Check if CLI is installed
-if ! command -v smus-cicd-cli &> /dev/null; then
-    echo "❌ smus-cicd-cli not found. Please install it first:"
+if ! command -v aws-smus-cicd-cli &> /dev/null; then
+    echo "❌ aws-smus-cicd-cli not found. Please install it first:"
     echo "   cd ."
     echo "   pip install -e ."
     exit 1
@@ -39,7 +39,7 @@ echo "🔍 Checking existing resources..."
 # List current targets to see what exists
 echo ""
 echo "Current pipeline targets:"
-smus-cicd-cli describe --bundle "$PIPELINE_FILE" --targets || echo "  No targets found or pipeline invalid"
+aws-smus-cicd-cli describe --bundle "$PIPELINE_FILE" --targets || echo "  No targets found or pipeline invalid"
 
 echo ""
 echo "🗑️  Cleaning up demo resources..."
@@ -47,7 +47,7 @@ echo "🗑️  Cleaning up demo resources..."
 # Delete test target (most common demo target)
 echo ""
 echo "Deleting test target..."
-smus-cicd-cli delete \
+aws-smus-cicd-cli delete \
   --bundle "$PIPELINE_FILE" \
   --targets test \
   --force || echo "  No test target to clean up"
@@ -55,7 +55,7 @@ smus-cicd-cli delete \
 # Delete staging target if it exists
 echo ""
 echo "Deleting staging target..."
-smus-cicd-cli delete \
+aws-smus-cicd-cli delete \
   --bundle "$PIPELINE_FILE" \
   --targets staging \
   --force || echo "  No staging target to clean up"
@@ -63,7 +63,7 @@ smus-cicd-cli delete \
 # Delete prod target if it exists
 echo ""
 echo "Deleting prod target..."
-smus-cicd-cli delete \
+aws-smus-cicd-cli delete \
   --bundle "$PIPELINE_FILE" \
   --targets prod \
   --force || echo "  No prod target to clean up"
@@ -72,7 +72,7 @@ smus-cicd-cli delete \
 echo ""
 echo "Deleting other demo targets..."
 for target in demo example marketing analytics; do
-    smus-cicd-cli delete \
+    aws-smus-cicd-cli delete \
       --bundle "$PIPELINE_FILE" \
       --targets "$target" \
       --force 2>/dev/null || echo "  No $target target to clean up"
@@ -87,7 +87,7 @@ echo "  - Use --force flag was used to avoid confirmation prompts"
 echo "  - Errors for non-existent targets are expected and ignored"
 echo ""
 echo "🔍 To verify cleanup, run:"
-echo "  smus-cicd-cli describe --bundle $PIPELINE_FILE --targets --connect"
+echo "  aws-smus-cicd-cli describe --bundle $PIPELINE_FILE --targets --connect"
 echo ""
 echo "💡 To clean up specific targets manually:"
-echo "  smus-cicd-cli delete --bundle $PIPELINE_FILE --targets <target-name> --force"
+echo "  aws-smus-cicd-cli delete --bundle $PIPELINE_FILE --targets <target-name> --force"
