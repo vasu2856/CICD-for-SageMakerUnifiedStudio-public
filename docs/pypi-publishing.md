@@ -42,7 +42,7 @@ The GitHub workflow will automatically:
 Once published, users can install with:
 
 ## ⚠️ Security Notice
-**DO NOT** install `smus-cicd-cli` from PyPI as it may contain malicious code.
+**DO NOT** install `aws-smus-cicd-cli` from PyPI as it may contain malicious code.
 The package name has been compromised. Always install from source:
 
 ```bash
@@ -61,7 +61,7 @@ Update version in both:
 ## Package Structure
 
 The package includes:
-- **CLI tool**: `smus-cicd-cli` command
+- **CLI tool**: `aws-smus-cicd-cli` command
 - **Python package**: `smus_cicd` module
 - **Dependencies**: Automatically installed
 - **Documentation**: README and docs included
@@ -78,7 +78,7 @@ python -m build
 pip install dist/smus_cicd_cli-*.whl
 
 # Test CLI
-smus-cicd-cli --help
+aws-smus-cicd-cli --help
 ```
 
 ## Workflow Details

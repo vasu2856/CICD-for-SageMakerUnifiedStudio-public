@@ -60,7 +60,7 @@ jobs:
       
       - name: Validate manifest
         run: |
-          smus-cicd-cli describe --manifest ${{ inputs.manifest_path }}
+          aws-smus-cicd-cli describe --manifest ${{ inputs.manifest_path }}
 
   deploy:
     name: Deploy to ${{ inputs.targets }}
@@ -94,7 +94,7 @@ jobs:
       
       - name: Deploy
         run: |
-          smus-cicd-cli deploy \
+          aws-smus-cicd-cli deploy \
             --manifest ${{ inputs.manifest_path }} \
             --targets ${{ inputs.targets }}
 
@@ -131,6 +131,6 @@ jobs:
       
       - name: Run tests
         run: |
-          smus-cicd-cli test \
+          aws-smus-cicd-cli test \
             --manifest ${{ inputs.manifest_path }} \
             --targets ${{ inputs.targets }}

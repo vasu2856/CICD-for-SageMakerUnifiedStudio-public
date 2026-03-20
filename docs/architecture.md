@@ -333,7 +333,7 @@ Provides tools for AI assistants (Amazon Q CLI) to:
 ### 1. Describe Command Flow
 
 ```
-User runs: smus-cicd-cli describe --manifest manifest.yaml --connect
+User runs: aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. CLI Layer (describe.py)                                  │
@@ -370,7 +370,7 @@ User runs: smus-cicd-cli describe --manifest manifest.yaml --connect
 
 ```
 
-User runs: smus-cicd-cli deploy --manifest manifest.yaml --targets test
+User runs: aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test
 
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. CLI Layer (deploy.py)                                    │
@@ -437,7 +437,7 @@ User runs: smus-cicd-cli deploy --manifest manifest.yaml --targets test
 ### 3. Monitor Command Flow
 
 ```
-User runs: smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
+User runs: aws-smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
 
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. CLI Layer (monitor.py)                                   │
@@ -505,7 +505,7 @@ User runs: smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
 │                        Validation Phase                                  │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cicd-cli describe --manifest manifest.yaml --connect             │  │
+│  │ aws-smus-cicd-cli describe --manifest manifest.yaml --connect             │  │
 │  │                                                                   │  │
 │  │ ✓ Validate YAML syntax                                           │  │
 │  │ ✓ Validate schema                                                │  │
@@ -521,7 +521,7 @@ User runs: smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
 │                        Bundle Phase (Optional)                           │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cicd-cli bundle --manifest manifest.yaml --targets test           │  │
+│  │ aws-smus-cicd-cli bundle --manifest manifest.yaml --targets test           │  │
 │  │                                                                   │  │
 │  │ 1. Download content from dev environment                         │  │
 │  │    - S3 files                                                    │  │
@@ -540,7 +540,7 @@ User runs: smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
 │                        Deployment Phase                                  │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cicd-cli deploy --manifest manifest.yaml --targets test          │  │
+│  │ aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test          │  │
 │  │                                                                   │  │
 │  │ Phase 1: Infrastructure Initialization                           │  │
 │  │ ├─ Resolve domain ID from tags                                   │  │
@@ -573,7 +573,7 @@ User runs: smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
 │                        Monitoring Phase                                  │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cicd-cli monitor --manifest manifest.yaml --targets test --live  │  │
+│  │ aws-smus-cicd-cli monitor --manifest manifest.yaml --targets test --live  │  │
 │  │                                                                   │  │
 │  │ ├─ Find workflow ARNs                                            │  │
 │  │ ├─ Poll workflow status                                          │  │
@@ -587,7 +587,7 @@ User runs: smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
 │                        Testing Phase                                     │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cicd-cli test --manifest manifest.yaml --targets test            │  │
+│  │ aws-smus-cicd-cli test --manifest manifest.yaml --targets test            │  │
 │  │                                                                   │  │
 │  │ ├─ Run integration tests                                         │  │
 │  │ ├─ Validate data quality                                         │  │
@@ -603,7 +603,7 @@ User runs: smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
 │  Repeat deployment for next stage (test → prod)                         │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ smus-cicd-cli deploy --manifest manifest.yaml --targets prod          │  │
+│  │ aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod          │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -692,10 +692,10 @@ User runs: smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
 │                        SMUS CI/CD CLI                                    │
 │                                                                          │
 │  Commands executed:                                                     │
-│  1. smus-cicd-cli describe --manifest manifest.yaml --connect           │
-│  2. smus-cicd-cli deploy --manifest manifest.yaml --targets test        │
-│  3. smus-cicd-cli test --manifest manifest.yaml --targets test          │
-│  4. smus-cicd-cli deploy --manifest manifest.yaml --targets prod        │
+│  1. aws-smus-cicd-cli describe --manifest manifest.yaml --connect           │
+│  2. aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test        │
+│  3. aws-smus-cicd-cli test --manifest manifest.yaml --targets test          │
+│  4. aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod        │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1135,15 +1135,15 @@ Workflow:
 Artifact Promotion
 
 1. Create bundle from dev:
-   smus-cicd-cli bundle --manifest manifest.yaml
+   aws-smus-cicd-cli bundle --manifest manifest.yaml
 
 2. Store bundle in artifact repository
 
 3. Deploy bundle to test:
-   smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets test
+   aws-smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets test
 
 4. Promote to prod:
-   smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets prod
+   aws-smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets prod
 ```
 
 ### 3. Tag-Based Deployment

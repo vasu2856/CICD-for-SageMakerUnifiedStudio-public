@@ -114,22 +114,22 @@ jobs:
           python-version: '3.11'
       
       - name: Install SMUS CI/CD CLI
-        run: pip install smus-cicd-cli
+        run: pip install aws-smus-cicd-cli
       
       - name: Deploy to Dev
         if: github.ref == 'refs/heads/main'
-        run: smus-cicd-cli deploy --manifest manifest.yaml --targets dev
+        run: aws-smus-cicd-cli deploy --manifest manifest.yaml --targets dev
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       
       - name: Deploy to Test
         if: github.ref == 'refs/heads/main'
-        run: smus-cicd-cli deploy --manifest manifest.yaml --targets test
+        run: aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test
       
       - name: Deploy to Prod (Manual Approval)
         if: github.event_name == 'workflow_dispatch'
-        run: smus-cicd-cli deploy --manifest manifest.yaml --targets prod
+        run: aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
 ```
 
 This workflow will:

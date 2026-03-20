@@ -140,7 +140,7 @@ def show_status():
 
     else:
         print("❌ MCP Server: Not registered")
-        print("   Run: smus-cicd-cli integrate qcli")
+        print("   Run: aws-smus-cicd-cli integrate qcli")
 
     return 0
 
@@ -158,7 +158,7 @@ def uninstall_integration():
         return 1
 
     print("✅ MCP server removed")
-    print("\nTo reinstall: smus-cicd-cli integrate qcli")
+    print("\nTo reinstall: aws-smus-cicd-cli integrate qcli")
 
     return 0
 

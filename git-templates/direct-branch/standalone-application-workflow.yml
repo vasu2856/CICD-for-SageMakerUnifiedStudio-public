@@ -78,7 +78,7 @@ jobs:
       - name: Validate manifest structure
         run: |
           echo "📋 Validating manifest structure..."
-          smus-cicd-cli describe --manifest ${{ steps.setup.outputs.manifest-path }}
+          aws-smus-cicd-cli describe --manifest ${{ steps.setup.outputs.manifest-path }}
           echo "✅ Manifest structure is valid"
         env:
           SMUS_LOG_LEVEL: WARNING
@@ -124,7 +124,7 @@ jobs:
       - name: Validate connections
         run: |
           echo "� Validatning AWS connections..."
-          smus-cicd-cli describe \
+          aws-smus-cicd-cli describe \
             --manifest ${{ needs.validate.outputs.manifest-path }} \
             --connect
           echo "✅ Connections validated"
@@ -136,7 +136,7 @@ jobs:
       - name: Deploy to test
         run: |
           echo "🚀 Deploying to test environment..."
-          smus-cicd-cli deploy \
+          aws-smus-cicd-cli deploy \
             --manifest ${{ needs.validate.outputs.manifest-path }} \
             test
           echo "✅ Deployed to test"
@@ -149,7 +149,7 @@ jobs:
         id: run-tests
         run: |
           echo "🧪 Running tests in test..."
-          smus-cicd-cli test \
+          aws-smus-cicd-cli test \
             --manifest ${{ needs.validate.outputs.manifest-path }} \
             test
           echo "✅ Tests passed"
@@ -209,7 +209,7 @@ jobs:
       - name: Validate connections
         run: |
           echo "� Validatning AWS connections..."
-          smus-cicd-cli describe \
+          aws-smus-cicd-cli describe \
             --manifest ${{ needs.validate.outputs.manifest-path }} \
             --connect
           echo "✅ Connections validated"
@@ -221,7 +221,7 @@ jobs:
       - name: Deploy to production
         run: |
           echo "🚀 Deploying to production environment..."
-          smus-cicd-cli deploy \
+          aws-smus-cicd-cli deploy \
             --manifest ${{ needs.validate.outputs.manifest-path }} \
             prod
           echo "✅ Deployed to production"
@@ -233,7 +233,7 @@ jobs:
       - name: Run smoke tests
         run: |
           echo "🧪 Running smoke tests in production..."
-          smus-cicd-cli test \
+          aws-smus-cicd-cli test \
             --manifest ${{ needs.validate.outputs.manifest-path }} \
             prod
           echo "✅ Smoke tests passed"
