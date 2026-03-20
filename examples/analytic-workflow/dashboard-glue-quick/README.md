@@ -66,7 +66,7 @@ echo "✓ Granted S3 access to QuickSight service role"
 Deploy the complete application (Glue jobs, workflows, and QuickSight dashboard) to dev:
 
 ```bash
-smus-cicd-cli deploy --targets dev --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml
+aws-smus-cicd-cli deploy --targets dev --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml
 ```
 
 This will:
@@ -89,7 +89,7 @@ The dashboard will be named `TotalDeathByCountry` with ID prefix `deployed-dev-c
 Export the customized dashboard from dev QuickSight:
 
 ```bash
-smus-cicd-cli bundle --targets dev --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml
+aws-smus-cicd-cli bundle --targets dev --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml
 ```
 
 This exports the live dashboard from dev QuickSight and packages it into `./artifacts/IntegrationTestETLWorkflow.zip`.
@@ -138,7 +138,7 @@ Create a project with the name matching the one set in the manifest file under t
 
 **Deploy the bundled application to test:**
 ```bash
-smus-cicd-cli deploy --targets test --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml
+aws-smus-cicd-cli deploy --targets test --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml
 ```
 
 This will:
@@ -222,13 +222,13 @@ python setup_test_dashboard.py
 
 # 4. Bundle from the clean dashboard
 cd ../../../..
-smus-cicd-cli bundle \
+aws-smus-cicd-cli bundle \
   --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml \
   --targets dev \
   --output-dir ./my-bundles
 
 # 5. Deploy to test
-smus-cicd-cli deploy \
+aws-smus-cicd-cli deploy \
   --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml \
   --targets test \
   --bundle-archive-path ./my-bundles/*.zip

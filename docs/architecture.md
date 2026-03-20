@@ -886,15 +886,15 @@ Workflow:
 Artifact Promotion
 
 1. Create bundle from dev:
-   smus-cicd-cli bundle --manifest manifest.yaml
+   aws-smus-cicd-cli bundle --manifest manifest.yaml
 
 2. Store bundle in artifact repository
 
 3. Deploy bundle to test:
-   smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets test
+   aws-smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets test
 
 4. Promote to prod:
-   smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets prod
+   aws-smus-cicd-cli deploy --bundle Bundle-MyApp-test-*.zip --targets prod
 ```
 
 ### 3. Tag-Based Deployment

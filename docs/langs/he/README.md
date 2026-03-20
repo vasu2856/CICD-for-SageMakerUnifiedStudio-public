@@ -81,16 +81,16 @@ pip install -e .
 
 ```bash
 # Validate configuration
-smus-cicd-cli describe --manifest manifest.yaml --connect
+aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # Create deployment bundle (optional)
-smus-cicd-cli bundle --manifest manifest.yaml
+aws-smus-cicd-cli bundle --manifest manifest.yaml
 
 # Deploy to test environment
-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run validation tests
-smus-cicd-cli test --manifest manifest.yaml --targets test
+aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 </div>
@@ -127,7 +127,7 @@ smus-cicd-cli test --manifest manifest.yaml --targets test
 → **[מדריך למנהל מערכת](docs/getting-started/admin-quickstart.md)** - הגדירו תשתית ו-pipeline תוך 15 דקות  
 → **[תבניות GitHub Workflow](git-templates/)** - תבניות workflow גנריות וניתנות לשימוש חוזר עבור פריסה אוטומטית
 
-**ה-CLI הוא שכבת ההפשטה שלכם:** אתם פשוט קוראים ל-`smus-cicd-cli deploy` - ה-CLI מטפל בכל האינטראקציות עם שירותי AWS‏ (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM וכו'). ה-workflow שלכם נשאר פשוט וגנרי.
+**ה-CLI הוא שכבת ההפשטה שלכם:** אתם פשוט קוראים ל-`aws-smus-cicd-cli deploy` - ה-CLI מטפל בכל האינטראקציות עם שירותי AWS‏ (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM וכו'). ה-workflow שלכם נשאר פשוט וגנרי.
 
 ---
 
@@ -214,7 +214,7 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 1. DevOps Team                 2. Data Team                    3. SMUS CI/CD CLI (The Abstraction)
    ↓                               ↓                              ↓
 Defines the PROCESS            Defines the CONTENT            Workflow calls:
-- Test on merge                - Glue jobs                    smus-cicd-cli deploy --manifest manifest.yaml
+- Test on merge                - Glue jobs                    aws-smus-cicd-cli deploy --manifest manifest.yaml
 - Approval for prod            - SageMaker training             ↓
 - Security scans               - Athena queries               CLI handles ALL AWS complexity:
 - Notification rules           - File structure               - DataZone APIs
@@ -257,7 +257,7 @@ service knowledge needed!
 - Business logic
 
 **Result:** 
-- **DevOps teams never call AWS APIs directly** - they just call `smus-cicd-cli deploy`
+- **DevOps teams never call AWS APIs directly** - they just call `aws-smus-cicd-cli deploy`
 - **CI/CD workflows are generic** - same workflow works for Glue apps, SageMaker apps, or Bedrock apps
 - Data teams never touch CI/CD configs
 - Both teams work independently using their expertise
@@ -326,17 +326,17 @@ GitHub Actions workflows (or other CI/CD systems) that automate deployment:
 - Enforces security and compliance policies
 - Example: `.github/workflows/deploy.yml`
 
-**Key insight:** DevOps teams create generic, reusable workflows that work for ANY application. They don't need to know if the app uses Glue, SageMaker, or Bedrock - the CLI handles all AWS service interactions. The workflow just calls `smus-cicd-cli deploy` and the CLI does the rest.
+**Key insight:** DevOps teams create generic, reusable workflows that work for ANY application. They don't need to know if the app uses Glue, SageMaker, or Bedrock - the CLI handles all AWS service interactions. The workflow just calls `aws-smus-cicd-cli deploy` and the CLI does the rest.
 
 ### Deployment Modes
 
 **Bundle-based (Artifact):** Create versioned archive → deploy archive to stages
 - Good for: audit trails, rollback capability, compliance
-- Command: `smus-cicd-cli bundle` then `smus-cicd-cli deploy --manifest app.tar.gz`
+- Command: `aws-smus-cicd-cli bundle` then `aws-smus-cicd-cli deploy --manifest app.tar.gz`
 
 **Direct (Git-based):** Deploy directly from sources without intermediate artifacts
 - Good for: simpler workflows, rapid iteration, git as source of truth
-- Command: `smus-cicd-cli deploy --manifest manifest.yaml --stage test`
+- Command: `aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test`
 
 Both modes work with any combination of storage and git content sources.
 
@@ -425,7 +425,7 @@ cd CICD-for-SageMakerUnifiedStudio
 pip install -e .
 
 # ❌ לא נכון - אין להשתמש ב-PyPI
-pip install smus-cicd-cli  # עלול להכיל קוד זדוני
+pip install aws-smus-cicd-cli  # עלול להכיל קוד זדוני
 ```
 
 </div>

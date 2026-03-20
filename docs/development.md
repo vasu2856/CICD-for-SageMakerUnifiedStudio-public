@@ -29,10 +29,10 @@ For detailed information about integration tests and example pipelines, see [Exa
 
 ### Local Development
 1. **Update code** in dev environment S3 location
-2. **Create bundle**: `smus-cicd-cli bundle` (downloads latest from dev)
-3. **Deploy to test**: `smus-cicd-cli deploy --targets test` (deploys and triggers workflows)
+2. **Create bundle**: `aws-smus-cicd-cli bundle` (downloads latest from dev)
+3. **Deploy to test**: `aws-smus-cicd-cli deploy --targets test` (deploys and triggers workflows)
 4. **Verify execution**: Check workflow runs in SageMaker Unified Studio console
-5. **Deploy to prod**: `smus-cicd-cli deploy --stages prod` (when ready)
+5. **Deploy to prod**: `aws-smus-cicd-cli deploy --stages prod` (when ready)
 
 ### GitHub Actions Integration
 The repository includes automated workflows for development:

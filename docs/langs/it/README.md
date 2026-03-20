@@ -55,16 +55,16 @@ pip install -e .
 **Distribuisci la tua prima applicazione:**
 ```bash
 # Valida la configurazione
-smus-cicd-cli describe --manifest manifest.yaml --connect
+aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # Crea il bundle di distribuzione (opzionale)
-smus-cicd-cli bundle --manifest manifest.yaml
+aws-smus-cicd-cli bundle --manifest manifest.yaml
 
 # Distribuisci nell'ambiente di test
-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Esegui i test di validazione
-smus-cicd-cli test --manifest manifest.yaml --targets test
+aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 **Guardalo in azione:** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
@@ -93,7 +93,7 @@ smus-cicd-cli test --manifest manifest.yaml --targets test
 → **[Guida Amministratore](docs/getting-started/admin-quickstart.md)** - Configura infrastruttura e pipeline in 15 minuti  
 → **[Template Workflow GitHub](git-templates/)** - Template di workflow generici e riutilizzabili per il deployment automatizzato
 
-"The CLI is your abstraction layer: You just call `smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic." (La CLI è il tuo livello di astrazione: Devi solo chiamare `smus-cicd-cli deploy` - la CLI gestisce tutte le interazioni con i servizi AWS. I tuoi workflow rimangono semplici e generici.)
+"The CLI is your abstraction layer: You just call `aws-smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic." (La CLI è il tuo livello di astrazione: Devi solo chiamare `aws-smus-cicd-cli deploy` - la CLI gestisce tutte le interazioni con i servizi AWS. I tuoi workflow rimangono semplici e generici.)
 
 ---
 
@@ -164,7 +164,7 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 1. DevOps Team                 2. Data Team                    3. SMUS CI/CD CLI (The Abstraction)
    ↓                               ↓                              ↓
 Defines the PROCESS            Defines the CONTENT            Workflow calls:
-- Test on merge                - Glue jobs                    smus-cicd-cli deploy --manifest manifest.yaml
+- Test on merge                - Glue jobs                    aws-smus-cicd-cli deploy --manifest manifest.yaml
 - Approval for prod            - SageMaker training             ↓
 - Security scans               - Athena queries               CLI handles ALL AWS complexity:
 - Notification rules           - File structure               - DataZone APIs
@@ -203,7 +203,7 @@ service knowledge needed!
 - Logica di business
 
 **Risultato:**
-- **I team DevOps non chiamano mai direttamente le API AWS** - eseguono solo `smus-cicd-cli deploy`
+- **I team DevOps non chiamano mai direttamente le API AWS** - eseguono solo `aws-smus-cicd-cli deploy`
 - **I workflow CI/CD sono generici** - lo stesso workflow funziona per applicazioni Glue, SageMaker o Bedrock
 - I team di dati non toccano mai le configurazioni CI/CD
 - Entrambi i team lavorano in modo indipendente usando le proprie competenze
@@ -226,11 +226,11 @@ Un file YAML dichiarativo (`manifest.yaml`) che definisce la tua applicazione da
 
 **Bundle-based (Basato su Artifact):** Crea archivio versionato → deploya l'archivio agli stage
 - Vantaggioso per: tracciabilità, capacità di rollback, conformità
-- Comando: `smus-cicd-cli bundle` poi `smus-cicd-cli deploy --manifest app.tar.gz`
+- Comando: `aws-smus-cicd-cli bundle` poi `aws-smus-cicd-cli deploy --manifest app.tar.gz`
 
 **Direct (Basato su Git):** Deploya direttamente dai sorgenti senza artifact intermedi
 - Vantaggioso per: workflow più semplici, iterazione rapida, git come fonte di verità
-- Comando: `smus-cicd-cli deploy --manifest manifest.yaml --stage test`
+- Comando: `aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test`
 
 Entrambe le modalità funzionano con qualsiasi combinazione di storage e sorgenti git.
 
@@ -327,7 +327,7 @@ cd CICD-for-SageMakerUnifiedStudio
 pip install -e .
 
 # ❌ Sbagliato - Non usare PyPI
-pip install smus-cicd-cli  # Potrebbe contenere codice malevolo
+pip install aws-smus-cicd-cli  # Potrebbe contenere codice malevolo
 ```
 
 ---

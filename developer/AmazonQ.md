@@ -274,7 +274,7 @@ python3 tests/scripts/analyze_notebook_errors.py tests/test-outputs/notebooks --
 # Quick test examples:
 # Notebook: python -c "import papermill as pm; pm.execute_notebook('nb.ipynb', '/tmp/out.ipynb', parameters={'p': 'v'})"
 # Manifest: python -c "from smus_cicd.application.application_manifest import ApplicationManifest; m = ApplicationManifest.from_file('manifest.yaml'); print(m.initialization)"
-# CLI: smus-cicd-cli describe --manifest manifest.yaml
+# CLI: aws-smus-cicd-cli describe --manifest manifest.yaml
 
 # Run full integration test only after fix confirmed working
 ```
@@ -875,7 +875,7 @@ Use temp directory with unique run ID to prevent stale artifacts:
 ```yaml
 # Bundle step
 BUNDLE_DIR="${{ runner.temp }}/smus-bundles-${{ github.run_id }}"
-smus-cicd-cli bundle --output-dir "$BUNDLE_DIR"
+aws-smus-cicd-cli bundle --output-dir "$BUNDLE_DIR"
 
 # Upload
 path: ${{ env.BUNDLE_DIR }}/*.zip
@@ -885,7 +885,7 @@ path: ${{ runner.temp }}/smus-bundles-${{ github.run_id }}
 
 # Deploy
 BUNDLE_FILE=$(ls ${{ runner.temp }}/smus-bundles-${{ github.run_id }}/*.zip | head -1)
-smus-cicd-cli deploy --bundle-archive-path "$BUNDLE_FILE"
+aws-smus-cicd-cli deploy --bundle-archive-path "$BUNDLE_FILE"
 ```
 
 **Impact:** Clean isolation per run, no stale artifacts, guaranteed only uploads what was just created.

@@ -145,7 +145,7 @@ jobs:
         AWS_ACCOUNT_ID: ${{ steps.aws-account.outputs.account-id }}
       run: |
         echo "Testing describe --connect with basic_app manifest"
-        smus-cicd-cli describe --connect --targets test --manifest tests/integration/basic_app/manifest.yaml || echo "Describe failed"
+        aws-smus-cicd-cli describe --connect --targets test --manifest tests/integration/basic_app/manifest.yaml || echo "Describe failed"
     
     - name: Run test
       env:

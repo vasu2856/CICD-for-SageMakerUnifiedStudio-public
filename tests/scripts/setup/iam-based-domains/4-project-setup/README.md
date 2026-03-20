@@ -36,5 +36,5 @@ Run Stage 5 to deploy testing infrastructure (MLflow, test data, etc.).
 ## Note
 
 Test and prod projects are created automatically by the CLI when needed:
-- `smus-cicd-cli initialize test`
-- `smus-cicd-cli initialize prod`
+- `aws-smus-cicd-cli initialize test`
+- `aws-smus-cicd-cli initialize prod`

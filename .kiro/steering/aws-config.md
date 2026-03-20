@@ -317,7 +317,7 @@ Use temp directory with unique run ID to prevent stale artifacts:
 ```yaml
 # Bundle step
 BUNDLE_DIR="${{ runner.temp }}/smus-bundles-${{ github.run_id }}"
-smus-cicd-cli bundle --output-dir "$BUNDLE_DIR"
+aws-smus-cicd-cli bundle --output-dir "$BUNDLE_DIR"
 
 # Upload
 path: ${{ env.BUNDLE_DIR }}/*.zip
@@ -327,7 +327,7 @@ path: ${{ runner.temp }}/smus-bundles-${{ github.run_id }}
 
 # Deploy
 BUNDLE_FILE=$(ls ${{ runner.temp }}/smus-bundles-${{ github.run_id }}/*.zip | head -1)
-smus-cicd-cli deploy --bundle-archive-path "$BUNDLE_FILE"
+aws-smus-cicd-cli deploy --bundle-archive-path "$BUNDLE_FILE"
 ```
 
 **Impact:** Clean isolation per run, no stale artifacts, guaranteed only uploads what was just created.

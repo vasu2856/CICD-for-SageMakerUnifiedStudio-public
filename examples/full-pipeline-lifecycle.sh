@@ -114,50 +114,50 @@ PIPELINE_NAME="DemoMarketingPipeline"
 PIPELINE_FILE="${PIPELINE_NAME}.yaml"
 
 # Step 1: Create pipeline manifest
-run_command "smus-cicd-cli create --name \"$PIPELINE_NAME\" --domain-id \"$DOMAIN_ID\" --dev-project-id \"$DEV_PROJECT_ID\" --output \"$PIPELINE_FILE\""
+run_command "aws-smus-cicd-cli create --name \"$PIPELINE_NAME\" --domain-id \"$DOMAIN_ID\" --dev-project-id \"$DEV_PROJECT_ID\" --output \"$PIPELINE_FILE\""
 
 pause_if_needed
 
 # Step 2: Validate pipeline configuration
-run_command "smus-cicd-cli describe --bundle \"$PIPELINE_FILE\" --workflows --connections --connect --output TEXT"
+run_command "aws-smus-cicd-cli describe --bundle \"$PIPELINE_FILE\" --workflows --connections --connect --output TEXT"
 
 pause_if_needed
 
 # Step 3: Create deployment bundle
-run_command "smus-cicd-cli bundle --bundle \"$PIPELINE_FILE\" --targets dev --output JSON"
+run_command "aws-smus-cicd-cli bundle --bundle \"$PIPELINE_FILE\" --targets dev --output JSON"
 
 pause_if_needed
 
 # Step 4: Deploy to test environment
-run_command "smus-cicd-cli deploy --bundle \"$PIPELINE_FILE\" --targets test"
+run_command "aws-smus-cicd-cli deploy --bundle \"$PIPELINE_FILE\" --targets test"
 
 pause_if_needed
 
 # Step 5: Run tests
-run_command "smus-cicd-cli test --bundle \"$PIPELINE_FILE\" --targets test"
+run_command "aws-smus-cicd-cli test --bundle \"$PIPELINE_FILE\" --targets test"
 
 pause_if_needed
 
 # Step 6: Monitor pipeline
-run_command "smus-cicd-cli monitor --bundle \"$PIPELINE_FILE\" --output TEXT"
+run_command "aws-smus-cicd-cli monitor --bundle \"$PIPELINE_FILE\" --output TEXT"
 
 pause_if_needed
 
 # Step 7: Execute workflow commands
-run_command "smus-cicd-cli run --bundle \"$PIPELINE_FILE\" --targets dev --workflow test_dag --command \"dags trigger test_dag\""
+run_command "aws-smus-cicd-cli run --bundle \"$PIPELINE_FILE\" --targets dev --workflow test_dag --command \"dags trigger test_dag\""
 
 pause_if_needed
 
-run_command "smus-cicd-cli run --bundle \"$PIPELINE_FILE\" --targets dev --workflow test_dag --command \"tasks list test_dag\""
+run_command "aws-smus-cicd-cli run --bundle \"$PIPELINE_FILE\" --targets dev --workflow test_dag --command \"tasks list test_dag\""
 
 pause_if_needed
 
-run_command "smus-cicd-cli run --bundle \"$PIPELINE_FILE\" --targets dev --workflow test_dag --command \"tasks state test_dag hello_world \$(date -u +'manual__%Y-%m-%dT%H:%M:%S+00:00')\""
+run_command "aws-smus-cicd-cli run --bundle \"$PIPELINE_FILE\" --targets dev --workflow test_dag --command \"tasks state test_dag hello_world \$(date -u +'manual__%Y-%m-%dT%H:%M:%S+00:00')\""
 
 pause_if_needed
 
 # Step 8: Cleanup
-run_command "smus-cicd-cli delete --targets test --bundle \"$PIPELINE_FILE\" --force"
+run_command "aws-smus-cicd-cli delete --targets test --bundle \"$PIPELINE_FILE\" --force"
 
 if [ "$PAUSE_MODE" = true ]; then
     echo ""
