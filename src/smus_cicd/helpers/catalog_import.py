@@ -185,11 +185,13 @@ def _ensure_import_permissions(client, domain_id: str, project_id: str) -> List[
         # Grant is missing — warn and attempt to add it
         logger.warning(
             "Policy grant %s is missing on domain unit %s",
-            policy_type, domain_unit_id,
+            policy_type,
+            domain_unit_id,
         )
         logger.info(
             "Attempting to add %s grant for project %s...",
-            policy_type, project_id,
+            policy_type,
+            project_id,
         )
         try:
             client.add_policy_grant(
@@ -591,10 +593,11 @@ def _resolve_target_data_source(
             return None
 
         def _build_result(ds_id: str) -> Dict[str, str]:
-            return {
-                "dataSourceId": ds_id,
-                "dataSourceRunId": _get_latest_run_id(ds_id),
-            }
+            run_id = _get_latest_run_id(ds_id)
+            result: Dict[str, str] = {"dataSourceId": ds_id}
+            if run_id is not None:
+                result["dataSourceRunId"] = run_id
+            return result
 
         # If no database_name, just return the first candidate
         if not database_name:
@@ -758,28 +761,28 @@ def _normalize_forms_input_for_api(
                     continue
 
             # Remap typeRevision to the target domain's current revision
-            form_id = form_copy.get("typeIdentifier", "")
+            form_id = str(form_copy.get("typeIdentifier", ""))
             if "typeRevision" in form_copy:
-                resolved = _resolve_revision(form_id, form_copy["typeRevision"])
+                resolved = _resolve_revision(form_id, str(form_copy["typeRevision"]))
                 if resolved:
                     form_copy["typeRevision"] = resolved
             normalized.append(form_copy)
         return normalized
 
     if resource_type == "assetTypes" and isinstance(forms_input, dict):
-        normalized = {}
+        normalized_dict: Dict[str, Dict[str, Any]] = {}
         for form_name, form_config in forms_input.items():
             config_copy = dict(form_config)
             if "typeName" in config_copy and "typeIdentifier" not in config_copy:
                 config_copy["typeIdentifier"] = config_copy.pop("typeName")
             # Remap typeRevision to the target domain's current revision
-            form_id = config_copy.get("typeIdentifier", form_name)
+            form_id = str(config_copy.get("typeIdentifier", form_name))
             if "typeRevision" in config_copy:
-                resolved = _resolve_revision(form_id, config_copy["typeRevision"])
+                resolved = _resolve_revision(form_id, str(config_copy["typeRevision"]))
                 if resolved:
                     config_copy["typeRevision"] = resolved
-            normalized[form_name] = config_copy
-        return normalized
+            normalized_dict[form_name] = config_copy
+        return normalized_dict
 
     return forms_input
 
