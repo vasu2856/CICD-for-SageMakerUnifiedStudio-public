@@ -34,9 +34,7 @@ As an admin, you'll configure:
 ## Step 1: Install the CLI
 
 ```bash
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 ```
 
 ---
@@ -404,10 +402,7 @@ jobs:
           python-version: '3.9'
       
       - name: Install SMUS CI/CD CLI
-        run: |
-          git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-          cd CICD-for-SageMakerUnifiedStudio
-          pip install -e .
+        run: pip install aws-smus-cicd-cli
       
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -443,10 +438,8 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Install SMUS CI/CD CLI
-        run: |
-          git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-          cd CICD-for-SageMakerUnifiedStudio
-          pip install -e .
+        run: pip install aws-smus-cicd-cli- name: Install SMUS CI/CD CLI
+        run: pip install aws-smus-cicd-cli
       
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2

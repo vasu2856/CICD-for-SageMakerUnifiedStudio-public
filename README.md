@@ -34,11 +34,9 @@ Deploy Airflow DAGs, Jupyter notebooks, and ML workflows from development to pro
 
 ## Quick Start
 
-**Install from source:**
+**Install:**
 ```bash
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 ```
 
 **Deploy your first application:**
@@ -1151,16 +1149,16 @@ genai_dev_workflow:
 
 ## Security Notice
 
-⚠️ **DO NOT** install from PyPI - always install from official AWS source code.
+Always install from the official AWS PyPI package or source code.
 
 ```bash
-# ✅ Correct - Install from official AWS repository
+# ✅ Correct - Install from official AWS PyPI package
+pip install aws-smus-cicd-cli
+
+# ✅ Also correct - Install from official AWS source code
 git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
 cd CICD-for-SageMakerUnifiedStudio
 pip install -e .
-
-# ❌ Wrong - Do not use PyPI
-pip install aws-smus-cicd-cli  # May contain malicious code
 ```
 
 ---

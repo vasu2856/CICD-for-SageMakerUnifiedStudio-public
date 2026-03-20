@@ -35,9 +35,7 @@ Implante DAGs do Airflow, notebooks Jupyter e workflows de ML do desenvolvimento
 
 **Instalar do código fonte:**
 ```bash
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 ```
 
 **Implante sua primeira aplicação:**
@@ -835,9 +833,7 @@ stages:
 
 ```bash
 # ✅ Correto - Instalar do repositório oficial da AWS
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 
 # ❌ Errado - Não use PyPI
 pip install aws-smus-cicd-cli  # Pode conter código malicioso

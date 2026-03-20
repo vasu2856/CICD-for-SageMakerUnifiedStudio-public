@@ -1,3 +1,8 @@
 """SMUS CI/CD CLI package."""
 
-__version__ = "0.1.1"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("aws-smus-cicd-cli")
+except PackageNotFoundError:
+    __version__ = "unknown"

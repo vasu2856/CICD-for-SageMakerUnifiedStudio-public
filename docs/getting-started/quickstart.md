@@ -21,9 +21,13 @@
 ## Step 1: Install the CLI
 
 ```bash
+pip install aws-smus-cicd-cli
+```
+
+To use the bundled examples, also clone the repository:
+
+```bash
 git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
 ```
 
 ---
@@ -33,7 +37,7 @@ pip install -e .
 Copy the data notebooks example:
 
 ```bash
-cp -r examples/analytic-workflow/data-notebooks my-notebook-app
+cp -r CICD-for-SageMakerUnifiedStudio/examples/analytic-workflow/data-notebooks my-notebook-app
 cd my-notebook-app
 ```
 

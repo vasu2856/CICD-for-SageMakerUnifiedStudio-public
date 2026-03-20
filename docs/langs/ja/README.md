@@ -53,9 +53,7 @@
 
 **ソースからインストール:**
 ```bash
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 ```
 
 **最初のアプリケーションをデプロイ:**
@@ -417,9 +415,7 @@ data-notebooks/
 
 ```bash
 # ✅ 正しい方法 - AWSの公式リポジトリからインストール
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 
 # ❌ 誤った方法 - PyPIを使用しないでください
 pip install aws-smus-cicd-cli  # 悪意のあるコードが含まれている可能性があります
