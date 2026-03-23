@@ -35,22 +35,24 @@
 
 ## 为什么选择 SMUS CI/CD CLI？
 
-✅ **AWS Abstraction Layer - CLI encapsulates all AWS analytics, ML, and SMUS complexity - DevOps teams never call AWS APIs directly**
-(AWS 抽象层 - CLI 封装了所有 AWS 分析、机器学习和 SMUS 的复杂性 - DevOps 团队无需直接调用 AWS API)
+✅ **AWS Abstraction Layer** - CLI encapsulates all AWS analytics, ML, and SMUS complexity - DevOps teams never call AWS APIs directly
+（AWS 抽象层 - CLI 封装了所有 AWS 分析、机器学习和 SMUS 的复杂性 - DevOps 团队无需直接调用 AWS API）
 
-✅ **Separation of Concerns - Data teams define WHAT to deploy (manifest.yaml), DevOps teams define HOW and WHEN (CI/CD workflows)**
-(关注点分离 - 数据团队定义需要部署什么(manifest.yaml)，DevOps 团队定义如何以及何时部署(CI/CD workflows))
+✅ **Separation of Concerns** - Data teams define WHAT to deploy (manifest.yaml), DevOps teams define HOW and WHEN (CI/CD workflows)
+（关注点分离 - 数据团队定义需要部署什么（manifest.yaml），DevOps 团队定义如何以及何时部署（CI/CD workflows））
 
-✅ **Generic CI/CD Workflows - Same workflow works for Glue, SageMaker, Bedrock, QuickSight, or any AWS service combination**
-(通用 CI/CD 工作流 - 同一工作流适用于 Glue、SageMaker、Bedrock、QuickSight 或任何 AWS 服务组合)
+✅ **Generic CI/CD Workflows** - Same workflow works for Glue, SageMaker, Bedrock, QuickSight, or any AWS service combination
+（通用 CI/CD 工作流 - 同一工作流适用于 Glue、SageMaker、Bedrock、QuickSight 或任何 AWS 服务组合）
 
-✅ **自动化测试和验证确保生产环境部署的可靠性**
+✅ **Deploy with Confidence** - Automated testing and validation before production
+（自信部署 - 生产环境前进行自动化测试和验证）
 
 ✅ **多环境管理 - 通过环境特定配置从测试环境到生产环境**
 
 ✅ **基础设施即代码 - 版本控制的应用程序 manifest 和可重现的部署**
 
-✅ **事件驱动工作流 - 通过 EventBridge 在部署时自动触发工作流**
+✅ **Event-Driven Workflows** - Trigger workflows automatically via EventBridge on deployment
+（事件驱动工作流 - 通过 EventBridge 在部署时自动触发工作流）
 
 ---
 
@@ -84,25 +86,25 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 
 ### 👨‍💻 数据团队（数据科学家、数据工程师、生成式 AI 应用开发者）
 **您专注于:** 您的应用 - 部署什么、部署到哪里以及如何运行  
-**您定义:** 包含代码、workflow 和配置的应用程序 manifest (`manifest.yaml`)  
-"You don't need to know: CI/CD pipelines, GitHub Actions, deployment automation" (您无需了解: CI/CD pipeline、GitHub Actions、部署自动化)
+**您定义:** 包含代码、workflow 和配置的应用 manifest (`manifest.yaml`)  
+**您无需了解:** CI/CD pipeline、GitHub Actions、部署自动化  
 
 → **[快速入门指南](docs/getting-started/quickstart.md)** - 10分钟内部署您的第一个应用  
 
 **包含以下示例:**
-"Data Engineering (Glue, Notebooks, Athena)" (数据工程)  
-"ML Workflows (SageMaker, Notebooks)" (机器学习工作流)  
-"GenAI Applications (Bedrock, Notebooks)" (生成式 AI 应用)
+- Data Engineering (Glue, Notebooks, Athena)
+- ML Workflows (SageMaker, Notebooks) 
+- GenAI Applications (Bedrock, Notebooks)
 
 ### 🔧 DevOps 团队
 **您专注于:** CI/CD 最佳实践、安全性、合规性和部署自动化  
 **您定义:** 强制执行测试、审批和晋升策略的 workflow 模板  
-"You don't need to know: Application-specific details, AWS services used, DataZone APIs, SMUS project structures, or business logic" (您无需了解：应用程序具体细节、使用的 AWS 服务、DataZone API、SMUS 项目结构或业务逻辑)
+**您无需了解:** 应用程序具体细节、AWS 服务使用情况、DataZone API、SMUS 项目结构或业务逻辑  
 
 → **[管理员指南](docs/getting-started/admin-quickstart.md)** - 15分钟内配置基础设施和 pipeline  
 → **[GitHub Workflow 模板](git-templates/)** - 用于自动部署的通用、可重用 workflow 模板
 
-"The CLI is your abstraction layer: You just call `aws-smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic." (CLI 是您的抽象层：您只需调用 `aws-smus-cicd-cli deploy` - CLI 会处理所有 AWS 服务交互。您的 workflow 保持简单和通用。)
+**CLI 是您的抽象层:** 您只需调用 `aws-smus-cicd-cli deploy` - CLI 会处理所有 AWS 服务交互 (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM 等)。您的 workflow 保持简单和通用。
 
 ---
 
@@ -195,16 +197,16 @@ service knowledge needed!
 - 部署编排
 - 监控和告警
 
-**SMUS CI/CD CLI handles ALL AWS complexity:** (SMUS CI/CD CLI 处理所有 AWS 复杂性：)
-- DataZone domain and project management
-- AWS Glue, Athena, SageMaker, MWAA APIs
-- S3 storage and artifact management
-- IAM roles and permissions
-- Connection configurations
-- Catalog asset subscriptions
-- Workflow deployment to Airflow
-- Infrastructure provisioning
-- Testing and validation
+**SMUS CI/CD CLI 处理所有 AWS 复杂性：**
+- DataZone 域和项目管理
+- AWS Glue、Athena、SageMaker、MWAA APIs
+- S3 存储和工件管理
+- IAM 角色和权限
+- 连接配置
+- 目录资产订阅
+- 工作流部署到 Airflow
+- 基础设施配置
+- 测试和验证
 
 **数据团队专注于：**
 - 应用代码和工作流
@@ -224,7 +226,7 @@ service knowledge needed!
 一个声明式 YAML 文件（`manifest.yaml`），用于定义您的数据应用：
 - **应用详情** - 名称、版本、描述
 - **内容** - 来自 git 仓库的代码、来自存储的数据/模型、QuickSight 仪表板
-- **工作流** - 用于编排和自动化的 Airflow DAG
+- **工作流** - 用于编排和自动化的 Airflow DAGs
 - **阶段** - 部署位置（开发、测试、生产环境）
 - **配置** - 特定环境的设置、连接和引导操作
 
@@ -236,12 +238,12 @@ service knowledge needed!
 - Jupyter notebook 和数据文件
 - ML 模型和训练代码
 - ETL pipeline 和转换
-- GenAI agent 和 MCP 服务器
-- 基础模型配置
+- GenAI agents 和 MCP servers
+- Foundation model 配置
 
 ### Stage
 映射到 SageMaker Unified Studio 项目的部署环境（开发、测试、生产）：
-- Domain 和区域配置
+- 域和区域配置
 - 项目名称和设置
 - 资源连接（S3、Airflow、Athena、Glue）
 - 特定环境的参数
@@ -271,7 +273,7 @@ service knowledge needed!
 - 数据处理和转换
 - 模型训练和推理
 
-工作流以 YAML 格式定义为 Airflow DAG（有向无环图）。支持 [MWAA (Managed Workflows for Apache Airflow)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) 和 [Amazon MWAA Serverless](https://aws.amazon.com/blogs/big-data/introducing-amazon-mwaa-serverless/) ([用户指南](https://docs.aws.amazon.com/mwaa/latest/mwaa-serverless-userguide/what-is-mwaa-serverless.html))。
+工作流以 YAML 格式定义为 Airflow DAGs（有向无环图）。支持 [MWAA (Managed Workflows for Apache Airflow)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) 和 [Amazon MWAA Serverless](https://aws.amazon.com/blogs/big-data/introducing-amazon-mwaa-serverless/) ([User Guide](https://docs.aws.amazon.com/mwaa/latest/mwaa-serverless-userguide/what-is-mwaa-serverless.html))。
 
 ### CI/CD Automation
 自动化部署的 GitHub Actions workflow（或其他 CI/CD 系统）：
@@ -294,7 +296,7 @@ service knowledge needed!
 - 适用于：更简单的工作流、快速迭代、git 作为真实来源
 - 命令：`aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test`
 
-这两种模式都适用于任何存储和 git 内容源的组合。
+两种模式都适用于任何存储和 git 内容源的组合。
 
 ---
 
@@ -306,7 +308,7 @@ service knowledge needed!
 
 部署交互式 BI 仪表板,使用自动化 Glue ETL 管道进行数据准备。使用 QuickSight 资产包、Athena 查询和 GitHub 数据集集成,支持环境特定配置。
 
-**AWS 服务:** QuickSight • Glue • Athena • S3 • MWAA Serverless
+**AWS Services:** QuickSight • Glue • Athena • S3 • MWAA Serverless
 
 **GitHub Workflow:** [analytic-dashboard-glue-quicksight.yml](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/workflows/analytic-dashboard-glue-quicksight.yml)
 
@@ -455,7 +457,7 @@ Deploy GenAI applications with Bedrock agents and knowledge bases. Demonstrates 
 
 ---
 
-## 安全须知
+## 安全提示
 
 请始终从官方 AWS PyPI 软件包或源代码进行安装。
 

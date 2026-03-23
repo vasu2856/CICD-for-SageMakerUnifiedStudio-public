@@ -327,10 +327,10 @@ dashboard-glue-quick/
 ```
 
 **主要ファイル:**
-- **Glue Jobs**: データベース設定、ETL、検証用のPythonスクリプト
-- **Workflow**: オーケストレーション用のAirflow DAG定義YAML
-- **QuickSight Bundle**: ダッシュボード、データセット、データソース
-- **Tests**: データ品質とダッシュボード機能の検証
+- **Glueジョブ**: データベース設定、ETL、検証用のPythonスクリプト
+- **ワークフロー**: オーケストレーション用のAirflow DAG定義YAML
+- **QuickSightバンドル**: ダッシュボード、データセット、データソース
+- **テスト**: データ品質とダッシュボード機能の検証
 
 </details>
 

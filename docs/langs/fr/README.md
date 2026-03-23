@@ -81,12 +81,12 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 → **[Guide de Démarrage Rapide](docs/getting-started/quickstart.md)** - Déployez votre première application en 10 minutes
 
 **Inclut des exemples pour :**
-- Data Engineering (Glue, Notebooks, Athena)
-- ML Workflows (SageMaker, Notebooks) 
-- GenAI Applications (Bedrock, Notebooks)
+"Data Engineering (Glue, Notebooks, Athena)" (Ingénierie des données)
+"ML Workflows (SageMaker, Notebooks)" (Workflows d'apprentissage automatique)
+"GenAI Applications (Bedrock, Notebooks)" (Applications GenAI)
 
 ### 🔧 Équipes DevOps
-**Votre focus :** Les bonnes pratiques CI/CD, la sécurité, la conformité et l'automatisation des déploiements  
+**Votre focus :** Les bonnes pratiques CI/CD, la sécurité, la conformité et l'automatisation du déploiement  
 **Vous définissez :** Des modèles de workflow qui imposent les tests, les approbations et les politiques de promotion  
 **Vous n'avez pas besoin de connaître :** Les détails spécifiques aux applications, les services AWS utilisés, les APIs DataZone, les structures de projet SMUS, ou la logique métier
 
@@ -120,13 +120,13 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 
 **📓 Code & Workflows**
 - Jupyter notebooks
-- Scripts Python
+- Python scripts
 - Airflow DAGs (MWAA et Amazon MWAA Serverless)
 - Lambda functions (futur)
 
 **💾 Données & Stockage**
-- Fichiers S3
-- Dépôts Git
+- S3 data files
+- Git repositories
 - Data catalogs (futur)
 
 ---
@@ -153,14 +153,13 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 
 ## Concepts Fondamentaux
 
-### Séparation des Préoccupations : Le Principe de Conception Clé
+### Séparation des Responsabilités : Le Principe de Conception Clé
 
 "The Problem: Traditional deployment approaches force DevOps teams to learn AWS analytics services (Glue, Athena, DataZone, SageMaker, MWAA, etc.) and understand SMUS project structures, or force data teams to become CI/CD experts." (Le problème : Les approches traditionnelles de déploiement forcent les équipes DevOps à apprendre les services d'analyse AWS et à comprendre les structures de projet SMUS, ou forcent les équipes de données à devenir des experts en CI/CD.)
 
-"The Solution: SMUS CI/CD CLI is the abstraction layer that encapsulates all AWS and SMUS complexity." (La solution : SMUS CI/CD CLI est la couche d'abstraction qui encapsule toute la complexité AWS et SMUS.)
+**La Solution :** SMUS CI/CD CLI est la couche d'abstraction qui encapsule toute la complexité AWS et SMUS.
 
-**Exemple de workflow :**
-
+**Example workflow:**
 ```
 1. DevOps Team                 2. Data Team                    3. SMUS CI/CD CLI (The Abstraction)
    ↓                               ↓                              ↓
@@ -186,16 +185,16 @@ service knowledge needed!
 - L'orchestration des déploiements
 - La surveillance et les alertes
 
-"SMUS CI/CD CLI handles ALL AWS complexity:" (SMUS CI/CD CLI gère TOUTE la complexité AWS :)
-- DataZone domain and project management
-- AWS Glue, Athena, SageMaker, MWAA APIs
-- S3 storage and artifact management
-- IAM roles and permissions
-- Connection configurations
-- Catalog asset subscriptions
-- Workflow deployment to Airflow
-- Infrastructure provisioning
-- Testing and validation
+**SMUS CI/CD CLI gère TOUTE la complexité AWS :**
+- Gestion des domaines et projets DataZone
+- APIs AWS Glue, Athena, SageMaker, MWAA
+- Gestion du stockage S3 et des artefacts
+- Rôles et permissions IAM
+- Configurations des connexions
+- Souscriptions aux ressources du catalogue
+- Déploiement des workflows vers Airflow
+- Provisionnement de l'infrastructure
+- Tests et validation
 
 **Les équipes de données se concentrent sur :**
 - Le code applicatif et les workflows
