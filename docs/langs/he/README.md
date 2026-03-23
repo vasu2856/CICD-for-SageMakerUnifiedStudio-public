@@ -61,9 +61,7 @@
 <div dir="ltr">
 
 ```bash
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 ```
 
 </div>
@@ -418,9 +416,7 @@ Note: I've started the translation but since there is a lot of technical content
 
 ```bash
 # ✅ נכון - התקנה ממאגר AWS הרשמי
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 
 # ❌ לא נכון - אין להשתמש ב-PyPI
 pip install aws-smus-cicd-cli  # עלול להכיל קוד זדוני
