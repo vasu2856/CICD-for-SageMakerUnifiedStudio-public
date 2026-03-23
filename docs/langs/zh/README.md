@@ -8,9 +8,6 @@
 
 # SMUS CI/CD Pipeline CLI
 
-← [Back to Main README](../../../README.md)
-
-
 [![en](https://img.shields.io/badge/lang-en-brightgreen.svg?style=for-the-badge)](README.md)
 [![pt](https://img.shields.io/badge/lang-pt-gray.svg)](docs/langs/pt/README.md)
 [![fr](https://img.shields.io/badge/lang-fr-gray.svg)](docs/langs/fr/README.md)
@@ -27,29 +24,32 @@
 
 "Deploy Airflow DAGs, Jupyter notebooks, and ML workflows from development to production with confidence. Built for data scientists, data engineers, ML engineers, and GenAI app developers working with DevOps teams." (从开发环境到生产环境可靠地部署Airflow DAG、Jupyter笔记本和ML工作流。专为与DevOps团队合作的数据科学家、数据工程师、ML工程师和GenAI应用开发人员打造。)
 
-"Works with your deployment strategy: Whether you use git branches (branch-based), versioned artifacts (bundle-based), git tags (tag-based), or direct deployment - this CLI supports your workflow. Define your application once, deploy it your way." (适用于您的部署策略：无论您使用git分支（基于分支）、版本化制品（基于bundle）、git标签（基于标签）还是直接部署 - 此CLI都支持您的工作流程。只需定义一次应用程序，就可以按照您的方式进行部署。)
+"Works with your deployment strategy: Whether you use git branches (branch-based), versioned artifacts (bundle-based), git tags (tag-based), or direct deployment - this CLI supports your workflow. Define your application once, deploy it your way." (适用于您的部署策略：无论您使用git分支（基于分支）、版本化制品（基于bundle）、git标签（基于标签）还是直接部署 - 此CLI都支持您的工作流程。只需定义一次应用程序，按照您的方式部署。)
 
 ---
 
 ## 为什么选择 SMUS CI/CD CLI？
 
-✅ **AWS Abstraction Layer - CLI encapsulates all AWS analytics, ML, and SMUS complexity - DevOps teams never call AWS APIs directly**
-(AWS 抽象层 - CLI 封装了所有 AWS 分析、机器学习和 SMUS 的复杂性 - DevOps 团队无需直接调用 AWS API)
+✅ **AWS Abstraction Layer** - CLI encapsulates all AWS analytics, ML, and SMUS complexity - DevOps teams never call AWS APIs directly
+（AWS 抽象层 - CLI 封装了所有 AWS 分析、机器学习和 SMUS 的复杂性 - DevOps 团队无需直接调用 AWS API）
 
-✅ **Separation of Concerns - Data teams define WHAT to deploy (manifest.yaml), DevOps teams define HOW and WHEN (CI/CD workflows)**
-(关注点分离 - 数据团队定义需要部署什么(manifest.yaml)，DevOps 团队定义如何以及何时部署(CI/CD workflows))
+✅ **Separation of Concerns** - Data teams define WHAT to deploy (manifest.yaml), DevOps teams define HOW and WHEN (CI/CD workflows)
+（关注点分离 - 数据团队定义需要部署什么（manifest.yaml），DevOps 团队定义如何以及何时部署（CI/CD workflows））
 
-✅ **Generic CI/CD Workflows - Same workflow works for Glue, SageMaker, Bedrock, QuickSight, or any AWS service combination**
-(通用 CI/CD 工作流 - 同一工作流适用于 Glue、SageMaker、Bedrock、QuickSight 或任何 AWS 服务组合)
+✅ **Generic CI/CD Workflows** - Same workflow works for Glue, SageMaker, Bedrock, QuickSight, or any AWS service combination
+（通用 CI/CD 工作流 - 同一工作流适用于 Glue、SageMaker、Bedrock、QuickSight 或任何 AWS 服务组合）
 
-✅ **自动化测试和验证确保生产环境部署的可靠性**
+✅ **Deploy with Confidence** - Automated testing and validation before production
+（自信部署 - 生产环境前进行自动化测试和验证）
 
-✅ **多环境管理 - 从测试环境到生产环境，具有环境特定的配置**
+✅ **Multi-Environment Management** - Test → Prod with environment-specific configuration
+（多环境管理 - 使用环境特定配置从测试过渡到生产环境）
 
-✅ **Infrastructure as Code - Version-controlled application manifests and reproducible deployments**
-(基础设施即代码 - 版本控制的应用程序清单和可重现的部署)
+✅ **Infrastructure as Code** - Version-controlled application manifests and reproducible deployments
+（基础设施即代码 - 版本控制的应用程序 manifest 和可重现的部署）
 
-✅ **事件驱动工作流 - 通过 EventBridge 在部署时自动触发工作流**
+✅ **Event-Driven Workflows** - Trigger workflows automatically via EventBridge on deployment
+（事件驱动工作流 - 通过 EventBridge 在部署时自动触发工作流）
 
 ---
 
@@ -85,25 +85,25 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 
 ### 👨‍💻 数据团队（数据科学家、数据工程师、生成式 AI 应用开发者）
 **您专注于:** 您的应用 - 部署什么、部署到哪里以及如何运行  
-**您定义:** 包含代码、workflow 和配置的应用程序 manifest (`manifest.yaml`)  
-"You don't need to know: CI/CD pipelines, GitHub Actions, deployment automation" (您无需了解: CI/CD pipeline、GitHub Actions、部署自动化)
+**您定义:** 包含代码、workflow 和配置的应用 manifest (`manifest.yaml`)  
+**您无需了解:** CI/CD pipeline、GitHub Actions、部署自动化  
 
 → **[快速入门指南](docs/getting-started/quickstart.md)** - 10分钟内部署您的第一个应用  
 
 **包含以下示例:**
-"Data Engineering (Glue, Notebooks, Athena)" (数据工程)  
-"ML Workflows (SageMaker, Notebooks)" (机器学习工作流)  
-"GenAI Applications (Bedrock, Notebooks)" (生成式 AI 应用)
+- Data Engineering (Glue, Notebooks, Athena)
+- ML Workflows (SageMaker, Notebooks) 
+- GenAI Applications (Bedrock, Notebooks)
 
 ### 🔧 DevOps 团队
 **您专注于:** CI/CD 最佳实践、安全性、合规性和部署自动化  
 **您定义:** 强制执行测试、审批和晋升策略的 workflow 模板  
-"You don't need to know: Application-specific details, AWS services used, DataZone APIs, SMUS project structures, or business logic" (您无需了解：应用程序具体细节、使用的 AWS 服务、DataZone API、SMUS 项目结构或业务逻辑)
+**您无需了解:** 应用程序具体细节、AWS 服务使用情况、DataZone API、SMUS 项目结构或业务逻辑  
 
 → **[管理员指南](docs/getting-started/admin-quickstart.md)** - 15分钟内配置基础设施和 pipeline  
 → **[GitHub Workflow 模板](git-templates/)** - 用于自动部署的通用、可重用 workflow 模板
 
-"The CLI is your abstraction layer: You just call `aws-smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic." (CLI 是您的抽象层：您只需调用 `aws-smus-cicd-cli deploy` - CLI 会处理所有 AWS 服务交互。您的 workflow 保持简单和通用。)
+**CLI 是您的抽象层:** 您只需调用 `aws-smus-cicd-cli deploy` - CLI 会处理所有 AWS 服务交互 (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM 等)。您的 workflow 保持简单和通用。
 
 ---
 
@@ -190,80 +190,76 @@ No ML/Analytics/GenAI
 service knowledge needed!
 ```
 
-**DevOps teams focus on:** (DevOps 团队专注于：)
-- CI/CD best practices (testing, approvals, notifications)
-- Security and compliance gates
-- Deployment orchestration
-- Monitoring and alerting
+**DevOps 团队专注于：**
+- CI/CD 最佳实践（测试、审批、通知）
+- 安全和合规检查
+- 部署编排
+- 监控和告警
 
-**SMUS CI/CD CLI handles ALL AWS complexity:** (SMUS CI/CD CLI 处理所有 AWS 复杂性：)
-- DataZone domain and project management
-- AWS Glue, Athena, SageMaker, MWAA APIs
-- S3 storage and artifact management
-- IAM roles and permissions
-- Connection configurations
-- Catalog asset subscriptions
-- Workflow deployment to Airflow
-- Infrastructure provisioning
-- Testing and validation
+**SMUS CI/CD CLI 处理所有 AWS 复杂性：**
+- DataZone 域和项目管理
+- AWS Glue、Athena、SageMaker、MWAA APIs
+- S3 存储和工件管理
+- IAM 角色和权限
+- 连接配置
+- 目录资产订阅
+- 工作流部署到 Airflow
+- 基础设施配置
+- 测试和验证
 
-**Data teams focus on:** (数据团队专注于：)
-- Application code and workflows
-- Which AWS services to use (Glue, Athena, SageMaker, etc.)
-- Environment configurations
-- Business logic
+**数据团队专注于：**
+- 应用代码和工作流
+- 选择使用哪些 AWS 服务（Glue、Athena、SageMaker 等）
+- 环境配置
+- 业务逻辑
 
 **结果：**
-- DevOps 团队从不直接调用 AWS API - 他们只需调用 `aws-smus-cicd-cli deploy`
-- CI/CD workflow 是通用的 - 同样的工作流适用于 Glue、SageMaker 或 Bedrock 应用
+- **DevOps teams never call AWS APIs directly - they just call `aws-smus-cicd-cli deploy`** (DevOps 团队从不直接调用 AWS APIs - 他们只需调用 `aws-smus-cicd-cli deploy`)
+- **CI/CD workflows are generic** - same workflow works for Glue apps, SageMaker apps, or Bedrock apps (CI/CD 工作流是通用的 - 同样的工作流适用于 Glue、SageMaker 或 Bedrock 应用)
 - 数据团队从不接触 CI/CD 配置
-- 两个团队都能独立运用各自的专业知识工作
+- 两个团队都能独立运用各自的专长工作
 
 ---
 
-### Application Manifest
-
+### Application Manifest (应用清单)
 一个声明式 YAML 文件（`manifest.yaml`）定义您的数据应用：
 - **应用详情** - 名称、版本、描述
 - **内容** - 来自 git 仓库的代码、来自存储的数据/模型、QuickSight 仪表板
-- **工作流** - 用于编排和自动化的 Airflow DAG
+- **工作流** - 用于编排和自动化的 Airflow DAGs
 - **阶段** - 部署位置（开发、测试、生产环境）
 - **配置** - 特定环境的设置、连接和引导操作
 
 **由数据团队创建和拥有。**定义**部署什么**和**部署到哪里**。无需 CI/CD 知识。
 
-### Application
-
-您要部署的数据/分析工作负载：
-- Airflow DAG 和 Python 脚本
-- Jupyter notebook 和数据文件
+### Application (应用)
+您正在部署的数据/分析工作负载：
+- Airflow DAGs 和 Python 脚本
+- Jupyter notebooks 和数据文件
 - ML 模型和训练代码
 - ETL pipeline 和转换
-- GenAI agent 和 MCP 服务器
-- 基础模型配置
+- GenAI agents 和 MCP servers
+- Foundation model 配置
 
-### Stage
-
+### Stage (阶段)
 映射到 SageMaker Unified Studio 项目的部署环境（开发、测试、生产）：
-- Domain 和区域配置
+- 域和区域配置
 - 项目名称和设置
 - 资源连接（S3、Airflow、Athena、Glue）
 - 特定环境的参数
 - 基于 git 部署的可选分支映射
 
-### Stage-to-Project Mapping
+### Stage-to-Project Mapping (阶段到项目的映射)
 
 每个应用阶段部署到专用的 SageMaker Unified Studio (SMUS) 项目。根据您的架构和 CI/CD 方法，一个项目可以托管单个应用或多个应用。阶段项目是具有自己治理的独立实体：
 
 - **所有权和访问：**每个阶段项目都有自己的所有者和贡献者，可能与开发项目不同。生产项目通常比开发环境有更严格的访问限制。
-- **多域和多区域：**阶段项目可以属于不同的 SMUS domain、AWS 账户和区域。例如，您的开发阶段可能部署到 us-east-1 的开发域，而生产部署到 eu-west-1 的生产域。
+- **多域和多区域：**阶段项目可以属于不同的 SMUS 域、AWS 账户和区域。例如，您的开发阶段可能部署到 us-east-1 的开发域，而生产环境部署到 eu-west-1 的生产域。
 - **灵活架构：**组织可以根据安全、合规和运营要求，选择每个应用专用项目（隔离）或托管多个应用的共享项目（整合）。
 
 这种分离实现了真正的环境隔离，具有独立的访问控制、合规边界和区域数据驻留要求。
 
-### Workflow
-
-执行应用的编排逻辑。工作流有两个用途：
+### Workflow (工作流)
+执行您的应用的编排逻辑。工作流有两个用途：
 
 **1. 部署时：**在部署期间创建所需的 AWS 资源
 - 配置基础设施（S3 存储桶、数据库、IAM 角色）
@@ -276,33 +272,30 @@ service knowledge needed!
 - 数据处理和转换
 - 模型训练和推理
 
-工作流以 YAML 格式定义为 Airflow DAG（有向无环图）。支持 [MWAA (Managed Workflows for Apache Airflow)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) 和 [Amazon MWAA Serverless](https://aws.amazon.com/blogs/big-data/introducing-amazon-mwaa-serverless/) ([用户指南](https://docs.aws.amazon.com/mwaa/latest/mwaa-serverless-userguide/what-is-mwaa-serverless.html))。
+工作流以 YAML 格式定义为 Airflow DAGs（有向无环图）。支持 [MWAA (Managed Workflows for Apache Airflow)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) 和 [Amazon MWAA Serverless](https://aws.amazon.com/blogs/big-data/introducing-amazon-mwaa-serverless/) ([User Guide](https://docs.aws.amazon.com/mwaa/latest/mwaa-serverless-userguide/what-is-mwaa-serverless.html))。
 
-### CI/CD Automation
-
+### CI/CD Automation (CI/CD 自动化)
 自动化部署的 GitHub Actions workflow（或其他 CI/CD 系统）：
 - **由 DevOps 团队创建和拥有**
 - 定义**如何**和**何时**部署
-- 运行测试和质量门控
+- 运行测试和质量检查
 - 管理跨目标的升级
 - 执行安全和合规策略
 - 示例：`.github/workflows/deploy.yml`
 
-**关键见解：**DevOps 团队创建适用于任何应用的通用、可重用 workflow。他们不需要知道应用是使用 Glue、SageMaker 还是 Bedrock - CLI 处理所有 AWS 服务交互。workflow 只需调用 `aws-smus-cicd-cli deploy`，CLI 就会完成其余工作。
+**关键见解：**DevOps teams create generic, reusable workflows that work for ANY application. They don't need to know if the app uses Glue, SageMaker, or Bedrock - the CLI handles all AWS service interactions. The workflow just calls `aws-smus-cicd-cli deploy` and the CLI does the rest. (DevOps 团队创建适用于任何应用的通用、可重用工作流。他们不需要知道应用是使用 Glue、SageMaker 还是 Bedrock - CLI 处理所有 AWS 服务交互。工作流只需调用 `aws-smus-cicd-cli deploy`，CLI 会处理其余部分。)
 
-### Deployment Modes
+### Deployment Modes (部署模式)
 
-**Bundle-based (Artifact):** (基于包的（制品）：)
-- 创建版本化归档 → 将归档部署到各阶段
+**Bundle-based (Artifact):** (基于包的（工件）：)创建版本化归档 → 将归档部署到各阶段
 - 适用于：审计跟踪、回滚能力、合规性
 - 命令：`aws-smus-cicd-cli bundle` 然后 `aws-smus-cicd-cli deploy --manifest app.tar.gz`
 
-**Direct (Git-based):** (直接（基于 Git）：)
-- 直接从源代码部署，无中间制品
-- 适用于：更简单的工作流、快速迭代、git 作为真实来源
+**Direct (Git-based):** (直接（基于 Git）：)无需中间工件，直接从源代码部署
+- 适用于：更简单的工作流、快速迭代、以 git 为事实来源
 - 命令：`aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test`
 
-这两种模式都适用于任何存储和 git 内容源的组合。
+两种模式都适用于任何存储和 git 内容源的组合。
 
 ---
 
@@ -312,13 +305,13 @@ service knowledge needed!
 
 ### 📊 分析 - QuickSight 仪表板
 
-部署交互式 BI 仪表板,包含用于数据准备的自动化 Glue ETL 管道。使用 QuickSight 资产包、Athena 查询和 GitHub 数据集集成,支持环境特定配置。
+部署交互式 BI 仪表板,使用自动化的 Glue ETL 管道进行数据准备。使用 QuickSight 资产包、Athena 查询和 GitHub 数据集集成,支持环境特定配置。
 
-**AWS 服务:** QuickSight • Glue • Athena • S3 • MWAA Serverless
+**AWS Services:** QuickSight • Glue • Athena • S3 • MWAA Serverless
 
 **GitHub Workflow:** [analytic-dashboard-glue-quicksight.yml](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/workflows/analytic-dashboard-glue-quicksight.yml)
 
-**部署过程中发生的事情:** 应用代码部署到 S3,创建并执行 Glue 作业和 Airflow 工作流,创建 QuickSight 仪表板/数据源/数据集,并启动 QuickSight 摄取以使用最新数据刷新仪表板。
+**部署过程中发生的事情:** 应用代码被部署到 S3,创建并执行 Glue 作业和 Airflow 工作流,创建 QuickSight 仪表板/数据源/数据集,并启动 QuickSight 摄取以使用最新数据刷新仪表板。
 
 <details>
 <summary><b>📁 应用结构</b></summary>
@@ -338,7 +331,7 @@ dashboard-glue-quick/
 
 **关键文件:**
 - **Glue 作业**: 用于数据库设置、ETL 和验证的 Python 脚本
-- **工作流**: 定义用于编排的 Airflow DAG
+- **工作流**: 定义编排的 Airflow DAG 的 YAML
 - **QuickSight 包**: 仪表板、数据集和数据源
 - **测试**: 验证数据质量和仪表板功能
 
@@ -350,46 +343,48 @@ dashboard-glue-quick/
 
 ### 📓 数据工程 - Notebooks
 
-"Deploy Jupyter notebooks with parallel execution orchestration for data analysis and ETL workflows" (部署 Jupyter notebooks,通过并行执行编排进行数据分析和 ETL 工作流。展示了与 MLflow 集成的 notebook 部署,用于实验跟踪。)
+Deploy Jupyter notebooks with parallel execution orchestration for data analysis and ETL workflows. Demonstrates notebook deployment with MLflow integration for experiment tracking.
+
+(部署 Jupyter notebooks,支持并行执行编排用于数据分析和 ETL 工作流。展示了与 MLflow 集成的 notebook 部署,用于实验跟踪。)
 
 **AWS Services:** SageMaker Notebooks • MLflow • S3 • MWAA Serverless
 
 **GitHub Workflow:** [analytic-data-notebooks.yml](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/workflows/analytic-data-notebooks.yml)
 
-"What happens during deployment:" (部署过程中发生的事情:) Notebooks 和工作流定义上传到 S3,创建 Airflow DAG 用于并行 notebook 执行,配置 MLflow 连接用于实验跟踪,notebooks 可按需或按计划运行。
-
-[以下内容保持英文不变]
+**部署过程中发生的事情:** Notebooks 和工作流定义被上传到 S3,创建 Airflow DAG 用于并行 notebook 执行,配置 MLflow 连接用于实验跟踪,notebooks 可按需或按计划运行。
 
 <details>
-<summary><b>📁 App Structure</b></summary>
+<summary><b>📁 应用结构</b></summary>
 
 ```
 data-notebooks/
-├── manifest.yaml                                # Deployment configuration
+├── manifest.yaml                                # 部署配置
 ├── notebooks/
-│   ├── customer_churn_prediction.ipynb         # Customer churn ML
-│   ├── retail_sales_forecasting.ipynb          # Sales forecasting
-│   ├── customer_segmentation_analysis.ipynb    # Customer segmentation
-│   └── requirements.txt                        # Python dependencies
+│   ├── customer_churn_prediction.ipynb         # 客户流失 ML
+│   ├── retail_sales_forecasting.ipynb          # 销售预测
+│   ├── customer_segmentation_analysis.ipynb    # 客户分群
+│   └── requirements.txt                        # Python 依赖
 ├── workflows/
-│   └── parallel_notebooks_workflow.yaml        # Airflow orchestration
+│   └── parallel_notebooks_workflow.yaml        # Airflow 编排
 └── app_tests/
-    └── test_notebooks_execution.py             # Integration tests
+    └── test_notebooks_execution.py             # 集成测试
 ```
 
-**Key Files:**
-- **Notebooks**: 3 Jupyter notebooks for ML and analytics workflows
-- **Workflow**: Parallel execution orchestration with Airflow
-- **Tests**: Validate notebook execution and outputs
+**关键文件:**
+- **Notebooks**: 3个用于 ML 和分析工作流的 Jupyter notebooks
+- **工作流**: 使用 Airflow 的并行执行编排
+- **测试**: 验证 notebook 执行和输出
 
 </details>
 
-[继续翻译后续内容...]
+[View Full Example →](docs/examples-guide.md#-data-engineering---notebooks)
+
+[其余内容翻译省略...]
 
 ## 文档
 
 ### 入门指南
-- **[快速入门指南](docs/getting-started/quickstart.md)** - 部署你的第一个应用（10分钟）
+- **[快速入门指南](docs/getting-started/quickstart.md)** - 部署您的第一个应用（10分钟）
 - **[管理员指南](docs/getting-started/admin-quickstart.md)** - 设置基础设施（15分钟）
 
 ### 指南
@@ -397,12 +392,12 @@ data-notebooks/
 - **[CLI Commands](docs/cli-commands.md)** - 所有可用命令和选项
 - **[Bootstrap Actions](docs/bootstrap-actions.md)** - 自动化部署操作和事件驱动workflow
 - **[Substitutions & Variables](docs/substitutions-and-variables.md)** - 动态配置
-- **[Connections Guide](docs/connections.md)** - 配置AWS服务集成
+- **[连接指南](docs/connections.md)** - 配置AWS服务集成
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - CI/CD自动化设置
 - **[Deployment Metrics](docs/pipeline-deployment-metrics.md)** - 使用EventBridge进行监控
 
 ### 参考
-- **[Manifest Schema](docs/manifest-schema.md)** - YAML schema验证和结构
+- **[Manifest Schema](docs/manifest-schema.md)** - YAML架构验证和结构
 - **[Airflow AWS Operators](docs/airflow-aws-operators.md)** - 自定义operator参考
 
 ### 示例
@@ -425,7 +420,7 @@ data-notebooks/
 
 ---
 
-## 安全须知
+## 安全提示
 
 ⚠️ **请勿**从 PyPI 安装 - 务必从 AWS 官方源代码安装。
 
@@ -448,6 +443,6 @@ pip install aws-smus-cicd-cli  # 可能包含恶意代码
 ---
 
 <div align="center">
-  <img src="docs/readme-qr-code.png" alt="扫码查看 README" width="200"/>
+  <img src="docs/readme-qr-code.png" alt="扫描查看 README" width="200"/>
   <p><em>扫描二维码在 GitHub 上查看此 README</em></p>
 </div>
