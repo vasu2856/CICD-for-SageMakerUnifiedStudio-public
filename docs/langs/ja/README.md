@@ -73,7 +73,7 @@ aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
-**動作例を見る:** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
+**動作確認:** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
 
 ---
 
@@ -82,8 +82,7 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ### 👨‍💻 データチーム（データサイエンティスト、データエンジニア、生成AIアプリ開発者）
 **注力すること:** アプリケーション - 何をデプロイし、どこにデプロイし、どのように実行するか  
 **定義すること:** コード、ワークフロー、設定を含むアプリケーションマニフェスト（`manifest.yaml`）  
-"You don't need to know: CI/CD pipelines, GitHub Actions, deployment automation"
-（知る必要がないこと：CI/CDパイプライン、GitHub Actions、デプロイメント自動化）
+"You don't need to know: CI/CD pipelines, GitHub Actions, deployment automation" (CI/CDパイプライン、GitHub Actions、デプロイメント自動化について知る必要はありません)
 
 → **[クイックスタートガイド](docs/getting-started/quickstart.md)** - 10分で最初のアプリケーションをデプロイ  
 
@@ -110,31 +109,31 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 - Glue ETL jobs and crawlers
 - Athena queries
 - QuickSight dashboards
-- EMR jobs (今後対応予定)
-- Redshift queries (今後対応予定)
+- EMR jobs (将来対応予定)
+- Redshift queries (将来対応予定)
 
 **🤖 機械学習**
 - SageMaker training jobs
 - ML models and endpoints
 - MLflow experiments
-- Feature Store (今後対応予定)
-- Batch transforms (今後対応予定)
+- Feature Store (将来対応予定)
+- Batch transforms (将来対応予定)
 
 **🧠 生成AI**
 - Bedrock agents
 - Knowledge bases
-- Foundation model configurations (今後対応予定)
+- Foundation model configurations (将来対応予定)
 
 **📓 コード & ワークフロー**
 - Jupyter notebooks
 - Python scripts
 - Airflow DAGs (MWAA and Amazon MWAA Serverless)
-- Lambda functions (今後対応予定)
+- Lambda functions (将来対応予定)
 
 **💾 データ & ストレージ**
 - S3 data files
 - Git repositories
-- Data catalogs (今後対応予定)
+- Data catalogs (将来対応予定)
 
 ---
 
@@ -346,7 +345,7 @@ dashboard-glue-quick/
 ### ガイド
 - **[Application Manifest](docs/manifest.md)** - 完全なYAML設定リファレンス
 - **[CLI Commands](docs/cli-commands.md)** - 利用可能なすべてのコマンドとオプション
-- **[Bootstrap Actions](docs/bootstrap-actions.md)** - 自動デプロイアクションとイベント駆動型workflow
+- **[Bootstrap Actions](docs/bootstrap-actions.md)** - 自動デプロイアクションとイベント駆動型ワークフロー
 - **[Substitutions & Variables](docs/substitutions-and-variables.md)** - 動的設定
 - **[接続ガイド](docs/connections.md)** - AWSサービス統合の設定
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - CI/CD自動化のセットアップ
@@ -355,7 +354,7 @@ dashboard-glue-quick/
 - **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - カタログデプロイのクイックリファレンス
 
 ### リファレンス
-- **[Manifest Schema](docs/manifest-schema.md)** - YAML スキーマ検証と構造
+- **[Manifest Schema](docs/manifest-schema.md)** - YAMLスキーマの検証と構造
 - **[Airflow AWS Operators](docs/airflow-aws-operators.md)** - カスタムオペレーターリファレンス
 
 ### 例
@@ -367,7 +366,7 @@ dashboard-glue-quick/
 - **[GenAI Application](docs/examples-guide.md#-generative-ai)** - Bedrockエージェントとナレッジベース
 
 ### 開発
-- **[開発者ガイド](developer/developer-guide.md)** - アーキテクチャ、テスト、workflowを含む完全な開発ガイド
+- **[開発者ガイド](developer/developer-guide.md)** - アーキテクチャ、テスト、ワークフローを含む完全な開発ガイド
 - **[AIアシスタントコンテキスト](developer/AmazonQ.md)** - AIアシスタント用コンテキスト（Amazon Q、Kiro）
 - **[テスト概要](tests/README.md)** - テストインフラストラクチャ
 

@@ -28,9 +28,9 @@
 
 **אוטומציה של פריסת אפליקציות נתונים בסביבות SageMaker Unified Studio**
 
-"Deploy Airflow DAGs, Jupyter notebooks, and ML workflows from development to production with confidence" (פרוס DAGs של Airflow, מחברות Jupyter ו-workflows של ML מפיתוח לייצור בביטחון). נבנה עבור מדעני נתונים, מהנדסי נתונים, מהנדסי ML ומפתחי אפליקציות GenAI העובדים עם צוותי DevOps.
+"Deploy Airflow DAGs, Jupyter notebooks, and ML workflows from development to production with confidence" (פרוס DAGs של Airflow, מחברות Jupyter ותהליכי עבודה של ML מפיתוח לייצור בביטחון). נבנה עבור מדעני נתונים, מהנדסי נתונים, מהנדסי ML ומפתחי אפליקציות GenAI העובדים עם צוותי DevOps.
 
-"Works with your deployment strategy:" (עובד עם אסטרטגיית הפריסה שלך:) בין אם אתה משתמש בענפי git (מבוסס-ענף), ארטיפקטים בגרסאות (מבוסס-bundle), תגיות git (מבוסס-תג), או פריסה ישירה - ה-CLI הזה תומך ב-workflow שלך. הגדר את האפליקציה שלך פעם אחת, פרוס אותה בדרך שלך.
+"Works with your deployment strategy:" (עובד עם אסטרטגיית הפריסה שלך:) בין אם אתה משתמש בענפי git (מבוסס-ענף), ארטיפקטים בגרסאות (מבוסס-bundle), תגיות git (מבוסס-תג), או פריסה ישירה - ה-CLI הזה תומך בתהליך העבודה שלך. הגדר את האפליקציה שלך פעם אחת, פרוס אותה בדרך שלך.
 
 ---
 
@@ -109,7 +109,7 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 **אתם מגדירים:** מניפסט אפליקציה (`manifest.yaml`) עם הקוד, workflow-ים והתצורות שלכם  
 **אתם לא צריכים לדעת:** CI/CD pipelines, GitHub Actions, אוטומציה של פריסה  
 
-→ **[מדריך התחלה מהירה](docs/getting-started/quickstart.md)** - פרסו את האפליקציה הראשונה שלכם תוך 10 דקות
+→ **[מדריך התחלה מהירה](docs/getting-started/quickstart.md)** - פרסו את האפליקציה הראשונה שלכם תוך 10 דקות  
 
 **כולל דוגמאות עבור:**
 - Data Engineering (Glue, Notebooks, Athena)
@@ -124,8 +124,9 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 → **[מדריך למנהל](docs/getting-started/admin-quickstart.md)** - הגדירו תשתית ו-pipeline תוך 15 דקות  
 → **[תבניות GitHub Workflow](git-templates/)** - תבניות workflow גנריות, לשימוש חוזר עבור פריסה אוטומטית
 
-"The CLI is your abstraction layer: You just call `aws-smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic."
-(ה-CLI הוא שכבת ההפשטה שלכם: אתם פשוט קוראים ל-`aws-smus-cicd-cli deploy` - ה-CLI מטפל בכל האינטראקציות עם שירותי AWS. ה-workflow שלכם נשאר פשוט וגנרי.)
+**ה-CLI הוא שכבת ההפשטה שלכם:** אתם פשוט קוראים ל-`aws-smus-cicd-cli deploy` - ה-CLI מטפל בכל האינטראקציות עם שירותי AWS‏ (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM וכו'). ה-workflow שלכם נשאר פשוט וגנרי.
+
+---
 
 </div>
 
@@ -171,7 +172,8 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 
 ## שירותי AWS נתמכים
 
-פריסת workflows באמצעות שירותי AWS אלה דרך תחביר YAML של Airflow:
+Deploy workflows using these AWS services through Airflow YAML syntax:
+(פריסת תהליכי עבודה באמצעות שירותי AWS אלה דרך תחביר Airflow YAML)
 
 ### 🎯 אנליטיקה ונתונים
 **Amazon Athena** • **AWS Glue** • **Amazon EMR** • **Amazon Redshift** • **Amazon QuickSight** • **Lake Formation**
@@ -191,18 +193,15 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 
 </div>
 
-<div dir="rtl">
+## Core Concepts
 
-## מושגי יסוד
+### Separation of Concerns: The Key Design Principle
 
-### הפרדת תחומי אחריות: עקרון התכנון המרכזי
+**The Problem:** Traditional deployment approaches force DevOps teams to learn AWS analytics services (Glue, Athena, DataZone, SageMaker, MWAA, etc.) and understand SMUS project structures, or force data teams to become CI/CD experts.
 
-**הבעיה:** "Traditional deployment approaches force DevOps teams to learn AWS analytics services (Glue, Athena, DataZone, SageMaker, MWAA, etc.) and understand SMUS project structures, or force data teams to become CI/CD experts"
-(גישות פריסה מסורתיות מאלצות צוותי DevOps ללמוד שירותי אנליטיקה של AWS או מאלצות צוותי נתונים להפוך למומחי CI/CD)
+**The Solution:** SMUS CI/CD CLI is the abstraction layer that encapsulates all AWS and SMUS complexity.
 
-**הפתרון:** SMUS CI/CD CLI הוא שכבת ההפשטה המכילה את כל המורכבות של AWS ו-SMUS.
-
-**דוגמה לתהליך עבודה:**
+**Example workflow:**
 
 <div dir="ltr">
 
@@ -231,67 +230,115 @@ service knowledge needed!
 
 </div>
 
-**צוותי DevOps מתמקדים ב:**
-- שיטות עבודה מיטביות של CI/CD (בדיקות, אישורים, התראות)
-- שערי אבטחה ותאימות
-- תזמון פריסות
-- ניטור והתראות
+**DevOps teams focus on:**
+- CI/CD best practices (testing, approvals, notifications)
+- Security and compliance gates
+- Deployment orchestration
+- Monitoring and alerting
 
-**SMUS CI/CD CLI מטפל בכל המורכבות של AWS:**
-- ניהול דומיין ופרויקטים ב-DataZone
-- ממשקי AWS Glue, Athena, SageMaker, MWAA
-- ניהול אחסון ב-S3 וארטיפקטים
-- תפקידי והרשאות IAM
-- הגדרות חיבורים
-- מנויי נכסי קטלוג
-- פריסת workflow ל-Airflow
-- הקצאת תשתיות
-- בדיקות ותיקוף
+**SMUS CI/CD CLI handles ALL AWS complexity:**
+- DataZone domain and project management
+- AWS Glue, Athena, SageMaker, MWAA APIs
+- S3 storage and artifact management
+- IAM roles and permissions
+- Connection configurations
+- Catalog asset subscriptions
+- Workflow deployment to Airflow
+- Infrastructure provisioning
+- Testing and validation
 
-**צוותי נתונים מתמקדים ב:**
-- קוד יישום ותהליכי עבודה
-- בחירת שירותי AWS לשימוש
-- הגדרות סביבה
-- לוגיקה עסקית
+**Data teams focus on:**
+- Application code and workflows
+- Which AWS services to use (Glue, Athena, SageMaker, etc.)
+- Environment configurations
+- Business logic
 
-**תוצאה:**
-- צוותי DevOps לעולם לא קוראים ישירות ל-API של AWS - הם פשוט קוראים ל-`aws-smus-cicd-cli deploy`
-- תהליכי CI/CD הם גנריים - אותו workflow עובד עבור יישומי Glue, SageMaker, או Bedrock
-- צוותי נתונים לא נוגעים בהגדרות CI/CD
-- שני הצוותים עובדים באופן עצמאי תוך שימוש במומחיות שלהם
+**Result:** 
+- **DevOps teams never call AWS APIs directly** - they just call `aws-smus-cicd-cli deploy`
+- **CI/CD workflows are generic** - same workflow works for Glue apps, SageMaker apps, or Bedrock apps
+- Data teams never touch CI/CD configs
+- Both teams work independently using their expertise
 
 ---
 
-### מניפסט היישום
-קובץ YAML הצהרתי (`manifest.yaml`) המגדיר את יישום הנתונים שלך:
-- **פרטי היישום** - שם, גרסה, תיאור
-- **תוכן** - קוד ממאגרי git, נתונים/מודלים מאחסון, לוחות מחוונים של QuickSight
-- **תהליכי עבודה** - DAGs של Airflow לתזמון ואוטומציה
-- **שלבים** - להיכן לפרוס (סביבות פיתוח, בדיקות, ייצור)
-- **תצורה** - הגדרות ספציפיות לסביבה, חיבורים ופעולות אתחול
+### Application Manifest
+A declarative YAML file (`manifest.yaml`) that defines your data application:
+- **Application details** - Name, version, description
+- **Content** - Code from git repositories, data/models from storage, QuickSight dashboards
+- **Workflows** - Airflow DAGs for orchestration and automation
+- **Stages** - Where to deploy (dev, test, prod environments)
+- **Configuration** - Environment-specific settings, connections, and bootstrap actions
 
-**נוצר ומנוהל על ידי צוותי נתונים.** מגדיר **מה** לפרוס ו**איפה**. לא נדרש ידע ב-CI/CD.
+**Created and owned by data teams.** Defines **what** to deploy and **where**. No CI/CD knowledge required.
 
-### יישום
-עומס העבודה של הנתונים/אנליטיקה שמתפרס:
-- DAGs של Airflow ותסריטי Python
-- מחברות Jupyter וקבצי נתונים
-- מודלים של ML וקוד אימון
-- צינורות ETL וטרנספורמציות
-- סוכני GenAI ושרתי MCP
-- הגדרות מודל בסיס
+### Application
+Your data/analytics workload being deployed:
+- Airflow DAGs and Python scripts
+- Jupyter notebooks and data files
+- ML models and training code
+- ETL pipelines and transformations
+- GenAI agents and MCP servers
+- Foundation model configurations
 
-### שלב
-סביבת פריסה (פיתוח, בדיקות, ייצור) הממופה לפרויקט SageMaker Unified Studio:
-- הגדרות דומיין ואזור
-- שם והגדרות פרויקט
-- חיבורי משאבים
-- פרמטרים ספציפיים לסביבה
-- מיפוי ענפים אופציונלי לפריסות מבוססות git
+### Stage
+A deployment environment (dev, test, prod) mapped to a SageMaker Unified Studio project:
+- Domain and region configuration
+- Project name and settings
+- Resource connections (S3, Airflow, Athena, Glue)
+- Environment-specific parameters
+- Optional branch mapping for git-based deployments
 
-[המשך התרגום מושמט בשל מגבלות אורך]
+### Stage-to-Project Mapping
 
-</div>
+Each application stage deploys to a dedicated SageMaker Unified Studio (SMUS) project. A project can host a single application or multiple applications depending on your architecture and CI/CD methodology. Stage projects are independent entities with their own governance:
+
+- **Ownership & Access:** Each stage project has its own set of owners and contributors, which may differ from the development project. Production projects typically have restricted access compared to development environments.
+- **Multi-Domain & Multi-Region:** Stage projects can belong to different SMUS domains, AWS accounts, and regions. For example, your dev stage might deploy to a development domain in us-east-1, while prod deploys to a production domain in eu-west-1.
+- **Flexible Architecture:** Organizations can choose between dedicated projects per application (isolation) or shared projects hosting multiple applications (consolidation), based on security, compliance, and operational requirements.
+
+This separation enables true environment isolation with independent access controls, compliance boundaries, and regional data residency requirements.
+
+### Workflow
+Orchestration logic that executes your application. Workflows serve two purposes:
+
+**1. Deployment-time:** Create required AWS resources during deployment
+- Provision infrastructure (S3 buckets, databases, IAM roles)
+- Configure connections and permissions
+- Set up monitoring and logging
+
+**2. Runtime:** Execute ongoing data and ML pipelines
+- Scheduled execution (daily, hourly, etc.)
+- Event-driven triggers (S3 uploads, API calls)
+- Data processing and transformations
+- Model training and inference
+
+Workflows are defined as Airflow DAGs (Directed Acyclic Graphs) in YAML format. Supports [MWAA (Managed Workflows for Apache Airflow)](https://aws.amazon.com/managed-workflows-for-apache-airflow/) and [Amazon MWAA Serverless](https://aws.amazon.com/blogs/big-data/introducing-amazon-mwaa-serverless/) ([User Guide](https://docs.aws.amazon.com/mwaa/latest/mwaa-serverless-userguide/what-is-mwaa-serverless.html)).
+
+### CI/CD Automation
+GitHub Actions workflows (or other CI/CD systems) that automate deployment:
+- **Created and owned by DevOps teams**
+- Defines **how** and **when** to deploy
+- Runs tests and quality gates
+- Manages promotion across targets
+- Enforces security and compliance policies
+- Example: `.github/workflows/deploy.yml`
+
+**Key insight:** DevOps teams create generic, reusable workflows that work for ANY application. They don't need to know if the app uses Glue, SageMaker, or Bedrock - the CLI handles all AWS service interactions. The workflow just calls `aws-smus-cicd-cli deploy` and the CLI does the rest.
+
+### Deployment Modes
+
+**Bundle-based (Artifact):** Create versioned archive → deploy archive to stages
+- Good for: audit trails, rollback capability, compliance
+- Command: `aws-smus-cicd-cli bundle` then `aws-smus-cicd-cli deploy --manifest app.tar.gz`
+
+**Direct (Git-based):** Deploy directly from sources without intermediate artifacts
+- Good for: simpler workflows, rapid iteration, git as source of truth
+- Command: `aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test`
+
+Both modes work with any combination of storage and git content sources.
+
+---
+
 
 <div dir="rtl">
 
@@ -325,7 +372,7 @@ service knowledge needed!
 ### מדריכים
 - **[Application Manifest](docs/manifest.md)** - מדריך מלא להגדרות YAML
 - **[CLI Commands](docs/cli-commands.md)** - כל הפקודות והאפשרויות הזמינות
-- **[Bootstrap Actions](docs/bootstrap-actions.md)** - פעולות פריסה אוטומטיות ו-workflow מבוססי אירועים
+- **[Bootstrap Actions](docs/bootstrap-actions.md)** - פעולות פריסה אוטומטיות ו-workflow מבוסס אירועים
 - **[Substitutions & Variables](docs/substitutions-and-variables.md)** - תצורה דינמית
 - **[מדריך חיבורים](docs/connections.md)** - הגדרת שילובי שירותי AWS
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - הגדרת אוטומציית CI/CD
