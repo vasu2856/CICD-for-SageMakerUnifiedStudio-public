@@ -71,22 +71,22 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 
 ---
 
-## À qui s'adresse cet outil ?
+## Pour Qui Est-ce Destiné ?
 
 ### 👨‍💻 Équipes Data (Data Scientists, Data Engineers, Développeurs d'Applications GenAI)
 **Votre focus :** Votre application - quoi déployer, où déployer et comment elle fonctionne  
 **Vous définissez :** Le manifest de l'application (`manifest.yaml`) avec votre code, workflows et configurations  
 **Vous n'avez pas besoin de connaître :** CI/CD pipelines, GitHub Actions, automatisation des déploiements
 
-→ **[Guide de Démarrage Rapide](docs/getting-started/quickstart.md)** - Déployez votre première application en 10 minutes
+→ **[Guide de Démarrage Rapide](docs/getting-started/quickstart.md)** - Déployez votre première application en 10 minutes  
 
 **Inclut des exemples pour :**
-"Data Engineering (Glue, Notebooks, Athena)" (Ingénierie des données)
-"ML Workflows (SageMaker, Notebooks)" (Workflows d'apprentissage automatique)
-"GenAI Applications (Bedrock, Notebooks)" (Applications GenAI)
+- Data Engineering (Glue, Notebooks, Athena)
+- ML Workflows (SageMaker, Notebooks)
+- GenAI Applications (Bedrock, Notebooks)
 
 ### 🔧 Équipes DevOps
-**Votre focus :** Les bonnes pratiques CI/CD, la sécurité, la conformité et l'automatisation du déploiement  
+**Vous vous concentrez sur :** Les bonnes pratiques CI/CD, la sécurité, la conformité et l'automatisation des déploiements  
 **Vous définissez :** Des modèles de workflow qui imposent les tests, les approbations et les politiques de promotion  
 **Vous n'avez pas besoin de connaître :** Les détails spécifiques aux applications, les services AWS utilisés, les APIs DataZone, les structures de projet SMUS, ou la logique métier
 
@@ -100,7 +100,7 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ## Que Pouvez-Vous Déployer ?
 
 **📊 Analytics & BI**
-- Glue ETL jobs and crawlers
+- Glue ETL jobs et crawlers
 - Athena queries
 - QuickSight dashboards
 - EMR jobs (futur)
@@ -108,14 +108,14 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 
 **🤖 Machine Learning**
 - SageMaker training jobs
-- ML models and endpoints
+- ML models and endpoints (modèles ML et points de terminaison)
 - MLflow experiments
 - Feature Store (futur)
 - Batch transforms (futur)
 
 **🧠 Intelligence Artificielle Générative**
 - Bedrock agents
-- Bases de connaissances
+- Knowledge bases (bases de connaissances)
 - Foundation model configurations (futur)
 
 **📓 Code & Workflows**
@@ -215,13 +215,13 @@ service knowledge needed!
 Exemples concrets montrant comment déployer différentes charges de travail avec SMUS CI/CD.
 
 ### 📊 Analytique - Tableau de bord QuickSight
-(Deploy interactive BI dashboards with automated Glue ETL pipelines for data preparation. Uses QuickSight asset bundles, Athena queries, and GitHub dataset integration with environment-specific configurations.)
+Déploiement de tableaux de bord BI interactifs avec des pipelines ETL Glue automatisés pour la préparation des données. Utilise les bundles d'actifs QuickSight, les requêtes Athena et l'intégration de jeux de données GitHub avec des configurations spécifiques à l'environnement.
 
-**Services AWS :** QuickSight • Glue • Athena • S3 • MWAA Serverless
+**Services AWS:** QuickSight • Glue • Athena • S3 • MWAA Serverless
 
-**Workflow GitHub :** [analytic-dashboard-glue-quicksight.yml](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/workflows/analytic-dashboard-glue-quicksight.yml)
+**GitHub Workflow:** [analytic-dashboard-glue-quicksight.yml](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/workflows/analytic-dashboard-glue-quicksight.yml)
 
-**Ce qui se passe pendant le déploiement :** Le code de l'application est déployé sur S3, les jobs Glue et les workflows Airflow sont créés et exécutés, le tableau de bord QuickSight/source de données/dataset sont créés, et l'ingestion QuickSight est initiée pour actualiser le tableau de bord avec les dernières données.
+**Ce qui se passe pendant le déploiement:** Le code de l'application est déployé sur S3, les jobs Glue et les workflows Airflow sont créés et exécutés, le tableau de bord/source de données/jeu de données QuickSight sont créés, et l'ingestion QuickSight est initiée pour actualiser le tableau de bord avec les dernières données.
 
 <details>
 <summary><b>📁 Structure de l'application</b></summary>
