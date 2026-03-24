@@ -21,7 +21,7 @@
 [![zh](https://img.shields.io/badge/lang-zh-gray.svg)](docs/langs/zh/README.md)
 [![he](https://img.shields.io/badge/lang-he-gray.svg)](docs/langs/he/README.md)
 
-> **[Anteprima]** Amazon SageMaker Unified Studio CI/CD CLI è attualmente in anteprima e soggetto a modifiche. I comandi, i formati di configurazione e le API potrebbero evolversi in base al feedback dei clienti. Consigliamo di valutare questo strumento in ambienti non di produzione durante l'anteprima. Per feedback e segnalazioni di bug, apri una segnalazione su https://github.com/aws/CICD-for-SageMakerUnifiedStudio/issues
+> **[Anteprima]** Amazon SageMaker Unified Studio CI/CD CLI è attualmente in anteprima e soggetto a modifiche. I comandi, i formati di configurazione e le API potrebbero evolversi in base al feedback dei clienti. Consigliamo di valutare questo strumento in ambienti non di produzione durante l'anteprima. Per feedback e segnalazioni di bug, apri una issue su https://github.com/aws/CICD-for-SageMakerUnifiedStudio/issues
 
 > **[Solo Domini IAM]** Questa CLI supporta attualmente solo domini SMUS che utilizzano l'autenticazione basata su IAM. Il supporto per i domini basati su IAM Identity Center (IdC) sarà disponibile a breve.
 
@@ -71,7 +71,7 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 
 ---
 
-## Per Chi È?
+## Per Chi È Questo?
 
 ### 👨‍💻 Team di Data (Data Scientists, Data Engineers, Sviluppatori di App GenAI)
 **Il tuo focus:** La tua applicazione - cosa distribuire, dove distribuire e come funziona  
@@ -91,9 +91,9 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 "You don't need to know: Application-specific details, AWS services used, DataZone APIs, SMUS project structures, or business logic" (Non devi conoscere: dettagli specifici dell'applicazione, servizi AWS utilizzati, API DataZone, strutture dei progetti SMUS o logica di business)
 
 → **[Guida Amministratore](docs/getting-started/admin-quickstart.md)** - Configura infrastruttura e pipeline in 15 minuti  
-→ **[Modelli Workflow GitHub](git-templates/)** - Modelli di workflow generici e riutilizzabili per il deployment automatizzato
+→ **[Template Workflow GitHub](git-templates/)** - Template di workflow generici e riutilizzabili per il deployment automatizzato
 
-"The CLI is your abstraction layer: You just call `aws-smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic." (La CLI è il tuo livello di astrazione: Devi solo chiamare `aws-smus-cicd-cli deploy` - la CLI gestisce tutte le interazioni con i servizi AWS (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, ecc.). I tuoi workflow rimangono semplici e generici.)
+"The CLI is your abstraction layer: You just call `aws-smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic." (La CLI è il tuo livello di astrazione: Devi solo chiamare `aws-smus-cicd-cli deploy` - la CLI gestisce tutte le interazioni con i servizi AWS. I tuoi workflow rimangono semplici e generici.)
 
 ---
 
@@ -268,7 +268,7 @@ Distribuisci dashboard BI interattive con pipeline ETL Glue automatizzate per la
 - **[ML Training](docs/examples-guide.md#-machine-learning---training)** - Training su SageMaker con MLflow
 - **[ML Deployment](docs/examples-guide.md#-machine-learning---deployment)** - Distribuzione endpoint SageMaker
 - **[QuickSight Dashboard](docs/examples-guide.md#-analytics---quicksight-dashboard)** - Dashboard BI con Glue
-- **[GenAI Application](docs/examples-guide.md#-generative-ai)** - Agenti Bedrock e knowledge base
+- **[GenAI Application](docs/examples-guide.md#-generative-ai)** - Agenti Bedrock e basi di conoscenza
 
 ### Sviluppo
 - **[Guida allo Sviluppo](developer/developer-guide.md)** - Guida completa allo sviluppo con architettura, testing e workflow
