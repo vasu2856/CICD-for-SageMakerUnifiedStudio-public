@@ -964,7 +964,7 @@ All commands support:
 
 ## Configuration Files
 
-### Bundle Manifest
+### Manifest
 - Default location: `manifest.yaml` (current directory)
 - Override with `--manifest` option
 - See [Manifest Reference](manifest.md) for format

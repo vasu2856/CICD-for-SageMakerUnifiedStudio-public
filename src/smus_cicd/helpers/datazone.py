@@ -149,9 +149,9 @@ def get_project_user_role_arn(project_name: str, domain_name: str, region: str) 
         env_names = [env.get("name") for env in environments_response.get("items", [])]
         typer.echo(f"🔍 DEBUG: Found environments: {env_names}")
 
-        # Find tooling environment
+        # Find an environment with UserRoleArn
         for env in environments_response.get("items", []):
-            typer.echo(f"🔍 DEBUG: Found tooling environment: {env.get('name')}")
+            typer.echo(f"🔍 DEBUG: Found an environment: {env.get('name')}")
             # Get environment details
             env_detail = datazone_client.get_environment(
                 domainIdentifier=domain_id, identifier=env.get("id")
@@ -165,7 +165,7 @@ def get_project_user_role_arn(project_name: str, domain_name: str, region: str) 
                     return role_arn
 
         raise ValueError(
-            f"Project '{project_name}' does not have a Tooling Environment configured. "
+            f"Project '{project_name}' does not have an environment with UserRoleArn configured. "
             "The target project must have a Tooling Environment set up in SageMaker Unified Studio "
             "before it can be used with the SMUS CLI. "
             "Please configure a Tooling Environment for this project in the SMUS portal and try again."
