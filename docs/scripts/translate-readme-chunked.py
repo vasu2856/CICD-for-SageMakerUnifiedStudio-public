@@ -16,6 +16,7 @@ LANGUAGES = {
     'he': 'Hebrew',
     'it': 'Italian',
     'ja': 'Japanese',
+    'pt': 'Portuguese',
     'zh': 'Chinese (Simplified)',
 }
 
@@ -125,18 +126,19 @@ def main():
         if lang_code in badge_map:
             idx = badge_map[lang_code]
             badges[idx] = badges[idx].replace('-gray.svg)', '-brightgreen.svg?style=for-the-badge)')
-        
+
         badge_bar = '\n'.join(badges)
-        
+        back_link = '\n\n← [Back to Main README](../../../README.md)'
+
         # Wrap Hebrew in RTL div and fix code blocks
         if lang_code == 'he':
             # Wrap code blocks in LTR divs
             import re
             pattern = r'(```[\s\S]*?```)'
             full_translation = re.sub(pattern, r'<div dir="ltr">\n\n\1\n\n</div>', full_translation)
-            full_translation = f'<div dir="rtl">\n\n{badge_bar}\n\n{full_translation}\n\n</div>'
+            full_translation = f'<div dir="rtl">\n\n{badge_bar}{back_link}\n\n{full_translation}\n\n</div>'
         else:
-            full_translation = f'{badge_bar}\n\n{full_translation}'
+            full_translation = f'{badge_bar}{back_link}\n\n{full_translation}'
         
         # Save
         output_dir = project_root / "docs" / "langs" / lang_code
