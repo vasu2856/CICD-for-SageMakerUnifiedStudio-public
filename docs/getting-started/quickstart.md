@@ -20,8 +20,6 @@
 
 ## Step 1: Install the CLI
 
-Clone the repo from Github
-
 ```bash
 pip install aws-smus-cicd-cli
 ```
