@@ -25,7 +25,7 @@ Deploy Airflow DAGs, Jupyter notebooks, and ML workflows from development to pro
 ✅ **AWS Abstraction Layer** - CLI encapsulates all AWS analytics, ML, and SMUS complexity - DevOps teams never call AWS APIs directly  
 ✅ **Separation of Concerns** - Data teams define WHAT to deploy (manifest.yaml), DevOps teams define HOW and WHEN (CI/CD workflows)  
 ✅ **Generic CI/CD Workflows** - Same workflow works for Glue, SageMaker, Bedrock, QuickSight, or any AWS service combination  
-✅ **Deploy with Confidence** - Automated testing and validation before production  
+✅ **Deploy with Confidence** - Pre-deployment dry-run validation and automated testing before production  
 ✅ **Multi-Environment Management** - Test → Prod with environment-specific configuration  
 ✅ **Infrastructure as Code** - Version-controlled application manifests and reproducible deployments  
 ✅ **Event-Driven Workflows** - Trigger workflows automatically via EventBridge on deployment  
@@ -48,6 +48,9 @@ smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # Create deployment bundle (optional)
 smus-cicd-cli bundle --manifest manifest.yaml
+
+# Preview deployment (dry run)
+smus-cicd-cli deploy --targets test --manifest manifest.yaml --dry-run
 
 # Deploy to test environment
 smus-cicd-cli deploy --targets test --manifest manifest.yaml
@@ -992,6 +995,7 @@ genai_dev_workflow:
 | Bundle-based deployment | ✅ | [Deploy Command](docs/cli-commands.md#deploy) |
 | Direct deployment | ✅ | [Deploy Command](docs/cli-commands.md#deploy) |
 | Deployment validation | ✅ | [Describe Command](docs/cli-commands.md#describe) |
+| Dry-run validation | ✅ | [Deploy --dry-run](docs/cli-commands.md#dry-run-mode) |
 | Incremental deployment | 🔄 | Upload only changed files |
 | Rollback support | 🔮 | Automated rollback |
 | Blue-green deployment | 🔮 | Zero-downtime deployments |

@@ -1,0 +1,86 @@
+"""DryRunEngine orchestrator for deployment validation.
+
+Instantiates all 12 phase-specific checkers in deployment order, runs each
+checker against a shared DryRunContext, and collects findings into a
+DryRunReport.  Implements fail-fast on manifest errors (Phase 1 ERROR →
+return immediately) while continuing through all other phases even when
+errors are found.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import List, Optional, Tuple
+
+from smus_cicd.commands.dry_run.checkers import Checker
+from smus_cicd.commands.dry_run.checkers.bootstrap_checker import BootstrapChecker
+from smus_cicd.commands.dry_run.checkers.bundle_checker import BundleChecker
+from smus_cicd.commands.dry_run.checkers.catalog_checker import CatalogChecker
+from smus_cicd.commands.dry_run.checkers.connectivity_checker import ConnectivityChecker
+from smus_cicd.commands.dry_run.checkers.dependency_checker import DependencyChecker
+from smus_cicd.commands.dry_run.checkers.git_checker import GitChecker
+from smus_cicd.commands.dry_run.checkers.manifest_checker import ManifestChecker
+from smus_cicd.commands.dry_run.checkers.permission_checker import PermissionChecker
+from smus_cicd.commands.dry_run.checkers.project_checker import ProjectChecker
+from smus_cicd.commands.dry_run.checkers.quicksight_checker import QuickSightChecker
+from smus_cicd.commands.dry_run.checkers.storage_checker import StorageChecker
+from smus_cicd.commands.dry_run.checkers.workflow_checker import WorkflowChecker
+from smus_cicd.commands.dry_run.models import DryRunContext, DryRunReport, Phase
+
+logger = logging.getLogger(__name__)
+
+
+class DryRunEngine:
+    """Orchestrates all dry-run validation phases in deployment order."""
+
+    def __init__(
+        self,
+        manifest_file: str,
+        stage_name: str,
+        bundle_path: Optional[str] = None,
+        output_format: str = "text",
+    ) -> None:
+        self.manifest_file = manifest_file
+        self.stage_name = stage_name
+        self.bundle_path = bundle_path
+        self.output_format = output_format
+
+        # Checkers in phase execution order
+        self._checkers: List[Tuple[Phase, Checker]] = [
+            (Phase.MANIFEST_VALIDATION, ManifestChecker()),
+            (Phase.BUNDLE_EXPLORATION, BundleChecker()),
+            (Phase.PERMISSION_VERIFICATION, PermissionChecker()),
+            (Phase.CONNECTIVITY, ConnectivityChecker()),
+            (Phase.PROJECT_INIT, ProjectChecker()),
+            (Phase.QUICKSIGHT, QuickSightChecker()),
+            (Phase.STORAGE_DEPLOYMENT, StorageChecker()),
+            (Phase.GIT_DEPLOYMENT, GitChecker()),
+            (Phase.CATALOG_IMPORT, CatalogChecker()),
+            (Phase.DEPENDENCY_VALIDATION, DependencyChecker()),
+            (Phase.WORKFLOW_VALIDATION, WorkflowChecker()),
+            (Phase.BOOTSTRAP_ACTIONS, BootstrapChecker()),
+        ]
+
+    def run(self) -> DryRunReport:
+        """Execute all dry-run phases and return the completed report."""
+        context = DryRunContext(
+            manifest_file=self.manifest_file,
+            stage_name=self.stage_name,
+            bundle_path=self.bundle_path,
+        )
+        report = DryRunReport()
+
+        for phase, checker in self._checkers:
+            findings = checker.check(context)
+            report.add_findings(phase, findings)
+
+            # Fail-fast: if manifest validation has blocking errors, stop
+            if phase == Phase.MANIFEST_VALIDATION and report.has_blocking_errors(
+                Phase.MANIFEST_VALIDATION
+            ):
+                logger.warning(
+                    "Manifest validation failed with errors — skipping remaining phases"
+                )
+                return report
+
+        return report

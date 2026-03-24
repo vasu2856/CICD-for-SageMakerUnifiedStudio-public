@@ -48,6 +48,16 @@ CREATION_ORDER = [
     "dataProducts",
 ]
 
+# Human-readable display names for each resource type key
+RESOURCE_TYPE_DISPLAY_NAMES = {
+    "glossaries": "glossaries",
+    "glossaryTerms": "glossary terms",
+    "formTypes": "form types",
+    "assetTypes": "custom asset types",
+    "assets": "assets",
+    "dataProducts": "data products",
+}
+
 # Deletion order (reverse): DataProducts → Assets → AssetTypes → FormTypes → GlossaryTerms → Glossaries
 DELETION_ORDER = list(reversed(CREATION_ORDER))
 
@@ -122,10 +132,147 @@ _POLICY_DETAIL_KEY = {
 # Prefix for managed/system form types that cannot be used in custom asset types
 _MANAGED_FORM_TYPE_PREFIX = "amazon.datazone."
 
+# Valid data source statuses for candidate filtering
+DATA_SOURCE_VALID_STATUSES = {"READY", "RUNNING"}
+
+# Cross-reference field definitions: maps resource type to a list of
+# (field_name, target_resource_type) tuples describing which fields
+# reference identifiers in other resource types.
+# Used by both the import flow and the dry-run checker to stay in sync.
+CROSS_REFERENCE_FIELDS = {
+    "glossaryTerms": [
+        # glossaryId references a glossary's sourceId
+        ("glossaryId", "glossaries"),
+    ],
+    "assets": [
+        # typeIdentifier references an assetType's sourceId
+        ("typeIdentifier", "assetTypes"),
+    ],
+    # dataProducts reference assets via items[].identifier — handled separately
+    # because the structure is nested, not a simple top-level field.
+}
+
+# Form type reference fields in formsInput — used to check cross-references
+# for form types referenced by assets (list format) and assetTypes (dict format).
+FORM_TYPE_REF_FIELDS = ("typeIdentifier", "typeName")
+
+# Well-known managed form type identifiers used for special handling.
+# Shared across import flow and dry-run checkers to prevent drift.
+GLUE_TABLE_FORM_TYPE = "amazon.datazone.GlueTableFormType"
+DATA_SOURCE_REF_FORM_TYPE = "amazon.datazone.DataSourceReferenceFormType"
+
 
 def _is_managed_resource(name: str) -> bool:
     """Return True if the resource name belongs to a managed/system type."""
     return name.startswith(_MANAGED_FORM_TYPE_PREFIX) if name else False
+
+
+def get_form_type_ref(form: dict) -> str:
+    """Extract form type identifier from a form dict using the shared field names.
+
+    Checks ``typeIdentifier`` first, then ``typeName`` as fallback.
+    Returns empty string if neither is present.
+
+    Args:
+        form: A single form dict from formsInput
+
+    Returns:
+        The form type identifier string, or ""
+    """
+    for field in FORM_TYPE_REF_FIELDS:
+        val = form.get(field, "")
+        if val:
+            return val
+    return ""
+
+
+def has_glue_references(catalog_data: dict) -> bool:
+    """Check whether any asset in catalog_data references Glue resources.
+
+    Scans assets (from both the keyed format and legacy flat format) for
+    formsInput entries containing GlueTableFormType.
+
+    Args:
+        catalog_data: Parsed catalog export dict
+
+    Returns:
+        True if at least one asset references a Glue table/view
+    """
+    if not catalog_data:
+        return False
+
+    # Collect assets from both formats
+    assets = []
+    # Real keyed format
+    for item in catalog_data.get("assets", []):
+        if isinstance(item, dict):
+            assets.append(item)
+    # Legacy flat format
+    for item in catalog_data.get("resources", []):
+        if isinstance(item, dict) and item.get("type") == "assets":
+            assets.append(item)
+
+    for asset in assets:
+        forms_input = asset.get("formsInput")
+        if not isinstance(forms_input, list):
+            continue
+        for form in forms_input:
+            if not isinstance(form, dict):
+                continue
+            type_id = get_form_type_ref(form)
+            if GLUE_TABLE_FORM_TYPE in type_id:
+                return True
+    return False
+
+
+def parse_form_content(content) -> Optional[Dict[str, Any]]:
+    """
+    Parse a form's JSON content string, returning None on failure.
+
+    Handles content that is already a dict, a JSON string, or None/empty.
+    Returns None for non-dict parsed values (arrays, numbers, etc.).
+
+    Args:
+        content: Raw form content (str, dict, or None)
+
+    Returns:
+        Parsed dict or None
+    """
+    if not content:
+        return None
+    if isinstance(content, dict):
+        return content
+    try:
+        parsed = json.loads(content)
+        return parsed if isinstance(parsed, dict) else None
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+def extract_database_name_from_forms(forms_input: list) -> Optional[str]:
+    """
+    Extract databaseName from the GlueTableFormType in an asset's formsInput.
+
+    Scans the forms list for a GlueTableFormType entry and returns the
+    databaseName from its content. Used by both the import flow (for data
+    source matching) and the dry-run checker (for dependency validation).
+
+    Args:
+        forms_input: List of form dicts from an asset's formsInput
+
+    Returns:
+        Database name string or None if not found
+    """
+    for form in forms_input:
+        if not isinstance(form, dict):
+            continue
+        type_id = get_form_type_ref(form)
+        if GLUE_TABLE_FORM_TYPE not in type_id:
+            continue
+        content = parse_form_content(form.get("content"))
+        if content and content.get("databaseName"):
+            return content["databaseName"]
+    return None
 
 
 def _ensure_import_permissions(client, domain_id: str, project_id: str) -> List[str]:
@@ -185,11 +332,13 @@ def _ensure_import_permissions(client, domain_id: str, project_id: str) -> List[
         # Grant is missing — warn and attempt to add it
         logger.warning(
             "Policy grant %s is missing on domain unit %s",
-            policy_type, domain_unit_id,
+            policy_type,
+            domain_unit_id,
         )
         logger.info(
             "Attempting to add %s grant for project %s...",
-            policy_type, project_id,
+            policy_type,
+            project_id,
         )
         try:
             client.add_policy_grant(
@@ -573,7 +722,7 @@ def _resolve_target_data_source(
             ds
             for ds in resp.get("items", [])
             if ds.get("type") == source_ds_type
-            and ds.get("status") in ("READY", "RUNNING")
+            and ds.get("status") in DATA_SOURCE_VALID_STATUSES
         ]
 
         if not candidates:
@@ -686,21 +835,9 @@ def _normalize_forms_input_for_api(
     # Cache for resolved target data sources keyed by (type, databaseName)
     _ds_cache: Dict[str, Optional[Dict[str, str]]] = {}
 
-    def _extract_database_name(all_forms: list) -> Optional[str]:
-        """Extract databaseName from the asset's GlueTableForm if present."""
-        for f in all_forms:
-            type_id = f.get("typeIdentifier") or f.get("typeName", "")
-            if "GlueTableFormType" in type_id:
-                try:
-                    content = json.loads(f.get("content", "{}"))
-                    return content.get("databaseName")
-                except (json.JSONDecodeError, KeyError):
-                    pass
-        return None
-
     if resource_type == "assets" and isinstance(forms_input, list):
         # Pre-extract database name for data source matching
-        db_name = _extract_database_name(forms_input)
+        db_name = extract_database_name_from_forms(forms_input)
 
         normalized = []
         for form in forms_input:
@@ -712,7 +849,7 @@ def _normalize_forms_input_for_api(
             # Remap DataSourceReferenceForm to target domain's data source
             form_type = form_copy.get("typeIdentifier", "")
             if (
-                form_type == "amazon.datazone.DataSourceReferenceFormType"
+                form_type == DATA_SOURCE_REF_FORM_TYPE
                 and client
                 and domain_id
                 and project_id

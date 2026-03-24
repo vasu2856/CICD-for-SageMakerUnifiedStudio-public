@@ -49,7 +49,7 @@ smus-cicd-cli describe --manifest manifest.yaml
 | `monitor` | Monitor workflow status | `smus-cicd-cli monitor --manifest manifest.yaml` |
 | `test` | Run tests for pipeline targets | `smus-cicd-cli test --targets marketing-test-stage` |
 | `integrate` | Integrate with external tools (Q CLI) | `smus-cicd-cli integrate qcli` |
-| `delete` | Remove target environments | `smus-cicd-cli delete --stages marketing-test-stage --force` |
+| `delete` | Remove target environments | `smus-cicd-cli delete --targets marketing-test-stage --force` |
 
 ## Detailed Command Examples
 
@@ -116,13 +116,13 @@ smus-cicd-cli bundle --targets dev,test --output-dir /tmp/bundles
 ### 3. Deploy Bundle
 ```bash
 # Deploy using auto-created bundle
-smus-cicd-cli deploy --stages test
+smus-cicd-cli deploy --targets test
 
 # Deploy using pre-created bundle file
-smus-cicd-cli deploy --stages test --manifest /path/to/bundle.zip
+smus-cicd-cli deploy --targets test --manifest /path/to/bundle.zip
 
 # Deploy with JSON output
-smus-cicd-cli deploy --stages test --manifest bundle.zip --output JSON
+smus-cicd-cli deploy --targets test --manifest bundle.zip --output JSON
 ```
 
 ### 4. Run Commands and Workflows
@@ -145,7 +145,7 @@ smus-cicd-cli run --workflow sample_dag --command "dags state sample_dag"
 smus-cicd-cli run --workflow test_dag
 
 # Trigger workflow on specific target
-smus-cicd-cli run --workflow test_dag --stages prod
+smus-cicd-cli run --workflow test_dag --targets prod
 
 # Trigger with JSON output
 smus-cicd-cli run --workflow test_dag --output JSON
@@ -232,7 +232,7 @@ smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:
 smus-cicd-cli monitor --manifest manifest.yaml
 
 # Monitor specific targets with JSON output
-smus-cicd-cli monitor --stages test --output JSON
+smus-cicd-cli monitor --targets test --output JSON
 ```
 
 ### 6. Test Pipeline
@@ -241,10 +241,10 @@ smus-cicd-cli monitor --stages test --output JSON
 smus-cicd-cli test --manifest manifest.yaml
 
 # Run tests for specific targets with verbose output
-smus-cicd-cli test --stages test --verbose
+smus-cicd-cli test --targets test --verbose
 
 # Stream test output directly to console
-smus-cicd-cli test --stages test --test-output console
+smus-cicd-cli test --targets test --test-output console
 ```
 
 ### 8. Integrate with External Tools
@@ -286,13 +286,13 @@ Q: [Validates and reports any schema errors]
 ### 9. Delete Resources
 ```bash
 # Delete with confirmation
-smus-cicd-cli delete --stages test
+smus-cicd-cli delete --targets test
 
 # Force delete without confirmation
-smus-cicd-cli delete --stages test --force
+smus-cicd-cli delete --targets test --force
 
 # Async delete (don't wait for completion)
-smus-cicd-cli delete --stages test --force --async
+smus-cicd-cli delete --targets test --force --async
 ```
 
 ## Universal Options
@@ -302,7 +302,7 @@ All commands support these universal options:
 | Option | Short | Description | Example |
 |--------|-------|-------------|---------|
 | `--manifest` | `-p` | Path to bundle manifest file | `--manifest my-manifest.yaml` |
-| `--stages` | `-t` | Target environment(s) | `--stages dev,test` |
+| `--targets` | `-t` | Target environment(s) | `--targets dev,test` |
 | `--output` | `-o` | Output format (TEXT/JSON) | `--output JSON` |
 
 ## Output Formats
@@ -404,10 +404,18 @@ Bundle creation complete for target: dev
 
 ### 3. Deploy to Test Environment
 ```bash
-smus-cicd-cli deploy --stages test --manifest manifest.yaml
+smus-cicd-cli deploy --targets test --manifest manifest.yaml
 ```
 **Example Output:**
 ```
+Running pre-deployment validation...
+  ✅ Manifest loaded and validated
+  ✅ Bundle artifacts verified (18 files)
+  ✅ IAM permissions verified
+  ✅ DataZone domain and project reachable
+  ✅ S3 buckets accessible
+Pre-deployment validation passed. 0 warning(s). Proceeding with deployment.
+
 Deploying to target: test
 Project: integration-test-test
 Domain: cicd-test-domain
@@ -481,7 +489,7 @@ Domain: cicd-test-domain (us-east-1)
 
 ### 5. Trigger Workflow Execution
 ```bash
-smus-cicd-cli run --manifest manifest.yaml --stages test --workflow test_dag --command trigger
+smus-cicd-cli run --manifest manifest.yaml --targets test --workflow test_dag --command trigger
 ```
 **Example Output:**
 ```
@@ -496,7 +504,7 @@ smus-cicd-cli run --manifest manifest.yaml --stages test --workflow test_dag --c
 
 ### 7. Run Tests
 ```bash
-smus-cicd-cli test --manifest manifest.yaml --stages marketing-test-stage
+smus-cicd-cli test --manifest manifest.yaml --targets marketing-test-stage
 ```
 **Example Output:**
 ```
@@ -520,7 +528,7 @@ Domain: cicd-test-domain (us-east-1)
 
 ### 8. Clean Up Resources
 ```bash
-smus-cicd-cli delete --stages test --manifest manifest.yaml --force
+smus-cicd-cli delete --targets test --manifest manifest.yaml --force
 ```
 **Example Output:**
 ```
@@ -596,7 +604,7 @@ smus-cicd-cli describe [OPTIONS]
 
 #### Options
 - **`-p, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
-- **`-t, --stages`**: Target name(s) - single target or comma-separated list (optional, defaults to all targets)
+- **`-t, --targets`**: Target name(s) - single target or comma-separated list (optional, defaults to all targets)
 - **`-o, --output`**: Output format: TEXT (default) or JSON
 - **`-w, --workflows`**: Show workflow information
 - **`-c, --connections`**: Show connection information
@@ -680,6 +688,7 @@ smus-cicd-cli bundle dev
 
 Deploys bundle files to target environments (auto-initializes if needed). The deploy command performs the following operations:
 
+0. **Pre-Deployment Validation (automatic)**: Runs a dry-run validation before deployment to catch errors early. If any blocking errors are found, the deployment is aborted before any resources are created or modified. This prevents partial deployments that leave resources in an inconsistent state. Skip with `--skip-validation`.
 1. **Bundle Deployment**: Uploads workflow and storage files to target project connections
 2. **Catalog Asset Access**: Processes catalog assets defined in the bundle manifest:
    - Searches for assets in the DataZone catalog
@@ -702,8 +711,11 @@ smus-cicd-cli deploy [OPTIONS] [TARGET_POSITIONAL]
 
 #### Options
 - **`-p, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
-- **`-t, --stages`**: Target name(s) - single target or comma-separated list (uses default target if not specified)
+- **`-t, --targets`**: Target name(s) - single target or comma-separated list (uses default target if not specified)
 - **`-b, --manifest`**: Path to pre-created bundle file (optional)
+- **`--dry-run`**: Preview the deployment without making any changes. Validates the manifest, bundle, IAM permissions, resource reachability, catalog dependencies, and workflow definitions, then produces a structured report of what would happen and any issues detected. No resources are created, modified, or deleted.
+- **`--output`**: Output format for the dry-run report: `text` (default, human-readable) or `json` (machine-readable). Only applies when `--dry-run` is used.
+- **`--skip-validation`**: Skip the automatic pre-deployment dry-run validation step and proceed directly to deployment. Useful when you have already validated with `--dry-run` or need to bypass validation for speed.
 - **`--emit-events`**: Enable EventBridge event emission for deployment tracking
 - **`--no-events`**: Disable EventBridge event emission
 - **`--event-bus-name`**: Custom EventBridge event bus name
@@ -739,17 +751,144 @@ See [Bundle Deployment Metrics](pipeline-deployment-metrics.md) for complete set
 smus-cicd-cli deploy
 
 # Deploy to specific targets
-smus-cicd-cli deploy --stages test,prod
+smus-cicd-cli deploy --targets test,prod
 
 # Deploy with pre-created bundle
-smus-cicd-cli deploy --stages test --manifest /path/to/bundle.zip
+smus-cicd-cli deploy --targets test --manifest /path/to/bundle.zip
 
 # Deploy with EventBridge monitoring enabled
-smus-cicd-cli deploy --stages prod --emit-events
+smus-cicd-cli deploy --targets prod --emit-events
 
 # Deploy using positional argument (backward compatibility)
 smus-cicd-cli deploy test
+
+# Preview deployment without making changes (dry run)
+smus-cicd-cli deploy --dry-run --targets test
+
+# Dry run with JSON output for automation
+smus-cicd-cli deploy --dry-run --targets test --output json
+
+# Skip pre-deployment validation for faster deployment
+smus-cicd-cli deploy --targets test --skip-validation
 ```
+
+#### Dry Run Mode
+
+Use `--dry-run` to preview a deployment without creating, modifying, or deleting any resources. The dry run walks through every deployment phase in read-only mode:
+
+1. **Manifest Validation** — Loads and validates the manifest YAML, resolves the target stage, builds domain configuration, checks environment variable references
+2. **Bundle Exploration** — Opens the bundle archive, enumerates files, validates catalog export data if present
+3. **Permission Verification** — Uses `iam:SimulatePrincipalPolicy` to check that the current IAM identity has all required permissions (S3, DataZone, Glue, IAM, QuickSight, Airflow, etc.). Also checks DataZone policy grants on the project's domain unit when catalog resources are present. Resolves domain IDs via tags when not directly configured.
+4. **Connectivity & Reachability** — Verifies that the DataZone domain and project are reachable, S3 buckets are accessible (resolved via project connections), and Airflow environments respond
+5. **Project Initialization** — Checks whether the target project exists or would need to be created
+6. **Deployment Simulation** — Simulates each deployment phase (QuickSight, storage, git, catalog import, workflows, bootstrap actions) and reports what would happen
+7. **Dependency Validation** — Checks that pre-existing AWS resources referenced by catalog export data (Glue tables/views/databases, data sources, custom form types, custom asset types) exist in the target environment
+8. **Workflow Validation** — Validates workflow YAML files for correct syntax, required Airflow DAG keys, and environment variable references
+
+The report ends with a **Resource Deployment Outlook** section that groups resources by deployment phase and shows which will deploy successfully vs. which will fail.
+
+**Example Dry Run Output (text):**
+```
+Dry Run Report
+========================================
+
+--- Manifest Validation ---
+  ✅ Manifest loaded successfully from manifest.yaml
+  ✅ Target stage 'test' resolved successfully
+  ✅ Domain configuration built successfully
+  ✅ All environment variable references are resolved
+
+--- Bundle Exploration ---
+  ✅ Bundle resolved from ./artifacts: ./artifacts/MyApp.zip
+  ✅ Bundle contains 1 file(s)
+  ✅ Catalog export validated: 19 resource(s) found
+
+--- Permission Verification ---
+  ✅ Caller identity: arn:aws:sts::123456789012:assumed-role/Admin/session
+  ✅ Permission 'datazone:GetDomain' allowed on *
+  ✅ Permission 'datazone:GetProject' allowed on *
+  ✅ Permission 's3:PutObject' allowed on arn:aws:s3:::my-bucket/*
+  ✅ Permission 'glue:GetTable' allowed on arn:aws:glue:us-east-1:123456789012:*
+  ⚠️  Could not verify quicksight:DescribeDashboard: AccessDenied
+
+--- Connectivity & Reachability ---
+  ✅ DataZone domain 'dzd-abc123' is reachable
+  ✅ DataZone project 'my-project' exists in domain 'dzd-abc123'
+  ✅ S3 bucket 'my-bucket' is accessible
+
+--- Project Initialization ---
+  ✅ Project 'my-project' exists in domain 'dzd-abc123'. No creation needed.
+
+--- Catalog Import ---
+  ✅ Catalog import would process 19 resource(s): 1 glossaries, 3 glossary terms, ...
+  ✅ Glossaries 'Business_Glossary' ready for import
+  ✅ Assets 'my_dataset' ready for import
+
+--- Workflow Validation ---
+  ✅ No workflows configured; skipping.
+
+--- Bootstrap Actions ---
+  ✅ No bootstrap actions configured.
+
+========================================
+Resource Deployment Outlook
+----------------------------------------
+  Will deploy (15):
+    [Catalog Import]
+      ✅ Business_Glossary  (glossaries)
+      ✅ my_dataset  (assets)
+      ...
+  Will fail (1):
+    [Permission Verification]
+      ❌ CREATE_GLOSSARY  (datazone)
+         └─ DataZone policy grant 'CREATE_GLOSSARY' is MISSING on domain unit 'dpxyz123'.
+========================================
+Summary: 48 OK, 1 warning(s), 1 error(s)
+```
+
+**Note on DataZone permissions:** When the manifest identifies the domain by tags (rather than a direct `domain_id`), the dry run automatically resolves the domain ID via DataZone API. For `SimulatePrincipalPolicy`, if the domain ID or account ID cannot be resolved, a wildcard resource ARN (`*`) is used instead of a partial-wildcard ARN to avoid false-positive permission denials.
+
+**Example Dry Run Output (json):**
+```json
+{
+  "summary": { "ok": 48, "warnings": 1, "errors": 1 },
+  "phases": {
+    "Manifest Validation": [
+      { "severity": "OK", "message": "Manifest loaded successfully from manifest.yaml" },
+      { "severity": "OK", "message": "Target stage 'test' resolved successfully" }
+    ],
+    "Permission Verification": [
+      { "severity": "OK", "message": "Permission 'datazone:GetDomain' allowed on *" },
+      { "severity": "WARNING", "message": "Could not verify quicksight:DescribeDashboard: AccessDenied" }
+    ],
+    "Connectivity & Reachability": [
+      { "severity": "OK", "message": "DataZone domain 'dzd-abc123' is reachable" },
+      { "severity": "OK", "message": "DataZone project 'my-project' exists in domain 'dzd-abc123'" }
+    ]
+  },
+  "resource_outlook": {
+    "will_deploy": [
+      { "resource": "Business_Glossary", "type": "glossaries", "phase": "Catalog Import" }
+    ],
+    "will_fail": [
+      { "resource": "CREATE_GLOSSARY", "service": "datazone", "phase": "Permission Verification",
+        "message": "DataZone policy grant 'CREATE_GLOSSARY' is MISSING on domain unit 'dpxyz123'." }
+    ]
+  }
+}
+```
+
+**Exit codes:**
+- `0` — All checks passed (zero errors). Deployment is expected to succeed.
+- `1` — One or more blocking errors detected. Deployment would fail.
+
+#### Pre-Deployment Validation
+
+By default, every `deploy` invocation (without `--dry-run`) automatically runs a dry-run validation step before beginning the actual deployment. This catches errors early and prevents partial deployments.
+
+- If the validation finds **errors**, the deployment is aborted and the report is displayed.
+- If the validation finds only **warnings** or passes cleanly, the deployment proceeds normally.
+- Use `--skip-validation` to bypass this step when you've already validated or need faster deployments.
 
 ### 4. monitor - Monitor Workflow Status
 
@@ -761,7 +900,7 @@ smus-cicd-cli monitor [OPTIONS]
 
 #### Options
 - **`-p, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
-- **`-t, --stages`**: Target name(s) - single target or comma-separated list (shows all targets if not specified)
+- **`-t, --targets`**: Target name(s) - single target or comma-separated list (shows all targets if not specified)
 - **`-l, --live`**: Keep monitoring until all workflows complete
 - **`-o, --output`**: Output format: TEXT (default) or JSON
 - **`--help`**: Show command help
@@ -862,7 +1001,7 @@ smus-cicd-cli run [OPTIONS]
 #### Options
 - **`-w, --workflow`**: Workflow name to run (optional)
 - **`-c, --command`**: Airflow CLI command to execute (optional)
-- **`-t, --stages`**: Target name(s) - single target or comma-separated list (optional, defaults to first available)
+- **`-t, --targets`**: Target name(s) - single target or comma-separated list (optional, defaults to first available)
 - **`-p, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
 - **`-o, --output`**: Output format: TEXT (default) or JSON
 - **`--help`**: Show command help
@@ -877,7 +1016,7 @@ smus-cicd-cli run --workflow my_dag
 smus-cicd-cli run --workflow my_dag --command version
 
 # Run on specific target with JSON output
-smus-cicd-cli run --workflow my_dag --stages prod --output JSON
+smus-cicd-cli run --workflow my_dag --targets prod --output JSON
 ```
 
 ### 6. logs - Fetch Workflow Logs
@@ -918,7 +1057,7 @@ smus-cicd-cli delete [OPTIONS]
 
 #### Options
 - **`-p, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
-- **`-t, --stages`**: Target name(s) - single target or comma-separated list (required)
+- **`-t, --targets`**: Target name(s) - single target or comma-separated list (required)
 - **`-f, --force`**: Skip confirmation prompt
 - **`--async`**: Don't wait for deletion to complete
 - **`-o, --output`**: Output format: TEXT (default) or JSON

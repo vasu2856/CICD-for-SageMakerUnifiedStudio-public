@@ -285,10 +285,10 @@ The CLI is used differently depending on your deployment approach:
 ### Direct Git-Based Deployment
 ```bash
 # Deploy directly from git to test
-smus-cicd-cli deploy --stages test --manifest manifest.yaml
+smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Deploy to production
-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+smus-cicd-cli deploy --targets prod --manifest manifest.yaml
 ```
 
 ### Bundle-Based Deployment
@@ -297,10 +297,10 @@ smus-cicd-cli deploy --stages prod --manifest manifest.yaml
 smus-cicd-cli bundle --manifest manifest.yaml --targets dev
 
 # Deploy bundle to test
-smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+smus-cicd-cli deploy --targets test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 
 # Deploy same bundle to production
-smus-cicd-cli deploy --stages prod --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+smus-cicd-cli deploy --targets prod --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 ```
 
 ### Hybrid Deployment
@@ -309,22 +309,25 @@ smus-cicd-cli deploy --stages prod --manifest manifest.yaml --manifest path/to/b
 smus-cicd-cli bundle --manifest manifest.yaml --targets dev
 
 # Deploy to test: pulls workflows from release_test branch + data from bundle
-smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+smus-cicd-cli deploy --targets test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 
 # Deploy to prod: pulls workflows from release_prod branch + data from bundle
-smus-cicd-cli deploy --stages prod --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+smus-cicd-cli deploy --targets prod --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 ```
 
 ### Validation Commands (All Approaches)
 ```bash
+# Preview deployment without making changes (dry run)
+smus-cicd-cli deploy --targets test --manifest manifest.yaml --dry-run
+
 # Validate deployment
-smus-cicd-cli test --stages test --manifest manifest.yaml
+smus-cicd-cli test --targets test --manifest manifest.yaml
 
 # Check logs
-smus-cicd-cli logs --stages test --workflow my_workflow --live
+smus-cicd-cli logs --targets test --workflow my_workflow --live
 
 # Monitor health
-smus-cicd-cli monitor --stages test --manifest manifest.yaml
+smus-cicd-cli monitor --targets test --manifest manifest.yaml
 ```
 
 **Key insight:** 
@@ -417,14 +420,14 @@ jobs:
       
       - name: Deploy to Test
         if: github.ref == 'refs/heads/release_test'
-        run: smus-cicd-cli deploy --stages test --manifest manifest.yaml
+        run: smus-cicd-cli deploy --targets test --manifest manifest.yaml
       
       - name: Deploy to Production
         if: github.ref == 'refs/heads/release_prod'
-        run: smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+        run: smus-cicd-cli deploy --targets prod --manifest manifest.yaml
       
       - name: Validate Deployment
-        run: smus-cicd-cli test --stages test --manifest manifest.yaml
+        run: smus-cicd-cli test --targets test --manifest manifest.yaml
 ```
 
 ### GitHub Actions - Bundle-Based Deployment
@@ -464,10 +467,10 @@ jobs:
           path: "*.tar.gz"
       
       - name: Deploy to Test
-        run: smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest *.tar.gz
+        run: smus-cicd-cli deploy --targets test --manifest manifest.yaml --manifest *.tar.gz
       
       - name: Validate Deployment
-        run: smus-cicd-cli test --stages test --manifest manifest.yaml
+        run: smus-cicd-cli test --targets test --manifest manifest.yaml
 
   deploy-prod:
     needs: deploy-test
@@ -483,10 +486,10 @@ jobs:
           name: application-bundle
       
       - name: Deploy to Production
-        run: smus-cicd-cli deploy --stages prod --manifest manifest.yaml --manifest *.tar.gz
+        run: smus-cicd-cli deploy --targets prod --manifest manifest.yaml --manifest *.tar.gz
       
       - name: Monitor Production
-        run: smus-cicd-cli monitor --stages prod --manifest manifest.yaml
+        run: smus-cicd-cli monitor --targets prod --manifest manifest.yaml
 ```
 
 **For complete CI/CD setup:**
@@ -509,7 +512,7 @@ After deployment, use these commands to verify everything works:
 ### Check Deployment Status
 ```bash
 # View overall bundle health
-smus-cicd-cli monitor --stages test --manifest manifest.yaml
+smus-cicd-cli monitor --targets test --manifest manifest.yaml
 ```
 
 **Output:**
@@ -533,16 +536,16 @@ Connections:
 ### View Workflow Logs
 ```bash
 # Live logs for specific workflow
-smus-cicd-cli logs --stages test --workflow metrics_etl --live
+smus-cicd-cli logs --targets test --workflow metrics_etl --live
 
 # Historical logs
-smus-cicd-cli logs --stages test --workflow metrics_etl --date 2025-01-13
+smus-cicd-cli logs --targets test --workflow metrics_etl --date 2025-01-13
 ```
 
 ### Run Tests
 ```bash
 # Execute validation tests
-smus-cicd-cli test --stages test --manifest manifest.yaml
+smus-cicd-cli test --targets test --manifest manifest.yaml
 ```
 
 **Output:**
@@ -651,9 +654,9 @@ Multiple data applications can deploy to the same project.
 4. After validation → Automatic deployment to prod
 
 ## Monitoring Your Deployment
-- Check status: `smus-cicd-cli monitor --stages test --manifest manifest.yaml`
-- View logs: `smus-cicd-cli logs --stages test --workflow YOUR_WORKFLOW --live`
-- Run tests: `smus-cicd-cli test --stages test --manifest manifest.yaml`
+- Check status: `smus-cicd-cli monitor --targets test --manifest manifest.yaml`
+- View logs: `smus-cicd-cli logs --targets test --workflow YOUR_WORKFLOW --live`
+- Run tests: `smus-cicd-cli test --targets test --manifest manifest.yaml`
 
 ## Support
 - Slack: #data-platform-support

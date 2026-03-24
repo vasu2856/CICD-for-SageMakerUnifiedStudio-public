@@ -3,6 +3,7 @@
 SMUS CI/CD CLI - Command Line Interface for SageMaker Unified Studio CI/CD Pipeline Management
 """
 
+import logging
 import sys
 
 import typer
@@ -13,6 +14,7 @@ from .commands.bundle import bundle_command
 from .commands.create import create_command_with_output
 from .commands.delete import delete_command
 from .commands.deploy import deploy_command
+from .commands.dry_run.engine import DryRunEngine
 
 # Import command functions
 from .commands.describe import describe_command
@@ -22,6 +24,8 @@ from .commands.monitor import monitor_command
 from .commands.run import run_command
 from .commands.test import test_command
 from .helpers.logger import setup_logger
+
+logger = logging.getLogger(__name__)
 
 console = Console()
 
@@ -238,6 +242,21 @@ def deploy(
         "--event-bus-name",
         help="EventBridge event bus name or ARN (overrides manifest config)",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Run deployment validation without making any changes",
+    ),
+    output_format: str = typer.Option(
+        "text",
+        "--output",
+        help="Output format for dry-run report: text (default) or json",
+    ),
+    skip_validation: bool = typer.Option(
+        False,
+        "--skip-validation",
+        help="Skip automatic pre-deployment validation and proceed directly to deployment",
+    ),
     target_positional: str = typer.Argument(
         None, help="Target name (positional argument for backward compatibility)"
     ),
@@ -247,7 +266,30 @@ def deploy(
 
     # Use positional argument if provided, otherwise use --targets flag
     final_targets = target_positional if target_positional else targets
-    deploy_command(final_targets, manifest_file, bundle, emit_events, event_bus_name)
+
+    if dry_run:
+        # Path 1: Standalone dry-run — EventBridge events are suppressed
+        engine = DryRunEngine(manifest_file, final_targets, bundle, output_format)
+        report = engine.run()
+        print(report.render(output_format))
+        sys.exit(0 if report.error_count == 0 else 1)
+    elif not skip_validation:
+        # Path 2: Normal deploy with pre-deployment validation
+        logger.info("Running pre-deployment validation...")
+        engine = DryRunEngine(manifest_file, final_targets, bundle, "text")
+        report = engine.run()
+        if report.error_count > 0:
+            logger.error("Pre-deployment validation failed. Deployment aborted.")
+            print(report.render("text"))
+            sys.exit(1)
+        logger.info(
+            "Pre-deployment validation passed. %d warning(s). Proceeding with deployment.",
+            report.warning_count,
+        )
+        deploy_command(final_targets, manifest_file, bundle, emit_events, event_bus_name)
+    else:
+        # Path 3: Normal deploy without validation (--skip-validation)
+        deploy_command(final_targets, manifest_file, bundle, emit_events, event_bus_name)
 
 
 @app.command(

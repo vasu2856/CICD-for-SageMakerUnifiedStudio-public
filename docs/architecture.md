@@ -182,6 +182,23 @@ src/smus_cicd/
     ├── describe.py           # Validate and describe manifest
     ├── bundle.py             # Create deployment bundles
     ├── deploy.py             # Deploy to target environments
+    ├── dry_run/              # Deploy dry-run validation engine
+    │   ├── engine.py         # DryRunEngine orchestrator
+    │   ├── models.py         # Finding, DryRunReport, Severity, Phase
+    │   ├── report.py         # Text and JSON report formatters
+    │   └── checkers/         # Phase-specific validation checkers
+    │       ├── manifest_checker.py
+    │       ├── bundle_checker.py
+    │       ├── permission_checker.py
+    │       ├── connectivity_checker.py
+    │       ├── project_checker.py
+    │       ├── quicksight_checker.py
+    │       ├── storage_checker.py
+    │       ├── git_checker.py
+    │       ├── catalog_checker.py
+    │       ├── dependency_checker.py
+    │       ├── workflow_checker.py
+    │       └── bootstrap_checker.py
     ├── monitor.py            # Monitor workflow status
     ├── run.py                # Execute workflows
     ├── logs.py               # Fetch workflow logs
@@ -195,6 +212,7 @@ src/smus_cicd/
 - Parse command-line arguments
 - Validate user inputs
 - Orchestrate command execution
+- Run pre-deployment dry-run validation (automatic, skippable with `--skip-validation`)
 - Format and display output (TEXT/JSON)
 - Handle errors and provide user feedback
 
@@ -503,7 +521,13 @@ graph TB
         BundleOp[smus-cli bundle --manifest manifest.yaml --targets test<br/><br/>1. Download content from dev environment<br/>2. Create compressed archive<br/>3. Save to artifacts directory]
     end
     
-    Bundle --> Deploy
+    Bundle --> DryRun
+    
+    subgraph DryRun[Pre-Deployment Validation Automatic]
+        DryRunOp[smus-cli deploy --dry-run --targets test<br/><br/>1. Validate manifest and target stage<br/>2. Explore bundle artifacts<br/>3. Verify IAM permissions<br/>4. Check resource reachability<br/>5. Simulate deployment phases<br/>6. Validate catalog dependencies<br/>7. Validate workflow definitions<br/>8. Produce structured report]
+    end
+    
+    DryRun --> Deploy
     
     subgraph Deploy[Deployment Phase]
         DeployOp[smus-cli deploy --manifest manifest.yaml --targets test<br/><br/>Phase 1: Infrastructure Initialization target domain/project<br/>Phase 2: Content Deployment<br/>Phase 3: Workflow Deployment<br/>Phase 4: Bootstrap Execution]
@@ -744,6 +768,7 @@ def my_command(
 - Schema validation failures
 - Missing required fields
 - Invalid environment variables
+- Dry-run pre-deployment validation failures (missing permissions, unreachable resources, missing dependencies)
 
 **AWS Service Errors:**
 - Permission denied

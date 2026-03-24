@@ -89,10 +89,15 @@ The data-notebooks example has two stages with different purposes:
 To actually create and run the workflow, deploy to the **test** stage:
 
 ```bash
+# Preview what will happen (optional but recommended)
+smus-cicd-cli deploy --targets test --manifest manifest.yaml --dry-run
+
+# Deploy to test
 smus-cicd-cli deploy --targets test --manifest manifest.yaml
 ```
 
 > No bundling needed — the CLI uploads files directly from your local directory.
+> The `--dry-run` flag validates your manifest, permissions, and resources without making any changes. The deploy command also runs automatic pre-deployment validation by default.
 
 **What happens:**
 1. ✅ Uploads notebooks and workflows to S3 from local files
@@ -327,10 +332,10 @@ Deploy your application to the test environment:
 
 ```bash
 # Option 1: Direct deployment (git-based)
-smus-cicd-cli deploy --stages test --manifest manifest.yaml
+smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Option 2: Bundle-based deployment (if you created a bundle in Step 6)
-smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+smus-cicd-cli deploy --targets test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 ```
 
 **See more:** [CLI Commands - deploy](../cli-commands.md#deploy)
@@ -341,10 +346,10 @@ smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest path/to/b
 
 ```bash
 # Run validation tests
-smus-cicd-cli test --stages test --manifest manifest.yaml
+smus-cicd-cli test --targets test --manifest manifest.yaml
 
 # Trigger workflow manually
-smus-cicd-cli run --stages test --workflow data_processing_dag
+smus-cicd-cli run --targets test --workflow data_processing_dag
 ```
 
 **See more:** [CLI Commands - test & run](../cli-commands.md#test)
@@ -357,7 +362,7 @@ After validating in test, deploy to production:
 
 ```bash
 # Deploy to production
-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+smus-cicd-cli deploy --targets prod --manifest manifest.yaml
 ```
 
 **See more:** [CLI Commands - deploy](../cli-commands.md#deploy)
@@ -383,7 +388,7 @@ content:
 
 **Deploy with catalog integration:**
 ```bash
-smus-cicd-cli deploy --stages test --manifest manifest.yaml
+smus-cicd-cli deploy --targets test --manifest manifest.yaml
 ```
 
 The CLI will automatically request subscriptions to catalog assets for your project.
@@ -396,13 +401,13 @@ The CLI will automatically request subscriptions to catalog assets for your proj
 
 ```bash
 # Monitor workflow status
-smus-cicd-cli monitor --stages test --manifest manifest.yaml
+smus-cicd-cli monitor --targets test --manifest manifest.yaml
 
 # View workflow logs
-smus-cicd-cli logs --workflow data_processing_dag --stages test --live
+smus-cicd-cli logs --workflow data_processing_dag --targets test --live
 
 # Check deployment history
-smus-cicd-cli describe --stages test --manifest manifest.yaml
+smus-cicd-cli describe --targets test --manifest manifest.yaml
 ```
 
 **See more:** [CLI Commands - monitor & logs](../cli-commands.md#monitor)
