@@ -121,7 +121,7 @@ lazy-object-proxy==1.12.0
 libclang==18.1.1
 lightgbm==4.6.0
 llama-cloud==0.1.35
-llama-cloud-services==0.6.54
+llama-cloud-services==0.6.94
 llama-index==0.13.0
 llama-index-agent-openai==0.4.12
 llama-index-cli==0.4.4
