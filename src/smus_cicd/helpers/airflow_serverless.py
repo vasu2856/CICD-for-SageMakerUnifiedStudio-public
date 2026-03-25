@@ -354,6 +354,31 @@ def create_workflow(
                 }
 
             except Exception as update_error:
+                if "ServiceQuotaExceededException" in str(update_error):
+                    logger.warning(
+                        f"⚠️ Workflow '{workflow_name}' has exceeded the maximum number of "
+                        f"versions allowed by the service quota. The workflow will be deleted "
+                        f"and recreated to unblock deployment. Workflow run history will be lost."
+                    )
+                    import typer
+
+                    typer.echo(
+                        f"⚠️ WARNING: Workflow '{workflow_name}' hit version quota limit. "
+                        f"Deleting and recreating workflow (run history will be lost)..."
+                    )
+                    client.delete_workflow(WorkflowArn=workflow_arn)
+                    logger.info(f"Deleted workflow {workflow_arn}, recreating...")
+                    create_response = client.create_workflow(**params)
+                    new_workflow_arn = create_response["WorkflowArn"]
+                    logger.info(f"Successfully recreated workflow: {new_workflow_arn}")
+                    typer.echo(f"✅ Workflow '{workflow_name}' recreated successfully.")
+                    return {
+                        "workflow_arn": new_workflow_arn,
+                        "workflow_version": create_response.get("WorkflowVersion"),
+                        "success": True,
+                        "already_exists": True,
+                        "recreated": True,
+                    }
                 logger.error(
                     f"Failed to update workflow {workflow_name}: {update_error}"
                 )
