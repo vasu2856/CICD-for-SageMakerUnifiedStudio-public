@@ -344,12 +344,12 @@ dashboard-glue-quick/
 - **[Bootstrap Actions](docs/bootstrap-actions.md)** - Ações de implantação automatizadas e workflows orientados a eventos
 - **[Substitutions & Variables](docs/substitutions-and-variables.md)** - Configuração dinâmica
 - **[Guia de Conexões](docs/connections.md)** - Configure integrações com serviços AWS
-- **[Integração GitHub Actions](docs/github-actions-integration.md)** - Configuração de automação CI/CD
-- **[Métricas de Implantação](docs/pipeline-deployment-metrics.md)** - Monitoramento com EventBridge
-- **[Catalog Import/Export Guide](docs/catalog-import-export-guide.md)** - Promover recursos do catálogo DataZone entre ambientes
-- **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - Referência rápida para implantação de catálogo
-- **[Schema do Manifesto](docs/manifest-schema.md)** - Validação e estrutura do schema YAML
-- **[Operadores AWS do Airflow](docs/airflow-aws-operators.md)** - Referência de operadores customizados
+- **[GitHub Actions Integration](docs/github-actions-integration.md)** - Configuração de automação CI/CD
+- **[Deployment Metrics](docs/pipeline-deployment-metrics.md)** - Monitoramento com EventBridge
+
+### Referência
+- **[Manifest Schema](docs/manifest-schema.md)** - Validação e estrutura do schema YAML
+- **[Airflow AWS Operators](docs/airflow-aws-operators.md)** - Referência de operadores personalizados
 
 ### Exemplos
 - **[Guia de Exemplos](docs/examples-guide.md)** - Demonstração de aplicações exemplo

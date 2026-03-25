@@ -357,122 +357,143 @@ Provides tools for AI assistants (Amazon Q CLI) to:
 
 ### 1. Describe Command Flow
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant CLI as CLI Layer<br/>(describe.py)
-    participant App as Application Layer<br/>(application_manifest.py)
-    participant Int as Integration Layer<br/>(datazone.py, connections.py)
-    participant Output
-    
-    User->>CLI: smus-cli describe --manifest manifest.yaml --connect
-    CLI->>CLI: Parse command arguments
-    CLI->>CLI: Load manifest file
-    CLI->>App: Parse and validate
-    App->>App: Parse YAML
-    App->>App: Validate schema
-    App->>App: Resolve environment variables
-    App->>App: Build ApplicationManifest object
-    App->>Int: Resolve domain/project/connections
-    Int->>Int: Resolve domain ID from tags or explicit config
-    Int->>Int: Support multiple domains per stage
-    Int->>Int: Fetch project information from each domain
-    Int->>Int: Retrieve connection details
-    Int->>Int: Validate IAM roles
-    Int->>Output: Return results
-    Output->>User: Display manifest structure<br/>Show resolved connections<br/>Validate configuration<br/>Report any issues
+```
+User runs: aws-smus-cicd-cli describe --manifest manifest.yaml --connect
+
+┌─────────────────────────────────────────────────────────────┐
+│ 1. CLI Layer (describe.py)                                  │
+│    - Parse command arguments                                │
+│    - Load manifest file                                     │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 2. Application Layer (application_manifest.py)              │
+│    - Parse YAML                                             │
+│    - Validate schema                                        │
+│    - Resolve environment variables                          │
+│    - Build ApplicationManifest object                       │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 3. Integration Layer (datazone.py, connections.py)          │
+│    - Resolve domain ID from tags                            │
+│    - Fetch project information                              │
+│    - Retrieve connection details                            │
+│    - Validate IAM roles                                     │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 4. Output                                                    │
+│    - Display manifest structure                             │
+│    - Show resolved connections                              │
+│    - Validate configuration                                 │
+│    - Report any issues                                      │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### 2. Deploy Command Flow
 
-```mermaid
-flowchart TD
-    Start[User: smus-cli deploy --manifest manifest.yaml --targets test] --> CLI[CLI Layer: Parse arguments, Load manifest, Identify target stages]
-    
-    CLI --> Init[Initialization Phase]
-    Init --> Init1[Resolve domain ID for target stage]
-    Init1 --> Init1a[Support independent domain per stage]
-    Init1a --> Init2[Create project if needed in target domain]
-    Init2 --> Init3[Setup IAM roles for target domain/project]
-    Init3 --> Init4[Create default connections in target project]
-    
-    Init4 --> Content[Content Deployment Phase]
-    Content --> Content1{For each deployment_configuration}
-    Content1 --> Storage[Storage: Upload files to S3, Apply compression]
-    Content1 --> Git[Git: Clone repositories, Upload to S3]
-    Content1 --> QS[QuickSight: Export/import dashboards, Configure permissions]
-    
-    Storage --> Workflow
-    Git --> Workflow
-    QS --> Workflow
-    
-    Workflow[Workflow Deployment Phase] --> Workflow1{For each workflow}
-    Workflow1 --> Workflow2[Parse workflow YAML]
-    Workflow2 --> Workflow3[Resolve template variables]
-    Workflow3 --> Workflow4[Create/update Airflow DAG]
-    Workflow4 --> Workflow5[Deploy to MWAA Serverless]
-    
-    Workflow5 --> Bootstrap[Bootstrap Phase]
-    Bootstrap --> Bootstrap1{Execute bootstrap actions sequentially}
-    Bootstrap1 --> BA1[workflow.create]
-    BA1 --> BA2[datazone.create_connection]
-    BA2 --> BA3[workflow.run]
-    BA3 --> BA4[quicksight.refresh_dataset]
-    BA4 --> BA5{Success?}
-    BA5 -->|No| Stop[Stop on first failure]
-    BA5 -->|Yes| Event
-    
-    Event[Event Emission Optional] --> Event1[Emit deployment events to EventBridge]
-    Event1 --> Event2[Include metadata: stage, status, timestamp]
-    
-    Event2 --> Output[Output]
-    Output --> Output1[Display deployment summary]
-    Output1 --> Output2[Show workflow ARNs]
-    Output2 --> Output3[Report success/failure]
-    
-    style CLI fill:#e1f5ff
-    style Init fill:#fff4e1
-    style Content fill:#ffe1f5
-    style Workflow fill:#e1ffe1
-    style Bootstrap fill:#f5e1ff
+```
+
+User runs: aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test
+
+┌─────────────────────────────────────────────────────────────┐
+│ 1. CLI Layer (deploy.py)                                    │
+│    - Parse command arguments                                │
+│    - Load manifest                                          │
+│    - Identify target stages                                 │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 2. Initialization Phase                                     │
+│    - Resolve domain ID                                      │
+│    - Create project if needed                               │
+│    - Setup IAM roles                                        │
+│    - Create default connections                             │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 3. Content Deployment Phase                                 │
+│    For each deployment_configuration:                       │
+│    a. Storage:                                              │
+│       - Upload files to S3                                  │
+│       - Apply compression if specified                      │
+│    b. Git:                                                  │
+│       - Clone repositories                                  │
+│       - Upload to S3                                        │
+│    c. QuickSight:                                           │
+│       - Export/import dashboards                            │
+│       - Configure permissions                               │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 4. Workflow Deployment Phase                                │
+│    For each workflow:                                       │
+│    - Parse workflow YAML                                    │
+│    - Resolve template variables                             │
+│    - Create/update Airflow DAG                              │
+│    - Deploy to MWAA Serverless                              │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 5. Bootstrap Phase                                          │
+│    Execute bootstrap actions sequentially:                  │
+│    - workflow.create                                        │
+│    - datazone.create_connection                             │
+│    - workflow.run                                           │
+│    - quicksight.refresh_dataset                             │
+│    Stop on first failure                                    │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 6. Event Emission (Optional)                                │
+│    - Emit deployment events to EventBridge                  │
+│    - Include metadata (stage, status, timestamp)            │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 7. Output                                                    │
+│    - Display deployment summary                             │
+│    - Show workflow ARNs                                     │
+│    - Report success/failure                                 │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### 3. Monitor Command Flow
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant CLI as CLI Layer<br/>(monitor.py)
-    participant Discovery as Workflow Discovery
-    participant Poll as Status Polling
-    participant Output
-    
-    User->>CLI: smus-cli monitor --manifest manifest.yaml --targets test --live
-    CLI->>CLI: Parse command arguments
-    CLI->>CLI: Load manifest
-    CLI->>CLI: Identify workflows to monitor
-    
-    CLI->>Discovery: Discover workflows
-    loop For each workflow
-        Discovery->>Discovery: Generate workflow name
-        Discovery->>Discovery: Find workflow ARN
-        Discovery->>Discovery: List recent runs
-    end
-    
-    alt --live flag enabled
-        Discovery->>Poll: Start polling
-        loop Until completion
-            Poll->>Poll: Get workflow run status
-            Poll->>Poll: Fetch latest logs
-            Poll->>Poll: Display progress
-            Poll->>Poll: Sleep 30 seconds
-        end
-        Poll->>Output: Status complete
-    else
-        Discovery->>Output: Return current status
-    end
-    
-    Output->>User: Display workflow status<br/>Show run history<br/>Report completion status
+```
+User runs: aws-smus-cicd-cli monitor --manifest manifest.yaml --targets test --live
+
+┌─────────────────────────────────────────────────────────────┐
+│ 1. CLI Layer (monitor.py)                                   │
+│    - Parse command arguments                                │
+│    - Load manifest                                          │
+│    - Identify workflows to monitor                          │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 2. Workflow Discovery                                       │
+│    For each workflow:                                       │
+│    - Generate workflow name                                 │
+│    - Find workflow ARN                                      │
+│    - List recent runs                                       │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 3. Status Polling (if --live)                               │
+│    Loop until completion:                                   │
+│    - Get workflow run status                                │
+│    - Fetch latest logs                                      │
+│    - Display progress                                       │
+│    - Sleep 30 seconds                                       │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────────┐
+│ 4. Output                                                    │
+│    - Display workflow status                                │
+│    - Show run history                                       │
+│    - Report completion status                               │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -481,59 +502,135 @@ sequenceDiagram
 
 ### Complete Deployment Lifecycle Diagram
 
-```mermaid
-graph TB
-    subgraph Development[Development Phase]
-        DataTeam[Data Team:<br/>Write Code, Notebooks, Scripts, Workflows]
-        DevOpsTeam[DevOps Team:<br/>Create CI/CD Workflows, GitHub Actions, Test Gates]
-        DataTeam --> Manifest[Create Manifest<br/>manifest.yaml]
-        DevOpsTeam --> Stages[Define Stages<br/>dev, test, prod<br/>Each can target independent domain/project]
-    end
-    
-    Manifest --> Validation
-    Stages --> Validation
-    
-    subgraph Validation[Validation Phase]
-        Validate[smus-cli describe --manifest manifest.yaml --connect<br/><br/>✓ Validate YAML syntax<br/>✓ Validate schema<br/>✓ Resolve environment variables<br/>✓ Check AWS connectivity<br/>✓ Verify domain/project existence per stage<br/>✓ Validate connections<br/>✓ Support multi-domain configuration]
-    end
-    
-    Validation --> Bundle
-    
-    subgraph Bundle[Bundle Phase Optional]
-        BundleOp[smus-cli bundle --manifest manifest.yaml --targets test<br/><br/>1. Download content from dev environment<br/>2. Create compressed archive<br/>3. Save to artifacts directory]
-    end
-    
-    Bundle --> Deploy
-    
-    subgraph Deploy[Deployment Phase]
-        DeployOp[smus-cli deploy --manifest manifest.yaml --targets test<br/><br/>Phase 1: Infrastructure Initialization target domain/project<br/>Phase 2: Content Deployment<br/>Phase 3: Workflow Deployment<br/>Phase 4: Bootstrap Execution]
-    end
-    
-    Deploy --> Monitor
-    
-    subgraph Monitor[Monitoring Phase]
-        MonitorOp[smus-cli monitor --manifest manifest.yaml --targets test --live<br/><br/>├─ Find workflow ARNs<br/>├─ Poll workflow status<br/>├─ Stream CloudWatch logs<br/>└─ Report completion status]
-    end
-    
-    Monitor --> Test
-    
-    subgraph Test[Testing Phase]
-        TestOp[smus-cli test --manifest manifest.yaml --targets test<br/><br/>├─ Run integration tests<br/>├─ Validate data quality<br/>├─ Check workflow outputs<br/>└─ Report test results]
-    end
-    
-    Test --> Promote
-    
-    subgraph Promote[Promotion Phase]
-        PromoteOp[Repeat deployment for next stage<br/>test → prod<br/><br/>smus-cli deploy --manifest manifest.yaml --targets prod]
-    end
-    
-    style Development fill:#e1f5ff
-    style Validation fill:#fff4e1
-    style Bundle fill:#ffe1f5
-    style Deploy fill:#e1ffe1
-    style Monitor fill:#f5e1ff
-    style Test fill:#ffe1e1
-    style Promote fill:#e1fff5
+```
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Development Phase                                 │
+│                                                                          │
+│  Data Team:                          DevOps Team:                       │
+│  ┌──────────────────┐               ┌──────────────────┐               │
+│  │ Write Code       │               │ Create CI/CD     │               │
+│  │ - Notebooks      │               │ Workflows        │               │
+│  │ - Scripts        │               │ - GitHub Actions │               │
+│  │ - Workflows      │               │ - Test Gates     │               │
+│  └────────┬─────────┘               └────────┬─────────┘               │
+│           │                                  │                          │
+│           ▼                                  ▼                          │
+│  ┌──────────────────┐               ┌──────────────────┐               │
+│  │ Create Manifest  │               │ Define Stages    │               │
+│  │ manifest.yaml    │               │ - dev, test, prod│               │
+│  └────────┬─────────┘               └────────┬─────────┘               │
+│           │                                  │                          │
+│           └──────────────┬───────────────────┘                          │
+│                          │                                              │
+└──────────────────────────┼──────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Validation Phase                                  │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ aws-smus-cicd-cli describe --manifest manifest.yaml --connect             │  │
+│  │                                                                   │  │
+│  │ ✓ Validate YAML syntax                                           │  │
+│  │ ✓ Validate schema                                                │  │
+│  │ ✓ Resolve environment variables                                  │  │
+│  │ ✓ Check AWS connectivity                                         │  │
+│  │ ✓ Verify domain/project existence                                │  │
+│  │ ✓ Validate connections                                           │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────┬──────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Bundle Phase (Optional)                           │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ aws-smus-cicd-cli bundle --manifest manifest.yaml --targets test           │  │
+│  │                                                                   │  │
+│  │ 1. Download content from dev environment                         │  │
+│  │    - S3 files                                                    │  │
+│  │    - Git repositories                                            │  │
+│  │    - QuickSight dashboards                                       │  │
+│  │                                                                   │  │
+│  │ 2. Create compressed archive                                     │  │
+│  │    - Bundle-{app}-{target}-{timestamp}.zip                       │  │
+│  │                                                                   │  │
+│  │ 3. Save to artifacts directory                                   │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────┬──────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Deployment Phase                                  │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test          │  │
+│  │                                                                   │  │
+│  │ Phase 1: Infrastructure Initialization                           │  │
+│  │ ├─ Resolve domain ID from tags                                   │  │
+│  │ ├─ Create project if needed                                      │  │
+│  │ ├─ Setup IAM roles                                               │  │
+│  │ └─ Create default connections (S3, Athena, Glue)                 │  │
+│  │                                                                   │  │
+│  │ Phase 2: Content Deployment                                      │  │
+│  │ ├─ Upload code to S3                                             │  │
+│  │ ├─ Clone and upload git repos                                    │  │
+│  │ ├─ Deploy QuickSight dashboards                                  │  │
+│  │ └─ Subscribe to catalog assets                                   │  │
+│  │                                                                   │  │
+│  │ Phase 3: Workflow Deployment                                     │  │
+│  │ ├─ Parse workflow YAML                                           │  │
+│  │ ├─ Resolve template variables                                    │  │
+│  │ ├─ Create Airflow DAG                                            │  │
+│  │ └─ Deploy to MWAA Serverless                                     │  │
+│  │                                                                   │  │
+│  │ Phase 4: Bootstrap Execution                                     │  │
+│  │ ├─ Execute initialization actions                                │  │
+│  │ ├─ Create additional connections                                 │  │
+│  │ ├─ Run workflows                                                 │  │
+│  │ └─ Refresh dashboards                                            │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────┬──────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Monitoring Phase                                  │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ aws-smus-cicd-cli monitor --manifest manifest.yaml --targets test --live  │  │
+│  │                                                                   │  │
+│  │ ├─ Find workflow ARNs                                            │  │
+│  │ ├─ Poll workflow status                                          │  │
+│  │ ├─ Stream CloudWatch logs                                        │  │
+│  │ └─ Report completion status                                      │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────┬──────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Testing Phase                                     │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ aws-smus-cicd-cli test --manifest manifest.yaml --targets test            │  │
+│  │                                                                   │  │
+│  │ ├─ Run integration tests                                         │  │
+│  │ ├─ Validate data quality                                         │  │
+│  │ ├─ Check workflow outputs                                        │  │
+│  │ └─ Report test results                                           │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────┬──────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Promotion Phase                                   │
+│                                                                          │
+│  Repeat deployment for next stage (test → prod)                         │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod          │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -574,20 +671,44 @@ graph TB
 
 ### 2. CI/CD Integration
 
-```mermaid
-graph TB
-    subgraph GHA[GitHub Actions]
-        Workflow[Workflow: .github/workflows/deploy.yml<br/><br/>on: push branches: main<br/><br/>jobs:<br/>deploy-test:<br/>- Install SMUS CLI<br/>- Validate manifest<br/>- Run unit tests<br/>- Deploy to test<br/>- Run integration tests<br/><br/>deploy-prod:<br/>needs: deploy-test<br/>environment: production<br/>- Deploy to prod<br/>- Smoke tests]
-    end
-    
-    Workflow -->|Calls| CLI
-    
-    subgraph CLI[SMUS CLI]
-        Commands[Commands executed:<br/>1. smus-cli describe --manifest manifest.yaml --connect<br/>2. smus-cli deploy --manifest manifest.yaml --targets test<br/>3. smus-cli test --manifest manifest.yaml --targets test<br/>4. smus-cli deploy --manifest manifest.yaml --targets prod]
-    end
-    
-    style GHA fill:#e1f5ff
-    style CLI fill:#fff4e1
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          GitHub Actions                                  │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ Workflow: .github/workflows/deploy.yml                           │  │
+│  │                                                                   │  │
+│  │ on:                                                               │  │
+│  │   push:                                                           │  │
+│  │     branches: [main]                                              │  │
+│  │                                                                   │  │
+│  │ jobs:                                                             │  │
+│  │   deploy-test:                                                    │  │
+│  │     - Install SMUS CI/CD CLI                                        │  │
+│  │     - Validate manifest                                           │  │
+│  │     - Run unit tests                                              │  │
+│  │     - Deploy to test                                              │  │
+│  │     - Run integration tests                                       │  │
+│  │                                                                   │  │
+│  │   deploy-prod:                                                    │  │
+│  │     needs: deploy-test                                            │  │
+│  │     environment: production                                       │  │
+│  │     - Deploy to prod                                              │  │
+│  │     - Smoke tests                                                 │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────┬──────────────────────────────────────────────┘
+                           │
+                           │ Calls
+                           │
+┌──────────────────────────▼──────────────────────────────────────────────┐
+│                        SMUS CI/CD CLI                                    │
+│                                                                          │
+│  Commands executed:                                                     │
+│  1. aws-smus-cicd-cli describe --manifest manifest.yaml --connect           │
+│  2. aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test        │
+│  3. aws-smus-cicd-cli test --manifest manifest.yaml --targets test          │
+│  4. aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod        │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 3. AI Assistant Integration (MCP)

@@ -43,14 +43,11 @@ pip install aws-smus-cicd-cli
 ```bash
 # Validate configuration
 aws-smus-cicd-cli describe --manifest manifest.yaml --connect
-aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # Create deployment bundle (optional)
 aws-smus-cicd-cli bundle --manifest manifest.yaml
-aws-smus-cicd-cli bundle --manifest manifest.yaml
 
 # Deploy to test environment
-aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run validation tests
