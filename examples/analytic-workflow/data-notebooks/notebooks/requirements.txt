@@ -204,7 +204,7 @@ ptyprocess==0.7.0
 pure-eval==0.2.3
 py-openapi-schema-to-json-schema==0.0.3
 py4j==0.10.9.7
-pyarrow==21.0.0
+pyarrow==23.0.1
 pyasn1==0.6.3
 pyasn1-modules==0.4.2
 pyathena==3.30.0
