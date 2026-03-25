@@ -700,5 +700,5 @@ This implementation showcases how the SMUS CI/CD CLI's infrastructure management
 
 For more detailed information about CLI commands and bundle configuration, see:
 - [CLI Commands Documentation](cli-commands.md)
-- [Bundle Manifest Guide](bundle-manifest.md)
+- [Manifest Guide](manifest.md)
 - [Development Guide](development.md)

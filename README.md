@@ -413,7 +413,7 @@ stages:
     domain:
       tags:
         purpose: smus-cicd-testing
-      region: ${TEST_DOMAIN_REGION:us-east-1}
+      region: ${TEST_DOMAIN_REGION}
     project:
       name: test-marketing
       owners:
@@ -422,7 +422,7 @@ stages:
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
     environment_variables:
       S3_PREFIX: test
-      AWS_REGION: ${TEST_DOMAIN_REGION:us-east-1}
+      AWS_REGION: ${TEST_DOMAIN_REGION}
       GRANT_TO: Admin,service-role/aws-quicksight-service-role-v0
     bootstrap:
       actions:
@@ -451,9 +451,9 @@ stages:
         assets:
         - name: TotalDeathByCountry
           owners:
-          - arn:aws:quicksight:${TEST_DOMAIN_REGION:us-east-1}:${AWS_ACCOUNT_ID}:user/default/Admin/*
+          - arn:aws:quicksight:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:user/default/Admin/*
           viewers:
-          - arn:aws:quicksight:${TEST_DOMAIN_REGION:us-east-1}:${AWS_ACCOUNT_ID}:user/default/Admin/*
+          - arn:aws:quicksight:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:user/default/Admin/*
         overrideParameters:
           ResourceIdOverrideConfiguration:
             PrefixForAllResources: deployed-{stage.name}-covid-
@@ -538,7 +538,7 @@ stages:
           name: mlflow-server
           connection_type: MLFLOW
           properties:
-            trackingServerArn: arn:aws:sagemaker:${STS_REGION}:${STS_ACCOUNT_ID}:mlflow-tracking-server/smus-integration-mlflow-use2
+            trackingServerArn: arn:aws:sagemaker:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:mlflow-tracking-server/smus-integration-mlflow-use2
             trackingServerName: smus-integration-mlflow-use2
         - type: workflow.create
           workflowName: parallel_notebooks_execution
@@ -690,7 +690,7 @@ stages:
           name: mlflow-server
           connection_type: MLFLOW
           properties:
-            trackingServerArn: arn:aws:sagemaker:${STS_REGION}:${STS_ACCOUNT_ID}:mlflow-tracking-server/smus-integration-mlflow-use2
+            trackingServerArn: arn:aws:sagemaker:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:mlflow-tracking-server/smus-integration-mlflow-use2
         - type: workflow.create
           workflowName: ml_training_workflow
         - type: workflow.run

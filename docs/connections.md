@@ -625,11 +625,11 @@ aws-smus-cicd-cli run --stages test --workflow test_connections
 
 ## Next Steps
 
-- **[Bundle Manifest Reference](bundle-manifest.md)** - Complete connection schema
+- **[Manifest Reference](manifest.md)** - Complete connection schema
 - **[Substitutions and Variables](substitutions-and-variables.md)** - Variable usage guide
 - **[Admin Quick Start](getting-started/admin-quickstart.md)** - Infrastructure setup
 - **[CLI Commands](cli-commands.md)** - Connection management commands
 
 ---
 
-**Questions?** See [Bundle Manifest Reference - Connections](bundle-manifest.md#connections) for complete schema details.
+**Questions?** See [Manifest Reference - Connections](manifest.md#connections) for complete schema details.

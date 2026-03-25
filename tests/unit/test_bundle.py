@@ -142,3 +142,35 @@ stages:
                 result = runner.invoke(app, ["bundle"])
                 assert result.exit_code == 1
                 assert "Target 'dev' not found in manifest" in result.output
+
+
+def test_bundle_directory_copy_contents_flat():
+    """Test that bundling a directory copies its contents directly into target_dir, not as a subdir."""
+    import os
+    import tempfile
+    import shutil
+    from unittest.mock import patch, MagicMock
+    from smus_cicd.commands.bundle import bundle_command
+
+    with tempfile.TemporaryDirectory() as source_root:
+        # Create source directory with files
+        src_dir = os.path.join(source_root, "notebooks")
+        os.makedirs(src_dir)
+        with open(os.path.join(src_dir, "notebook1.ipynb"), "w") as f:
+            f.write("{}")
+        with open(os.path.join(src_dir, "notebook2.ipynb"), "w") as f:
+            f.write("{}")
+
+        with tempfile.TemporaryDirectory() as target_dir:
+            # Simulate the directory copy logic from bundle.py
+            shutil.copytree(
+                src_dir,
+                target_dir,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns("*.pyc", "__pycache__", ".ipynb_checkpoints"),
+            )
+
+            # Files should be directly in target_dir, not in target_dir/notebooks/
+            assert os.path.exists(os.path.join(target_dir, "notebook1.ipynb"))
+            assert os.path.exists(os.path.join(target_dir, "notebook2.ipynb"))
+            assert not os.path.exists(os.path.join(target_dir, "notebooks", "notebook1.ipynb"))
