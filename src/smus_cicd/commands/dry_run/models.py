@@ -56,6 +56,8 @@ class DryRunContext:
     bundle_path: Optional[str] = None
     bundle_files: Set[str] = field(default_factory=set)
     catalog_data: Optional[Dict[str, Any]] = None
+    target_domain_id: Optional[str] = None
+    target_region: Optional[str] = None
 
 
 @dataclass

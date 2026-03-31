@@ -3,7 +3,8 @@
 Validates catalog export data from ``context.catalog_data`` (populated by
 BundleChecker). Checks required fields (``type``, ``name``, ``identifier``)
 on each resource entry, verifies cross-references between catalog resources
-are resolvable, and reports count of each resource type.
+are resolvable, checks for disabled form types in the target project, and
+reports count of each resource type.
 
 Reuses validation patterns from ``helpers/catalog_import.py``.
 
@@ -15,6 +16,9 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from typing import Any, List, Set
+
+import boto3
+from botocore.exceptions import ClientError
 
 from smus_cicd.commands.dry_run.models import DryRunContext, Finding, Severity
 from smus_cicd.helpers.catalog_import import (
@@ -81,10 +85,14 @@ class CatalogChecker:
         # 2. Build identifier index and verify cross-references
         self._validate_cross_references(resources, findings)
 
-        # 3. Report resource type counts
+        # 3. Check for disabled form types in the target project
+        if context.target_domain_id and context.target_region:
+            self._check_disabled_form_types(context, resources, findings)
+
+        # 4. Report resource type counts
         self._report_resource_type_counts(resources, findings)
 
-        # 4. Emit per-resource OK findings for resources without errors
+        # 5. Emit per-resource OK findings for resources without errors
         self._emit_per_resource_outcomes(resources, findings)
 
         return findings
@@ -236,6 +244,55 @@ class CatalogChecker:
                                     ),
                                 )
                             )
+
+    def _check_disabled_form_types(
+        self,
+        context: DryRunContext,
+        resources: List[Any],
+        findings: List[Finding],
+    ) -> None:
+        """Check if any custom form types in the bundle exist but are DISABLED in the target."""
+        # Collect custom form type names from the bundle
+        bundle_form_types = [
+            r.get("name")
+            for r in resources
+            if isinstance(r, dict)
+            and r.get("type") == "formTypes"
+            and r.get("name")
+            and not _is_managed_resource(r.get("name", ""))
+        ]
+
+        if not bundle_form_types:
+            return
+
+        try:
+            client = boto3.client("datazone", region_name=context.target_region)
+            for ft_name in bundle_form_types:
+                try:
+                    resp = client.get_form_type(
+                        domainIdentifier=context.target_domain_id,
+                        formTypeIdentifier=ft_name,
+                    )
+                    status = resp.get("status")
+                    if status == "DISABLED":
+                        findings.append(
+                            Finding(
+                                severity=Severity.WARNING,
+                                message=(
+                                    f"Form type '{ft_name}' exists in the target "
+                                    f"but is DISABLED. It will be re-enabled during import."
+                                ),
+                                resource=ft_name,
+                                service="form types",
+                            )
+                        )
+                except ClientError as e:
+                    if e.response["Error"]["Code"] == "ResourceNotFoundException":
+                        pass  # Doesn't exist yet, will be created
+                    else:
+                        logger.debug(f"Failed to check form type {ft_name}: {e}")
+        except Exception as e:
+            logger.debug(f"Could not check form type status in target: {e}")
 
     def _emit_per_resource_outcomes(
         self,

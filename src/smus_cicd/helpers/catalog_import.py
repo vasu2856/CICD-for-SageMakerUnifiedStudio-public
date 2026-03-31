@@ -1024,7 +1024,36 @@ def _import_resource(
                 logger.info(f"Skipping managed FormType {name}")
                 return True, False
             if is_update:
-                logger.info(f"FormType {name} already exists, skipping (no update API)")
+                # Form types have no update API, but if the existing one is
+                # DISABLED we must re-enable it by calling create_form_type
+                # with status=ENABLED (the API acts as an upsert for status).
+                try:
+                    ft_resp = client.get_form_type(
+                        domainIdentifier=domain_id,
+                        formTypeIdentifier=name,
+                    )
+                    ft_status = ft_resp.get("status")
+                except Exception:
+                    ft_status = None
+
+                if ft_status == "DISABLED":
+                    logger.info(f"FormType {name} is DISABLED, re-enabling")
+                    kwargs = {
+                        "domainIdentifier": domain_id,
+                        "owningProjectIdentifier": project_id,
+                        "name": resolved.get("name"),
+                        "status": "ENABLED",
+                    }
+                    if resolved.get("description"):
+                        kwargs["description"] = resolved["description"]
+                    if resolved.get("model"):
+                        kwargs["model"] = resolved["model"]
+                    client.create_form_type(**kwargs)
+                    logger.info(f"FormType {name} re-enabled")
+                else:
+                    logger.info(
+                        f"FormType {name} already exists and is ENABLED, skipping"
+                    )
                 return True, True
             else:
                 kwargs = {

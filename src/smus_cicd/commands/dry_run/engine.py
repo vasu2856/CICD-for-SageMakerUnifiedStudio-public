@@ -83,4 +83,25 @@ class DryRunEngine:
                 )
                 return report
 
+            # After manifest validation succeeds, resolve target domain/region
+            # so downstream checkers can query the target environment.
+            if phase == Phase.MANIFEST_VALIDATION and context.config:
+                self._resolve_target_identifiers(context)
+
         return report
+
+    def _resolve_target_identifiers(self, context: DryRunContext) -> None:
+        """Resolve target_domain_id and target_region from the manifest config."""
+        config = context.config or {}
+        region = config.get("region", "us-east-1")
+        context.target_region = region
+
+        domain_id = config.get("domain_id")
+        if not domain_id:
+            try:
+                from smus_cicd.helpers.utils import _resolve_domain_id
+
+                domain_id = _resolve_domain_id(config, region)
+            except Exception:
+                pass
+        context.target_domain_id = domain_id
