@@ -1,0 +1,56 @@
+name: SMUS Workflow Housekeeping
+
+on:
+  schedule:
+    - cron: '0 3 */3 * *'  # Every 3 days at 3am UTC
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cleanup-dev-workflows:
+    name: Delete All MWAA Workflows (Dev)
+    runs-on: ubuntu-latest
+    environment: dev-aws-account
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_DEV }}
+          aws-region: ${{ vars.DOMAIN_REGION }}
+          role-session-name: smus-housekeeping-dev-session
+      - name: Delete all MWAA workflows
+        run: python3 tests/scripts/delete_all_workflows.py --region ${{ vars.DOMAIN_REGION }}
+
+  cleanup-test-workflows:
+    name: Delete All MWAA Workflows (Test)
+    runs-on: ubuntu-latest
+    environment: test-aws-account
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_TEST }}
+          aws-region: ${{ vars.DOMAIN_REGION }}
+          role-session-name: smus-housekeeping-test-session
+      - name: Delete all MWAA workflows
+        run: python3 tests/scripts/delete_all_workflows.py --region ${{ vars.DOMAIN_REGION }}
+
+  cleanup-prod-workflows:
+    name: Delete All MWAA Workflows (Prod)
+    runs-on: ubuntu-latest
+    environment: prod-aws-account
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ vars.DOMAIN_REGION }}
+          role-session-name: smus-housekeeping-prod-session
+      - name: Delete all MWAA workflows
+        run: python3 tests/scripts/delete_all_workflows.py --region ${{ vars.DOMAIN_REGION }}
