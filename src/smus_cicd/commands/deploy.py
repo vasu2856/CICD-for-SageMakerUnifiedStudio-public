@@ -1,5 +1,6 @@
 """Deploy command implementation."""
 
+import json
 import os
 import shutil
 import tempfile
@@ -232,7 +233,7 @@ def deploy_command(
                 target_config,
                 manifest,
                 config,
-                bundle,
+                bundle_path,
                 stage_name,
                 emitter,
                 metadata,
@@ -429,7 +430,11 @@ def _deploy_bundle_to_target(
     storage_configs = bundle_target_config.storage or []
     git_configs = bundle_target_config.git or []
 
-    if not storage_configs and not git_configs:
+    # Check if we have a bundle file for catalog import
+    has_bundle_for_catalog = bundle_file is not None
+
+    # Only require storage/git config if we're not just importing catalog from bundle
+    if not storage_configs and not git_configs and not has_bundle_for_catalog:
         handle_error(
             "No storage or git configuration found in deployment_configuration"
         )
@@ -593,10 +598,24 @@ def _deploy_bundle_to_target(
         target_config, manifest, config, emitter, metadata
     )
 
+    # Import catalog resources from bundle if present
+    # Use bundle_path if available (set when has_bundle_items), otherwise fall back
+    # to the original bundle_file argument (covers catalog-only bundles with no
+    # storage/git items).
+    effective_bundle_path = bundle_path or bundle_file
+    catalog_import_success = _import_catalog_from_bundle(
+        effective_bundle_path,
+        target_config,
+        config,
+        emitter,
+        metadata,
+        manifest=manifest,
+    )
+
     # Return overall success - storage must succeed, git is optional
     storage_success = all(r[0] is not None for r in storage_results)
     git_success = all(r[0] is not None for r in git_results) if git_results else True
-    return storage_success and git_success and asset_success
+    return storage_success and git_success and asset_success and catalog_import_success
 
 
 def _resolve_and_upload_workflows(
@@ -1336,6 +1355,139 @@ def _validate_deployed_workflows(
         # Don't fail deployment for validation issues
 
 
+def _import_catalog_from_bundle(
+    bundle_path: str,
+    target_config,
+    config: Dict[str, Any],
+    emitter=None,
+    metadata: Optional[Dict[str, Any]] = None,
+    manifest: Optional[ApplicationManifest] = None,
+) -> bool:
+    """
+    Import catalog resources from bundle if present.
+
+    Args:
+        bundle_path: Path to bundle ZIP file
+        target_config: Target configuration object
+        config: Configuration dictionary
+        emitter: Optional EventEmitter for monitoring
+        metadata: Optional metadata for events
+        manifest: Optional application manifest for catalog publish config
+
+    Returns:
+        True if import succeeded or was skipped, False if all imports failed
+    """
+    from ..helpers.bundle_storage import ensure_bundle_local, is_s3_url
+
+    # Check if catalog import is disabled in deployment configuration
+    if (
+        target_config.deployment_configuration
+        and target_config.deployment_configuration.catalog
+        and target_config.deployment_configuration.catalog.get("disable", False)
+    ):
+        typer.echo("📋 Catalog import disabled in deployment configuration")
+        return True
+
+    # Skip if no bundle path (local deployment without bundle)
+    if not bundle_path:
+        return True
+
+    # Ensure bundle is available locally
+    local_bundle_path = ensure_bundle_local(
+        bundle_path, config.get("region", "us-east-1")
+    )
+
+    try:
+        # Check if catalog_export.json exists in bundle
+        catalog_json_path = None
+        with zipfile.ZipFile(local_bundle_path, "r") as zip_ref:
+            # Look for catalog/catalog_export.json
+            if "catalog/catalog_export.json" in zip_ref.namelist():
+                # Extract to temp directory
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    zip_ref.extract("catalog/catalog_export.json", temp_dir)
+                    catalog_json_path = os.path.join(
+                        temp_dir, "catalog", "catalog_export.json"
+                    )
+
+                    # Read and parse JSON
+                    with open(catalog_json_path, "r") as f:
+                        catalog_data = json.load(f)
+
+                    typer.echo("📋 Importing catalog resources from bundle...")
+
+                    # Get domain and project IDs
+                    from ..helpers.datazone import (
+                        get_domain_from_target_config,
+                        get_project_id_by_name,
+                    )
+
+                    region = target_config.domain.region
+                    domain_id, domain_name = get_domain_from_target_config(
+                        target_config, region
+                    )
+                    project_name = target_config.project.name
+                    project_id = get_project_id_by_name(project_name, domain_id, region)
+
+                    if not project_id:
+                        typer.echo(
+                            f"❌ Could not find project ID for project: {project_name}"
+                        )
+                        return False
+
+                    # Get skipPublish flag from manifest (default: False)
+                    skip_publish = False
+                    if manifest and manifest.content and manifest.content.catalog:
+                        skip_publish = manifest.content.catalog.skipPublish
+
+                    # Import catalog resources
+                    from ..helpers.catalog_import import import_catalog
+
+                    summary = import_catalog(
+                        domain_id,
+                        project_id,
+                        catalog_data,
+                        region,
+                        skip_publish=skip_publish,
+                    )
+
+                    # Report summary
+                    typer.echo("✅ Catalog import completed:")
+                    typer.echo(f"   Created: {summary['created']}")
+                    typer.echo(f"   Updated: {summary['updated']}")
+                    typer.echo(f"   Deleted: {summary['deleted']}")
+                    typer.echo(f"   Failed: {summary['failed']}")
+                    typer.echo(f"   Published: {summary['published']}")
+
+                    # Return False if all imports failed
+                    total_attempted = (
+                        summary["created"]
+                        + summary["updated"]
+                        + summary["deleted"]
+                        + summary["failed"]
+                    )
+                    if total_attempted > 0 and summary["failed"] == total_attempted:
+                        typer.echo("❌ All catalog imports failed")
+                        return False
+
+                    return True
+            else:
+                # No catalog export in bundle - skip silently (backward compatible)
+                return True
+
+    except json.JSONDecodeError as e:
+        typer.echo(f"❌ Invalid catalog JSON in bundle: {e}")
+        return False
+    except Exception as e:
+        typer.echo(f"❌ Error importing catalog from bundle: {e}")
+        return False
+    finally:
+        # Clean up temporary file if we downloaded from S3
+        if is_s3_url(bundle_path) and local_bundle_path != bundle_path:
+            if os.path.exists(local_bundle_path):
+                os.unlink(local_bundle_path)
+
+
 def _process_catalog_assets(
     target_config,
     manifest: ApplicationManifest,
@@ -1368,7 +1520,11 @@ def _process_catalog_assets(
         return True
 
     # Check if catalog assets are configured
-    if not manifest.content.catalog or not manifest.content.catalog.assets:
+    if (
+        not manifest.content.catalog
+        or not manifest.content.catalog.assets
+        or not manifest.content.catalog.assets.access
+    ):
         typer.echo("📋 No catalog assets configured")
         return True
 
@@ -1382,7 +1538,7 @@ def _process_catalog_assets(
                 "assetId": asset.selector.assetId,
                 "permission": asset.permission,
             }
-            for asset in manifest.content.catalog.assets
+            for asset in manifest.content.catalog.assets.access
         ]
         emitter.catalog_assets_started(
             manifest.application_name, target_info, asset_configs, metadata
@@ -1437,7 +1593,7 @@ def _process_catalog_assets(
 
     # Convert assets to dictionary format for processing
     assets_data = []
-    for asset in manifest.content.catalog.assets:
+    for asset in manifest.content.catalog.assets.access:
         asset_dict = {
             "selector": {},
             "permission": asset.permission,
@@ -1469,7 +1625,7 @@ def _process_catalog_assets(
                         "assetId": asset.selector.assetId,
                         "status": "processed",
                     }
-                    for asset in manifest.content.catalog.assets
+                    for asset in manifest.content.catalog.assets.access
                 ]
                 emitter.catalog_assets_completed(
                     manifest.application_name, target_info, asset_results, metadata

@@ -1,0 +1,45 @@
+monitoring:
+  eventbridge:
+    enabled: true
+    eventBusName: default
+    includeMetadata: true
+applicationName: CatalogSkipPublishTest
+content:
+  storage:
+    - name: code
+      include:
+        - code
+  catalog:
+    enabled: true
+    skipPublish: true    # Explicitly skip all publishing
+    assets:
+      access: []
+
+stages:
+  dev:
+    stage: DEV
+    domain:
+      tags:
+        purpose: smus-cicd-import-export
+      region: ${DEV_DOMAIN_REGION}
+    project:
+      name: admin-project-592756948959
+      owners:
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
+      role:
+        arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
+  test:
+    stage: TEST
+    domain:
+      tags:
+        purpose: smus-cicd-import-export
+      region: ${DEV_DOMAIN_REGION}
+    project:
+      name: admin-project-592756948959
+      owners:
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
+      role:
+        arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
+    deployment_configuration:
+      catalog:
+        disable: false

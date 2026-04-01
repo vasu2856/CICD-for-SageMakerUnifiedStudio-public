@@ -114,7 +114,7 @@ aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 **💾 Data & Storage**
 - S3 data files
 - Git repositories
-- Data catalogs (future)
+- DataZone catalog resources (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, Data Products, Metadata Forms)
 
 ---
 
@@ -1121,11 +1121,20 @@ genai_dev_workflow:
 - **[Substitutions & Variables](docs/substitutions-and-variables.md)** - Dynamic configuration
 - **[Connections Guide](docs/connections.md)** - Configure AWS service integrations
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - CI/CD automation setup
+- **[GitHub Workflow Application Guide](docs/github-workflow-application-guide.md)** - Application admin guide for direct branch deployment
+- **[GitHub Workflow DevOps Guide](docs/github-workflow-devops-guide.md)** - DevOps guide for direct branch deployment
 - **[Deployment Metrics](docs/pipeline-deployment-metrics.md)** - Monitoring with EventBridge
+- **[Catalog Import/Export Guide](docs/catalog-import-export-guide.md)** - Promote DataZone catalog resources across environments
+- **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - Quick reference for catalog deployment
+- **[MCP Configuration](docs/mcp-configuration.md)** - MCP server configuration guide
+- **[Q CLI Conversation Examples](docs/q-cli-conversation-examples.md)** - Example conversations with Q CLI
 
 ### Reference
 - **[Manifest Schema](docs/manifest-schema.md)** - YAML schema validation and structure
 - **[Airflow AWS Operators](docs/airflow-aws-operators.md)** - Custom operator reference
+- **[Airflow in SMUS CI/CD Summary](docs/airflow-smus-cicd-summary.md)** - Overview of Airflow's role in SMUS CI/CD
+- **[Architecture](docs/architecture.md)** - CLI architecture documentation
+- **[Pipeline Architecture Diagram](docs/pipeline-architecture-diagram.md)** - CI/CD pipeline architecture overview
 
 ### Examples
 - **[Examples Guide](docs/examples-guide.md)** - Walkthrough of example applications
@@ -1137,6 +1146,8 @@ genai_dev_workflow:
 
 ### Development
 - **[Developer Guide](developer/developer-guide.md)** - Complete development guide with architecture, testing, and workflows
+- **[Development Guide](docs/development.md)** - Development workflows, testing, and contribution guidelines
+- **[PyPI Publishing](docs/pypi-publishing.md)** - PyPI publishing setup
 - **[AI Assistant Context](developer/AmazonQ.md)** - Context for AI assistants (Amazon Q, Kiro)
 - **[Tests Overview](tests/README.md)** - Testing infrastructure
 

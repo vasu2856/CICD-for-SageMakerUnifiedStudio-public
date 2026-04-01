@@ -1,0 +1,45 @@
+applicationName: CatalogImportExportExample
+content:
+  catalog:
+    enabled: true
+stages:
+  dev:
+    stage: DEV
+    domain:
+      region: ${DEV_DOMAIN_REGION}
+      tags:
+        purpose: smus-cicd-testing
+    project:
+      name: dev-catalog-project
+      owners:
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
+    deployment_configuration:
+      catalog: {}
+  test:
+    stage: TEST
+    domain:
+      region: ${TEST_DOMAIN_REGION}
+      tags:
+        purpose: smus-cicd-testing
+    project:
+      name: test-catalog-project
+      profileName: All capabilities
+      owners:
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
+    deployment_configuration:
+      catalog: {}
+  prod:
+    stage: PROD
+    domain:
+      region: ${PROD_DOMAIN_REGION}
+      tags:
+        purpose: smus-cicd-testing
+    project:
+      name: prod-catalog-project
+      profileName: All capabilities
+      owners:
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
+    deployment_configuration:
+      catalog: {}
+tests:
+  folder: examples/catalog-import-export/app_tests/

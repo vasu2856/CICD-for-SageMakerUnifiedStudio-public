@@ -10,6 +10,9 @@
 
 # SMUS CI/CD Pipeline CLI
 
+← [Back to Main README](../../../README.md)
+
+
 [![en](https://img.shields.io/badge/lang-en-brightgreen.svg?style=for-the-badge)](README.md)
 [![pt](https://img.shields.io/badge/lang-pt-gray.svg)](docs/langs/pt/README.md)
 [![fr](https://img.shields.io/badge/lang-fr-gray.svg)](docs/langs/fr/README.md)
@@ -239,6 +242,8 @@ Distribuisci dashboard BI interattive con pipeline ETL Glue automatizzate per la
 - **[Guida alle Connessioni](docs/connections.md)** - Configura le integrazioni dei servizi AWS
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - Configurazione dell'automazione CI/CD
 - **[Deployment Metrics](docs/pipeline-deployment-metrics.md)** - Monitoraggio con EventBridge
+- **[Catalog Import/Export Guide](docs/catalog-import-export-guide.md)** - Promuovere risorse del catalogo DataZone tra ambienti
+- **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - Riferimento rapido per il deployment del catalogo
 
 ### Riferimenti
 - **[Manifest Schema](docs/manifest-schema.md)** - Validazione e struttura dello schema YAML

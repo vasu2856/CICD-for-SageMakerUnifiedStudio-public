@@ -15,19 +15,16 @@ class TestTestCommandExitCodes:
         """Set up test fixtures."""
         self.runner = CliRunner()
 
-    @pytest.mark.xfail(reason="Expected failure: no tests configured")
     @patch("smus_cicd.commands.test.ApplicationManifest.from_file")
     def test_no_tests_configured_returns_exit_code_1(self, mock_manifest):
         """Test that test command returns exit code 1 when no tests are configured."""
-        # Mock manifest with target that has no tests
-        mock_target = MagicMock()
-        mock_target.tests = None
-
+        # Mock manifest with no tests configured
         mock_manifest_obj = MagicMock()
-        mock_manifest_obj.stages = {"test": mock_target}
+        mock_manifest_obj.stages = {"test": MagicMock()}
         mock_manifest_obj.domain.region = "us-east-1"
         mock_manifest_obj.domain.name = "test-domain"
-        mock_manifest_obj.pipeline_name = "test-pipeline"
+        mock_manifest_obj.application_name = "test-pipeline"
+        mock_manifest_obj.tests = None  # No tests configured
 
         mock_manifest.return_value = mock_manifest_obj
 
@@ -39,9 +36,7 @@ class TestTestCommandExitCodes:
         # Verify exit code 1
         assert result.exit_code == 1
         assert "No tests configured" in result.stdout
-        assert "Failed (no tests configured)" in result.stdout
 
-    @pytest.mark.xfail(reason="Expected failure: missing test folder")
     @patch("smus_cicd.commands.test.ApplicationManifest.from_file")
     def test_missing_test_folder_returns_exit_code_1(self, mock_manifest):
         """Test that test command returns exit code 1 when test folder is missing."""

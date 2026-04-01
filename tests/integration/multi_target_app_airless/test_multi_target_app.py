@@ -1008,11 +1008,12 @@ stages:
 
             manifest = ApplicationManifest.from_file(pipeline_file)
 
-            if not manifest.content.catalog or not manifest.content.catalog.assets:
+            if not manifest.content.catalog or not manifest.content.catalog.assets or not manifest.content.catalog.assets.access:
                 pytest.skip("No catalog assets configured in manifest")
 
-            print(f"✅ Found {len(manifest.content.catalog.assets)} catalog assets")
-            for i, asset in enumerate(manifest.content.catalog.assets):
+            access_assets = manifest.content.catalog.assets.access
+            print(f"✅ Found {len(access_assets)} catalog assets")
+            for i, asset in enumerate(access_assets):
                 identifier = asset.selector.search.identifier if asset.selector.search else asset.selector.assetId
                 print(f"   Asset {i+1}: {identifier} (permission: {asset.permission})")
 
@@ -1034,7 +1035,7 @@ stages:
                     datazone_client = boto3.client('datazone', region_name=region)
 
                     # Cancel existing subscriptions for test assets
-                    for asset in manifest.content.catalog.assets:
+                    for asset in access_assets:
                         if asset.selector.search:
                             identifier = asset.selector.search.identifier
                             print(f"  Checking subscriptions for: {identifier}")
@@ -1141,7 +1142,7 @@ stages:
                         print(f"✅ Project ID resolved: {project_id}")
 
                         # Test asset search functionality
-                        for asset in manifest.content.catalog.assets:
+                        for asset in access_assets:
                             if asset.selector.search:
                                 identifier = asset.selector.search.identifier
                                 print(f"  Testing asset search: {identifier}")

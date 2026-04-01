@@ -10,6 +10,9 @@
 
 # SMUS CI/CD Pipeline CLI
 
+← [Back to Main README](../../../README.md)
+
+
 [![en](https://img.shields.io/badge/lang-en-brightgreen.svg?style=for-the-badge)](README.md)
 [![pt](https://img.shields.io/badge/lang-pt-gray.svg)](docs/langs/pt/README.md)
 [![fr](https://img.shields.io/badge/lang-fr-gray.svg)](docs/langs/fr/README.md)
@@ -367,6 +370,8 @@ dashboard-glue-quick/
 - **[连接指南](docs/connections.md)** - 配置AWS服务集成
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - CI/CD自动化设置
 - **[Deployment Metrics](docs/pipeline-deployment-metrics.md)** - 使用EventBridge进行监控
+- **[Catalog Import/Export Guide](docs/catalog-import-export-guide.md)** - 跨环境推广DataZone目录资源
+- **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - 目录部署快速参考
 
 ### 参考
 - **[Manifest Schema](docs/manifest-schema.md)** - YAML模式验证和结构

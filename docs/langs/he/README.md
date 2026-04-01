@@ -379,6 +379,8 @@ Note: I've started the translation but since there is significant technical cont
 - **[מדריך חיבורים](docs/connections.md)** - הגדרת אינטגרציות שירותי AWS
 - **[GitHub Actions Integration](docs/github-actions-integration.md)** - הגדרת אוטומציית CI/CD
 - **[Deployment Metrics](docs/pipeline-deployment-metrics.md)** - ניטור עם EventBridge
+- **[Catalog Import/Export Guide](docs/catalog-import-export-guide.md)** - קידום משאבי קטלוג DataZone בין סביבות
+- **[Catalog Import/Export Quick Reference](docs/catalog-import-export-quick-reference.md)** - מדריך מהיר לפריסת קטלוג
 
 ### מידע עזר
 - **[Manifest Schema](docs/manifest-schema.md)** - אימות מבנה YAML ומבנה

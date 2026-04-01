@@ -1,0 +1,27 @@
+monitoring:
+  eventbridge:
+    enabled: false
+applicationName: CatalogDisabledTest
+content:
+  storage:
+    - name: code
+      include:
+        - code
+  catalog:
+    enabled: false
+    assets:
+      access: []
+
+stages:
+  dev:
+    stage: DEV
+    domain:
+      tags:
+        purpose: smus-cicd-import-export
+      region: ${DEV_DOMAIN_REGION}
+    project:
+      name: admin-project-592756948959
+      owners:
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
+      role:
+        arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin

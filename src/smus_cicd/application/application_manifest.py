@@ -66,11 +66,30 @@ class AssetConfig:
 
 
 @dataclass
-class CatalogConfig:
-    """Catalog configuration for bundle."""
+class CatalogAssetsConfig:
+    """Catalog assets configuration for subscription requests only."""
 
+    access: Optional[List[AssetConfig]] = None
+
+
+@dataclass
+class CatalogConfig:
+    """Catalog configuration for bundle.
+
+    The manifest content.catalog section ONLY supports:
+    - enabled (bool): Enable/disable catalog export (default: false)
+    - skipPublish (bool): Skip publishing assets/data products during deploy (default: false).
+      When false, resources are published only if they were published in the source project.
+    - connectionName (Optional[str]): Connection name for catalog access
+    - assets (Optional[CatalogAssetsConfig]): For asset subscription requests only
+
+    NOTE: No filter fields (include, names, assetTypes, etc.) are supported.
+    """
+
+    enabled: bool = False
+    skipPublish: bool = False
     connectionName: Optional[str] = None
-    assets: List[AssetConfig] = field(default_factory=list)
+    assets: Optional[CatalogAssetsConfig] = None
 
 
 @dataclass
@@ -283,38 +302,51 @@ class ApplicationManifest:
         # Parse content configuration
         content_data = data.get("content", {})
 
-        # Parse catalog configuration
+        # Parse catalog configuration (simplified: enabled, skipPublish, assets.access only)
         catalog = None
         catalog_data = content_data.get("catalog")
-        if catalog_data:
-            assets = []
-            for asset_data in catalog_data.get("assets", []):
-                selector_data = asset_data.get("selector", {})
+        if catalog_data is not None:
+            # Parse assets config (for subscription requests only)
+            assets_config = None
+            assets_data = catalog_data.get("assets")
 
-                # Parse search config if present
-                search = None
-                search_data = selector_data.get("search")
-                if search_data:
-                    search = AssetSearchConfig(
-                        assetType=search_data.get("assetType"),
-                        identifier=search_data.get("identifier", ""),
+            if assets_data is not None:
+                access_assets = []
+                access_data = assets_data.get("access", [])
+                for asset_data in access_data:
+                    selector_data = asset_data.get("selector", {})
+
+                    # Parse search config if present
+                    search = None
+                    search_data = selector_data.get("search")
+                    if search_data:
+                        search = AssetSearchConfig(
+                            assetType=search_data.get("assetType"),
+                            identifier=search_data.get("identifier", ""),
+                        )
+
+                    selector = AssetSelectorConfig(
+                        assetId=selector_data.get("assetId"), search=search
                     )
 
-                selector = AssetSelectorConfig(
-                    assetId=selector_data.get("assetId"), search=search
-                )
+                    asset = AssetConfig(
+                        selector=selector,
+                        permission=asset_data.get("permission", "READ"),
+                        requestReason=asset_data.get(
+                            "requestReason", "Required for pipeline deployment"
+                        ),
+                    )
+                    access_assets.append(asset)
 
-                asset = AssetConfig(
-                    selector=selector,
-                    permission=asset_data.get("permission", "READ"),
-                    requestReason=asset_data.get(
-                        "requestReason", "Required for pipeline deployment"
-                    ),
+                assets_config = CatalogAssetsConfig(
+                    access=access_assets if access_assets else None,
                 )
-                assets.append(asset)
 
             catalog = CatalogConfig(
-                connectionName=catalog_data.get("connectionName"), assets=assets
+                enabled=catalog_data.get("enabled", False),
+                skipPublish=catalog_data.get("skipPublish", False),
+                connectionName=catalog_data.get("connectionName"),
+                assets=assets_config,
             )
 
         # Parse storage configs
