@@ -354,6 +354,25 @@ def create_workflow(
                 }
 
             except Exception as update_error:
+                if "ServiceQuotaExceededException" in str(update_error):
+                    logger.error(
+                        f"Workflow update failed because the workflow version quota limit "
+                        f"has been reached for '{workflow_name}'."
+                    )
+                    import typer
+
+                    typer.echo(
+                        f"\n❌ Workflow update failed: version quota limit reached for '{workflow_name}'.\n"
+                        f"\nTo resolve, delete old versions or the entire workflow and retry:\n"
+                        f"\n  # Delete a specific version:\n"
+                        f"  aws mwaa-serverless delete-workflow \\\n"
+                        f"    --workflow-arn {workflow_arn} \\\n"
+                        f"    --workflow-version <VERSION>\n"
+                        f"\n  # Or delete the entire workflow (loses run history):\n"
+                        f"  aws mwaa-serverless delete-workflow \\\n"
+                        f"    --workflow-arn {workflow_arn}\n"
+                    )
+                    raise
                 logger.error(
                     f"Failed to update workflow {workflow_name}: {update_error}"
                 )

@@ -6,7 +6,6 @@ updates:
       interval: "weekly"
     ignore:
       - dependency-name: "mlflow"
-        reason: "mlflow>=3.x requires Python >=3.10; training container uses Python 3.9"
 
   - package-ecosystem: "pip"
     directory: "/examples/analytic-workflow/data-notebooks/notebooks"
@@ -14,10 +13,6 @@ updates:
       interval: "weekly"
     ignore:
       - dependency-name: "mlflow"
-        reason: "mlflow>=3.x requires Python >=3.10; training container uses Python 3.9"
       - dependency-name: "mlflow-skinny"
-        reason: "mlflow>=3.x requires Python >=3.10; training container uses Python 3.9"
       - dependency-name: "mlflow-tracing"
-        reason: "mlflow>=3.x requires Python >=3.10; training container uses Python 3.9"
       - dependency-name: "sagemaker-mlflow"
-        reason: "pinned alongside mlflow for compatibility"

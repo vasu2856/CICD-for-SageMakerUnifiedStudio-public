@@ -14,22 +14,12 @@ content:
   - workflowName: notebooks_workflow
     connectionName: default.workflow_serverless
 stages:
-  dev:
-    stage: DEV
-    domain:
-      tags:
-        purpose: smus-cicd-testing
-      region: ${DEV_DOMAIN_REGION:us-east-2}
-    project:
-      name: dev-marketing
-    environment_variables:
-      S3_PREFIX: dev
   test:
     stage: TEST
     domain:
       tags:
         purpose: smus-cicd-testing
-      region: ${TEST_DOMAIN_REGION:us-east-1}
+      region: ${TEST_DOMAIN_REGION}
     project:
       name: test-marketing
       owners:
@@ -52,7 +42,7 @@ stages:
         name: mlflow-server
         connection_type: MLFLOW
         properties:
-          trackingServerArn: arn:aws:sagemaker:${STS_REGION}:${STS_ACCOUNT_ID}:mlflow-tracking-server/${MLFLOW_TRACKING_SERVER_NAME:smus-integration-mlflow-use2}
+          trackingServerArn: arn:aws:sagemaker:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:mlflow-tracking-server/${MLFLOW_TRACKING_SERVER_NAME:smus-integration-mlflow-use2}
       - type: workflow.create
         workflowName: notebooks_workflow
       - type: workflow.run
@@ -60,6 +50,3 @@ stages:
         trailLogs: true
 tests:
   folder: examples/analytic-workflow/data-notebooks/app_tests/
-
-
-# Trigger workflow

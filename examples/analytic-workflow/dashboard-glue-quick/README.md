@@ -61,7 +61,34 @@ echo "✓ Granted S3 access to QuickSight service role"
 
 **Note**: The S3 bucket pattern `amazon-sagemaker-*-ACCOUNT_ID-*` matches the buckets created by SageMaker/DataZone for data storage.
 
-### 1. Deploy to Dev Environment
+### 1. Set Environment Variables
+
+```bash
+export DEV_DOMAIN_REGION=<your-dev-region>   # e.g. us-east-2
+export QUICKSIGHT_USER=<your-quicksight-user> # e.g. Admin
+```
+
+### 2. Create the Source Dashboard in Dev
+
+Import the reference QuickSight dashboard bundle into your dev environment:
+
+```bash
+python examples/analytic-workflow/dashboard-glue-quick/quicksight/setup_test_dashboard.py
+```
+
+This creates a clean `TotalDeathByCountry` dashboard in your dev QuickSight account that will be used as the source for bundling.
+
+### 3. Bundle from Dev
+
+Export the dashboard from dev QuickSight and package it for deployment:
+
+```bash
+smus-cli bundle --targets dev --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml
+```
+
+This exports the live dashboard from dev QuickSight and packages it into `./artifacts/IntegrationTestETLWorkflow.zip`.
+
+### 4. Deploy to Dev Environment
 
 Deploy the complete application (Glue jobs, workflows, and QuickSight dashboard) to dev:
 
@@ -75,7 +102,7 @@ This will:
 - Create QuickSight dashboard with prefix `deployed-dev-covid-`
 - Refresh the QuickSight dataset with ETL results
 
-### 2. Customize Dashboard in Dev
+### 5. Customize Dashboard in Dev
 
 Open the QuickSight dashboard in the dev account (us-east-2) and make your customizations:
 - Add/modify visuals
@@ -84,7 +111,7 @@ Open the QuickSight dashboard in the dev account (us-east-2) and make your custo
 
 The dashboard will be named `TotalDeathByCountry` with ID prefix `deployed-dev-covid-`.
 
-### 3. Bundle from Dev
+### 6. Re-bundle from Dev (after customization)
 
 Export the customized dashboard from dev QuickSight:
 
@@ -96,7 +123,7 @@ This exports the live dashboard from dev QuickSight and packages it into `./arti
 
 **Note**: The manifest does NOT specify `assetBundle` for the QuickSight dashboard, which means it defaults to "export" mode (exports from live QuickSight).
 
-### 4. Deploy to Test Environment
+### 7. Deploy to Test Environment
 
 **First, switch to your test account credentials**
 ```bash

@@ -26,13 +26,9 @@ def setup_test_dashboard():
     """Import test dashboard to dev environment."""
     
     # Get from environment or use defaults
-    account_id = os.environ.get("AWS_ACCOUNT_ID")
     dev_region = os.environ.get("DEV_DOMAIN_REGION", "us-east-2")
-    
-    if not account_id:
-        # Try to get from STS
-        sts = boto3.client("sts")
-        account_id = sts.get_caller_identity()["Account"]
+    sts = boto3.client("sts")
+    account_id = sts.get_caller_identity()["Account"]
     
     # Configuration
     dashboard_bundle = os.path.join(os.path.dirname(__file__), "TotalDeathByCountry.qs")

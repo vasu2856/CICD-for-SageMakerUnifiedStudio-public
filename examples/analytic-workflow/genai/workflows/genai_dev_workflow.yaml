@@ -11,6 +11,7 @@ genai_dev_workflow:
           agent_llm: "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
           force_recreate: "True"
           kb_name: "mortgage-kb"
+          region: "{domain.region}"
       output_config:
         output_formats: 
           ['NOTEBOOK']
