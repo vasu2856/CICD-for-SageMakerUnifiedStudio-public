@@ -8,7 +8,7 @@ genai_dev_workflow:
         input_path: "genai/bundle/workflows/bedrock_agent_notebook.ipynb"
         input_params:
           agent_name: "calculator_agent"
-          agent_llm: "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+          agent_llm: "us.anthropic.claude-sonnet-4-6"
           force_recreate: "True"
           kb_name: "mortgage-kb"
           region: "{domain.region}"
