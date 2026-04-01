@@ -20,8 +20,6 @@ Validates the Search API and SearchTypes API wrappers handle pagination, ownersh
 |---|-------------|----------------|--------|
 | U1 | A single-page search returns all items without following nextToken | Result list matches API response items | ✅ |
 | U2 | A multi-page search follows nextToken until exhausted and returns all items | All items from both pages returned | ✅ |
-| U3 | When `--updated-after` is provided, the search includes a `filters.and` clause with `updatedAt >= timestamp` | Filter clause present in API call | ✅ |
-| U4 | When `--updated-after` is NOT provided, no filter clause is added to the search | No `filters` key in API call | ✅ |
 | U5 | The `owningProjectIdentifier` parameter is applied to all Search API calls for server-side ownership filtering | API call includes `owningProjectIdentifier` | ✅ |
 | U6 | A sort clause of `{"attribute": "updatedAt", "order": "DESCENDING"}` is applied to all search queries | Sort clause present in API call | ✅ |
 | U7 | An empty search result returns an empty list without error | Returns `[]` | ✅ |
@@ -39,7 +37,6 @@ Validates the SearchTypes API wrapper for FormTypes and AssetTypes with client-s
 | U10 | Searching for asset types returns items with `owningProjectId` matching the source project | Only project-owned asset types returned | ✅ |
 | U11 | Client-side `owningProjectId` filtering removes items owned by other projects | Non-matching items excluded | ✅ |
 | U12 | Managed resources (`managed=True`) are excluded from search type results | Managed items filtered out | ✅ |
-| U13 | When `--updated-after` is provided, the filter clause is applied to SearchTypes queries | Filter clause present | ✅ |
 | U14 | Multi-page SearchTypes results are paginated correctly | All pages followed, all items returned | ✅ |
 | U15 | Sort clause is applied to SearchTypes queries | Sort clause present in API call | ✅ |
 | U16 | When the SearchTypes API raises an exception, it propagates to the caller | Exception raised | ✅ |
@@ -91,8 +88,6 @@ Validates the complete export flow: Search → Enrich → Serialize → JSON out
 | U35 | Assets are queried via Search API, form/asset types via SearchTypes API | Correct API routing | ✅ |
 | U36 | SearchTypes API is used for form types and asset types | `search_types` called for these types | ✅ |
 | U37 | Ownership filter is applied to all queries | `owningProjectIdentifier` or client-side filter on all calls | ✅ |
-| U38 | `--updated-after` filter is applied uniformly to all resource types | Filter present on all API calls | ✅ |
-| U39 | When `--updated-after` is not provided, no filter is applied | No filter on any API call | ✅ |
 | U40 | `externalIdentifier` is exported for assets | Field present in asset entries | ✅ |
 | U41 | `formsInput` (from enriched `formsOutput`) is exported for assets | Field present in asset entries | ✅ |
 | U42 | `termRelations` is exported for glossary terms | Field present in glossary term entries | ✅ |
@@ -413,7 +408,6 @@ Validates export correctness properties across randomly generated inputs.
 |---|-------------|----------------|--------|
 | P1 | When `enabled=True`, all 6 resource types are queried; when `enabled=False`, no queries are made | All types present or none | ✅ |
 | P2 | All Search/SearchTypes queries include the ownership filter for the source project | `owningProjectIdentifier` or client-side filter present | ✅ |
-| P3 | When `--updated-after` is provided, the filter is applied uniformly to all resource type queries | Filter present on all calls | ✅ |
 | P6 | The export JSON always has the 7 required top-level keys and valid metadata | Structure invariant holds | ✅ |
 | P7a | Glossary field preservation: `name`, `sourceId`, `description` survive serialization | Fields match input | ✅ |
 | P7b | Glossary term field preservation: `termRelations` survive serialization | Relations match input | ✅ |
@@ -591,7 +585,6 @@ These tests require real AWS credentials and DataZone domains. Run via `smus-cli
 | 2.9 catalog_export.json in bundle | I1 |
 | 2.10 formsOutput → formsInput | U30, U41, P7d |
 | 2.11 termRelations export | U24, U42, P7b |
-| 2.12 --updated-after filter | U3, U13, U38, P3 |
 | 2.13 GetAsset enrichment | U17, U51, U52 |
 | 2.14 identifier/id fallback | U28, U51 |
 | 3.1–3.2 JSON structure | P6, U33, U34 |
@@ -620,7 +613,6 @@ These tests require real AWS credentials and DataZone domains. Run via `smus-cli
 |----------|-----------|----------------|-------------------|
 | P1: Export Enabled/Disabled | U33–U46 | P1 | I1, I7 |
 | P2: Ownership Filtering | U5, U11, U37 | P2 | — |
-| P3: Updated-After Filter | U3, U13, U38 | P3 | — |
 | P6: JSON Structure Invariant | U33, U34 | P6 | I2 |
 | P7: Field Preservation | U23–U32, U47–U58 | P7a–P7f | I3–I6 |
 | P8: JSON Round-Trip | — | P8 | — |

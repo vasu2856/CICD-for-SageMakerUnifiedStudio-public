@@ -6,15 +6,13 @@ FormTypes, AssetTypes, Assets, and Data Products) owned by a DataZone project us
 Search and SearchTypes APIs.
 
 The export is controlled by a simple `content.catalog.enabled` boolean in the manifest.
-When enabled, ALL project-owned resources are exported. The only optional filter is the
-`--updated-after` CLI flag which filters ALL resource types uniformly by modification
-timestamp. No manifest-based filters are applied.
+When enabled, ALL project-owned resources are exported. No manifest-based filters are applied.
 """
 
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import boto3
 
@@ -61,44 +59,23 @@ def _get_datazone_client(region: str):
     return boto3.client("datazone", region_name=region)
 
 
-def _build_updated_after_filter(updated_after: str) -> Dict[str, Any]:
-    """
-    Build the updatedAfter filter clause for search queries.
-
-    Args:
-        updated_after: ISO 8601 timestamp from --updated-after CLI flag
-
-    Returns:
-        Filter dict for DataZone search/searchTypes API
-    """
-    return {
-        "filter": {
-            "attribute": "updatedAt",
-            "value": updated_after,
-        }
-    }
-
-
 def _search_resources(
     client,
     domain_id: str,
     project_id: str,
     search_scope: str,
-    updated_after: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Search for resources using DataZone Search API with pagination.
 
     Uses owningProjectIdentifier filter to ensure only project-owned resources
-    are returned. Optionally filters by updatedAt when --updated-after CLI flag
-    is provided.
+    are returned.
 
     Args:
         client: DataZone boto3 client
         domain_id: DataZone domain identifier
         project_id: DataZone project identifier
         search_scope: Search scope (ASSET, GLOSSARY, GLOSSARY_TERM, DATA_PRODUCT)
-        updated_after: Optional ISO 8601 timestamp from --updated-after CLI flag
 
     Returns:
         List of resource items from search results
@@ -115,9 +92,6 @@ def _search_resources(
         "owningProjectIdentifier": project_id,
         "sort": SORT_CLAUSE,
     }
-
-    if updated_after:
-        search_params["filters"] = _build_updated_after_filter(updated_after)
 
     while True:
         if next_token:
@@ -139,7 +113,6 @@ def _search_type_resources(
     domain_id: str,
     project_id: str,
     search_scope: str,
-    updated_after: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Search for type resources using DataZone SearchTypes API with pagination.
@@ -152,7 +125,6 @@ def _search_type_resources(
         domain_id: DataZone domain identifier
         project_id: DataZone project identifier
         search_scope: Search scope (FORM_TYPE, ASSET_TYPE)
-        updated_after: Optional ISO 8601 timestamp from --updated-after CLI flag
 
     Returns:
         List of type resource items from search results
@@ -169,9 +141,6 @@ def _search_type_resources(
         "managed": False,
         "sort": SORT_CLAUSE,
     }
-
-    if updated_after:
-        search_params["filters"] = _build_updated_after_filter(updated_after)
 
     while True:
         if next_token:
@@ -371,7 +340,6 @@ def export_catalog(
     domain_id: str,
     project_id: str,
     region: str,
-    updated_after: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Export ALL catalog resources owned by a DataZone project.
@@ -380,16 +348,12 @@ def export_catalog(
     exports all resource types owned by the project: Glossaries, GlossaryTerms,
     FormTypes, AssetTypes, Assets, and Data Products.
 
-    No manifest-based filters are applied. The only optional filter is the
-    --updated-after CLI flag which filters ALL resource types uniformly.
+    No manifest-based filters are applied.
 
     Args:
         domain_id: DataZone domain identifier
         project_id: DataZone project identifier
         region: AWS region
-        updated_after: Optional ISO 8601 timestamp from --updated-after CLI flag
-                       (NOT from manifest). Filters ALL resource types uniformly
-                       by updatedAt.
 
     Returns:
         Dict matching the catalog_export.json schema with metadata and all
@@ -419,7 +383,7 @@ def export_catalog(
     # Export resources using Search API
     for resource_type, search_scope in SEARCH_API_RESOURCE_TYPES.items():
         items = _search_resources(
-            client, domain_id, project_id, search_scope, updated_after
+            client, domain_id, project_id, search_scope
         )
         # Enrich assets with full details (search API doesn't return formsOutput)
         if resource_type == "assets" and items:
@@ -434,7 +398,7 @@ def export_catalog(
     # Export resources using SearchTypes API
     for resource_type, search_scope in SEARCH_TYPES_API_RESOURCE_TYPES.items():
         items = _search_type_resources(
-            client, domain_id, project_id, search_scope, updated_after
+            client, domain_id, project_id, search_scope
         )
         result[resource_type] = [
             _serialize_resource(item, resource_type) for item in items

@@ -80,7 +80,6 @@ def bundle_command(
     manifest_file: str,
     output_dir: str,
     output: str,
-    updated_after: Optional[str] = None,
 ):
     """Create bundle zip files by downloading from S3 connection locations."""
     try:
@@ -448,12 +447,10 @@ def bundle_command(
                         )
                     else:
                         # Export ALL project-owned catalog resources when enabled
-                        # The only optional filter is the --updated-after CLI flag
                         catalog_data = export_catalog(
                             domain_id=domain_id,
                             project_id=project_id,
                             region=region,
-                            updated_after=updated_after,
                         )
 
                         # Write catalog/catalog_export.json to temp_bundle_dir

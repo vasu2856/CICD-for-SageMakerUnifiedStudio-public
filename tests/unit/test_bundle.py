@@ -329,7 +329,6 @@ def test_bundle_catalog_export_writes_json_to_bundle(tmp_path):
                                 domain_id="dom-456",
                                 project_id="proj-123",
                                 region="us-east-1",
-                                updated_after=None,
                             )
 
                             # Verify the ZIP contains catalog/catalog_export.json
@@ -454,90 +453,6 @@ def test_bundle_catalog_export_skipped_when_omitted(tmp_path):
                             mock_export.assert_not_called()
 
 
-def test_bundle_updated_after_cli_flag_passed_to_export(tmp_path):
-    """Test that --updated-after CLI flag value is passed correctly to export_catalog()."""
-    from smus_cicd.commands.bundle import bundle_command
-
-    mock_catalog_data = {
-        "metadata": {
-            "sourceProjectId": "proj-123",
-            "sourceDomainId": "dom-456",
-            "exportTimestamp": "2024-06-01T00:00:00Z",
-            "resourceTypes": [
-                "glossaries",
-                "glossaryTerms",
-                "formTypes",
-                "assetTypes",
-                "assets",
-                "dataProducts",
-            ],
-        },
-        "glossaries": [],
-        "glossaryTerms": [],
-        "formTypes": [],
-        "assetTypes": [],
-        "assets": [],
-        "dataProducts": [],
-    }
-
-    manifest_content = {
-        "applicationName": "TestApp",
-        "content": {
-            "catalog": {"enabled": True},
-        },
-        "stages": {
-            "dev": {
-                "stage": "DEV",
-                "domain": {"name": "test-domain", "region": "us-east-1"},
-                "project": {"name": "dev-project"},
-            }
-        },
-    }
-
-    output_dir = str(tmp_path / "artifacts")
-    os.makedirs(output_dir, exist_ok=True)
-
-    with patch("smus_cicd.commands.bundle.ApplicationManifest.from_file") as mock_mf:
-        from smus_cicd.application import ApplicationManifest
-
-        mock_mf.return_value = ApplicationManifest.from_dict(manifest_content)
-
-        with patch(
-            "smus_cicd.commands.bundle.load_config",
-            return_value={"domain": {"region": "us-east-1"}},
-        ):
-            with patch(
-                "smus_cicd.commands.bundle.get_datazone_project_info",
-                return_value={
-                    "connections": {},
-                    "domain_id": "dom-456",
-                    "project_id": "proj-123",
-                },
-            ):
-                with patch("boto3.client"):
-                    with patch(
-                        "smus_cicd.helpers.catalog_export.export_catalog",
-                        return_value=mock_catalog_data,
-                    ) as mock_export:
-                        with patch("smus_cicd.commands.bundle.deployment"):
-                            # Pass updated_after via the CLI flag parameter
-                            bundle_command(
-                                "dev",
-                                "manifest.yaml",
-                                output_dir,
-                                "TEXT",
-                                updated_after="2024-06-01T00:00:00Z",
-                            )
-
-                            # Verify export_catalog was called with the CLI updated_after value
-                            mock_export.assert_called_once_with(
-                                domain_id="dom-456",
-                                project_id="proj-123",
-                                region="us-east-1",
-                                updated_after="2024-06-01T00:00:00Z",
-                            )
-
-
 def test_bundle_no_manifest_filter_values_passed():
     """Test that no manifest-based filter values are read or passed to export_catalog."""
     from smus_cicd.application import ApplicationManifest
@@ -574,16 +489,4 @@ def test_bundle_no_manifest_filter_values_passed():
     assert not hasattr(catalog, "metadataForms")
 
 
-def test_bundle_updated_after_cli_validation_invalid():
-    """Test that invalid --updated-after timestamp format raises an error."""
-    result = runner.invoke(app, ["bundle", "--updated-after", "not-a-timestamp"])
-    assert result.exit_code == 1
-    assert "Invalid --updated-after timestamp format" in result.output
 
-
-def test_bundle_updated_after_cli_validation_valid():
-    """Test that valid --updated-after timestamp format is accepted."""
-    # This should not fail on timestamp validation (may fail later for other reasons)
-    result = runner.invoke(app, ["bundle", "--updated-after", "2024-01-01T00:00:00Z"])
-    # Should not contain timestamp validation error
-    assert "Invalid --updated-after timestamp format" not in result.output

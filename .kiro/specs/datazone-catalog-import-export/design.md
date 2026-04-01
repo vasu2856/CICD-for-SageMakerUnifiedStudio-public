@@ -2,7 +2,7 @@
 
 ## Overview
 
-This design adds catalog resource export/import capabilities to the SMUS CI/CD `bundle` and `deploy` commands. During bundling, a new `CatalogExporter` component queries the DataZone Search and SearchTypes APIs to retrieve Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products that are owned by the source project, serializing them into `catalog/catalog_export.json` within the bundle ZIP. The Search API supports `owningProjectIdentifier` as a request parameter for server-side ownership filtering, while the SearchTypes API requires client-side filtering by `owningProjectId` on response items (it does not support the `owningProjectIdentifier` parameter). For assets, an additional `get_asset` API call per item enriches search results with full details including `formsOutput`, since the Search API only returns summary data. The export captures each asset's and data product's `listingStatus` to preserve the source publish state. The manifest configuration is intentionally simple: only `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array) — no filter options of any kind exist in the manifest. An optional `--updated-after` CLI flag on the bundle command allows filtering ALL resource types uniformly by modification timestamp. During deployment, a new `CatalogImporter` component reads the exported JSON, builds an identifier mapping between source and target projects using externalIdentifier (with normalization) or name as fallback, creates or updates resources in dependency order via DataZone create/update APIs, and publishes assets and data products that were published (listingStatus == "ACTIVE") in the source project unless `skipPublish` is set to true.
+This design adds catalog resource export/import capabilities to the SMUS CI/CD `bundle` and `deploy` commands. During bundling, a new `CatalogExporter` component queries the DataZone Search and SearchTypes APIs to retrieve Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products that are owned by the source project, serializing them into `catalog/catalog_export.json` within the bundle ZIP. The Search API supports `owningProjectIdentifier` as a request parameter for server-side ownership filtering, while the SearchTypes API requires client-side filtering by `owningProjectId` on response items (it does not support the `owningProjectIdentifier` parameter). For assets, an additional `get_asset` API call per item enriches search results with full details including `formsOutput`, since the Search API only returns summary data. The export captures each asset's and data product's `listingStatus` to preserve the source publish state. The manifest configuration is intentionally simple: only `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array) — no filter options of any kind exist in the manifest. During deployment, a new `CatalogImporter` component reads the exported JSON, builds an identifier mapping between source and target projects using externalIdentifier (with normalization) or name as fallback, creates or updates resources in dependency order via DataZone create/update APIs, and publishes assets and data products that were published (listingStatus == "ACTIVE") in the source project unless `skipPublish` is set to true.
 
 The design follows existing patterns in the codebase: helpers live in `src/smus_cicd/helpers/`, manifest configuration extends the existing schema, and the deploy command orchestrates import after storage and QuickSight deployments.
 
@@ -12,7 +12,6 @@ The design follows existing patterns in the codebase: helpers live in `src/smus_
 flowchart TD
     subgraph Bundle["bundle command"]
         M[manifest.yaml<br/>content.catalog.enabled: true<br/>NO filter options in manifest] --> CE[CatalogExporter]
-        CLI["--updated-after CLI flag<br/>(optional, filters ALL types uniformly)"] --> CE
         CE -->|Search API<br/>ALL resources| DZ1[(DataZone<br/>Source Project)]
         CE -->|SearchTypes API<br/>ALL resources| DZ1
         CE --> JSON[catalog/catalog_export.json<br/>ALL catalog resources]
@@ -36,7 +35,7 @@ flowchart TD
 
 ### 1. Manifest Schema Extension
 
-Extend `content.catalog` in `application-manifest-schema.yaml` with a simple `enabled` boolean, optional `skipPublish` boolean, and preserve the existing `assets.access` array for subscription requests. The manifest contains NO filter options — no `include`, `names`, `assetTypes`, `updatedAfter`, or any other filter fields. The `--updated-after` timestamp is purely a CLI flag on the bundle command, not a manifest field.
+Extend `content.catalog` in `application-manifest-schema.yaml` with a simple `enabled` boolean, optional `skipPublish` boolean, and preserve the existing `assets.access` array for subscription requests. The manifest contains NO filter options — no `include`, `names`, `assetTypes`, or any other filter fields.
 
 Publishing behavior: By default, assets and data products are published during import only if they were published (`listingStatus == "ACTIVE"`) in the source project. This preserves the source publish state across environments. Set `skipPublish: true` to skip all publishing regardless of source state.
 
@@ -75,8 +74,7 @@ class CatalogConfig:
     skipPublish: bool = False    # When true, skip all publishing regardless of source state
     connectionName: Optional[str] = None
     assets: Optional[CatalogAssetsConfig] = None  # For asset subscription requests only
-    # NOTE: No filter fields (include, names, assetTypes, updatedAfter, etc.)
-    # The --updated-after filter is a CLI-only option on the bundle command
+    # NOTE: No filter fields (include, names, assetTypes, etc.)
 ```
 
 ### 2. CatalogExporter (`src/smus_cicd/helpers/catalog_export.py`)
@@ -86,7 +84,6 @@ def export_catalog(
     domain_id: str,
     project_id: str,
     region: str,
-    updated_after: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Export ALL catalog resources owned by a DataZone project.
@@ -95,15 +92,12 @@ def export_catalog(
         domain_id: DataZone domain identifier
         project_id: DataZone project identifier
         region: AWS region
-        updated_after: Optional ISO 8601 timestamp from --updated-after CLI flag
-                       (NOT from manifest). Filters ALL resource types uniformly by updatedAt.
 
     Returns a dict matching the catalog_export.json schema.
     Raises on API errors during search.
     
     Exports all resource types owned by the project: Glossaries, GlossaryTerms, 
-    FormTypes, AssetTypes, Assets, and Data Products. No manifest-based filters
-    are applied — the only optional filter is the CLI --updated-after timestamp.
+    FormTypes, AssetTypes, Assets, and Data Products.
     """
 ```
 
@@ -111,8 +105,8 @@ Internal helpers:
 
 | Function | Purpose |
 |---|---|
-| `_search_resources(client, domain_id, project_id, search_scope, updated_after)` | Paginated Search API call for Assets, GlossaryTerms, Glossaries with `owningProjectIdentifier` parameter and optional updatedAfter filter (from CLI flag only) |
-| `_search_type_resources(client, domain_id, project_id, search_scope, updated_after)` | Paginated SearchTypes API call for FormTypes, AssetTypes with client-side `owningProjectId` filtering and optional updatedAfter filter (from CLI flag only). Note: the SearchTypes API does NOT support the `owningProjectIdentifier` parameter — ownership filtering is done client-side on response items. |
+| `_search_resources(client, domain_id, project_id, search_scope)` | Paginated Search API call for Assets, GlossaryTerms, Glossaries with `owningProjectIdentifier` parameter |
+| `_search_type_resources(client, domain_id, project_id, search_scope)` | Paginated SearchTypes API call for FormTypes, AssetTypes with client-side `owningProjectId` filtering. Note: the SearchTypes API does NOT support the `owningProjectIdentifier` parameter — ownership filtering is done client-side on response items. |
 | `_enrich_asset_items(client, domain_id, items)` | Call `get_asset` for each asset item to retrieve full details including `formsOutput`, `description`, and `listingStatus` — the Search API only returns summary data without form details |
 | `_serialize_resource(resource, resource_type)` | Extract user-configurable fields, preserve `name`, `externalIdentifier`, and source identifier. For assets, uses `identifier` (from Search API) or `id` (from GetAsset API) as `sourceId` fallback. |
 | `_normalize_external_identifier(external_id)` | Remove AWS account ID and region information from externalIdentifier |
@@ -141,7 +135,6 @@ All queries use:
 - Ownership filtering (server-side via `owningProjectIdentifier` for Search API, client-side via `owningProjectId` for SearchTypes API)
 - `sort=[{"attribute": "updatedAt", "order": "DESCENDING"}]`
 - `nextToken` pagination until exhausted
-- Optional `filters.updatedAt >= updated_after` when `updated_after` is provided via CLI `--updated-after` flag (applied uniformly to ALL resource types)
 
 Export additional fields:
 - Assets: Include `inputForms` field in serialization
@@ -200,16 +193,11 @@ In `bundle.py`, after QuickSight export and before ZIP creation:
 if manifest.content and manifest.content.catalog and manifest.content.catalog.enabled:
     from ..helpers.catalog_export import export_catalog
     
-    # Get optional --updated-after from CLI args only (NOT from manifest)
-    updated_after = args.updated_after if hasattr(args, 'updated_after') else None
-    
     # Export ALL project-owned catalog resources when enabled
-    # No manifest-based filters — the only filter is the optional CLI --updated-after flag
     catalog_data = export_catalog(
         domain_id, 
         project_id,
         region,
-        updated_after=updated_after,  # CLI-only, applies uniformly to ALL resource types
     )
     
     # Write catalog/catalog_export.json to temp_bundle_dir
@@ -218,18 +206,6 @@ if manifest.content and manifest.content.catalog and manifest.content.catalog.en
     with open(os.path.join(catalog_dir, "catalog_export.json"), "w") as f:
         json.dump(catalog_data, f, indent=2, default=str)
     total_files_added += 1
-```
-
-CLI argument addition (this is the ONLY way to filter resources — not via manifest):
-
-```python
-# In bundle command argument parser
-parser.add_argument(
-    '--updated-after',
-    type=str,
-    help='ISO 8601 timestamp to filter ALL catalog resources uniformly by updatedAt (e.g., 2024-01-01T00:00:00Z). This is a CLI-only option, not a manifest field.',
-    required=False
-)
 ```
 
 ### 5. Deploy Command Integration
@@ -354,12 +330,7 @@ For all manifest configurations `M` where `M.content.catalog.enabled` is true, t
 ### Property 2: Export All Project-Owned Resources
 **Validates: Requirement 2.1, 2.2, 2.3**
 
-When catalog export is enabled, the `CatalogExporter` SHALL query ALL resource types from the source project. For the Search API (Assets, Glossaries, GlossaryTerms, Data Products), the `owningProjectIdentifier` parameter is used for server-side filtering. For the SearchTypes API (FormTypes, AssetTypes), client-side filtering by `owningProjectId` is used since the SearchTypes API does not support the `owningProjectIdentifier` parameter. The resulting JSON SHALL contain all project-owned resources without any manifest-based filtering. The only optional filter is the `--updated-after` CLI flag.
-
-### Property 3: Updated-After CLI Filter Correctness
-**Validates: Requirement 2.12**
-
-For all ISO 8601 timestamps `T` provided via the `--updated-after` CLI flag (not from manifest), and for all resources `R` in the resulting `catalog_export.json`, the `updatedAt` attribute of `R` in the source system SHALL be greater than or equal to `T`. When `--updated-after` is not provided, all project-owned resources SHALL be exported regardless of their `updatedAt` timestamp. This filter is applied uniformly to ALL resource types.
+When catalog export is enabled, the `CatalogExporter` SHALL query ALL resource types from the source project. For the Search API (Assets, Glossaries, GlossaryTerms, Data Products), the `owningProjectIdentifier` parameter is used for server-side filtering. For the SearchTypes API (FormTypes, AssetTypes), client-side filtering by `owningProjectId` is used since the SearchTypes API does not support the `owningProjectIdentifier` parameter. The resulting JSON SHALL contain all project-owned resources without any filtering.
 
 ### Property 4: API Routing by Resource Type
 **Validates: Requirements 2.1, 2.2, 2.6, 2.7**
@@ -457,7 +428,7 @@ For all JSON inputs `J` that are missing any of the required top-level keys `{me
 | `deployment_configuration.catalog.disable: true` | Skip catalog import, log message |
 | Resource exists in target but not in bundle | Delete resource in reverse dependency order |
 | Deletion fails due to dependency | Log error, continue with next resource, report in summary |
-| Invalid --updated-after timestamp format | Raise validation error with helpful message |
+| Invalid timestamp format | Raise validation error with helpful message |
 | DataSourceReferenceForm with no matching target data source | Strip the form from the asset's formsInput, log warning |
 | DataSourceReferenceForm JSON parse failure | Strip the form from the asset's formsInput, log warning |
 
@@ -475,7 +446,6 @@ Located in `tests/unit/helpers/`:
   - Verify `_enrich_asset_items` falls back to search data on `get_asset` failure
   - Verify `sourceId` resolution uses `identifier` (Search API) or `id` (GetAsset API) fallback
   - Verify pagination handling
-  - Verify --updated-after CLI flag filter construction and application (CLI-only, not manifest)
   - Verify JSON structure output with all resource types
   - Verify error propagation on API failure
   - Verify externalIdentifier and inputForms/termRelations are exported
@@ -502,7 +472,6 @@ Located in `tests/unit/helpers/test_catalog_properties.py`:
 - Generate random resource collections with `@st.composite` strategies
 - Test catalog export enabled/disabled (Property 1)
 - Test export all project-owned resources (Property 2)
-- Test updated-after filter correctness (Property 3)
 - Test round-trip serialization (Property 8)
 - Test externalIdentifier-based identifier mapping with normalization (Property 9)
 - Test dependency ordering invariant for creation (Property 11)
@@ -517,7 +486,6 @@ Located in `tests/integration/catalog-import-export/`:
 
 - `test_catalog_export.py` — End-to-end export from a real DataZone project
   - Verify all resource types owned by project are exported when enabled
-  - Verify --updated-after CLI flag filters ALL resource types uniformly
   - Verify externalIdentifier is exported for assets
   - Verify inputForms and termRelations are exported
   

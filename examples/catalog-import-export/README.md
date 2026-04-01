@@ -22,35 +22,13 @@ The `content.catalog` section supports only three fields:
 | `skipPublish` | boolean | `false` | When true, skip all publishing regardless of source state |
 | `assets.access` | array | `[]` | Subscription access requests (unchanged from existing behavior) |
 
-No filter options (`include`, `names`, `assetTypes`, `updatedAfter`, etc.) exist in the manifest.
-
-## Filtering with `--updated-after`
-
-The **only** way to filter exported catalog resources is via the `--updated-after` CLI flag on the `bundle` command. This flag accepts an ISO 8601 timestamp and filters **all** resource types uniformly by their `updatedAt` timestamp.
-
-```bash
-# Export only resources modified after a specific date
-smus-cli bundle --manifest examples/catalog-import-export/manifest.yaml \
-    --updated-after 2024-06-01T00:00:00Z
-
-# Export all resources (no filter)
-smus-cli bundle --manifest examples/catalog-import-export/manifest.yaml
-```
+No filter options (`include`, `names`, `assetTypes`, etc.) exist in the manifest.
 
 ## Setup
 
-### 1. Seed Sample Data (Optional)
+### 1. Prepare Catalog Resources
 
-Use the seed script to populate your source project with sample catalog resources:
-
-```bash
-python examples/catalog-import-export/seed_catalog_data.py \
-    --domain-id <your-domain-id> \
-    --project-id <your-project-id> \
-    --region us-east-1
-```
-
-The script is idempotent — it skips resources that already exist.
+Ensure your source project has catalog resources (glossaries, glossary terms, form types, asset types, assets, data products). For setting up sample catalog resources, refer to the MaxdomeCatalogSamplesSetup Brazil package.
 
 ### 2. Bundle
 

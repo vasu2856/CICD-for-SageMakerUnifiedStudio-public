@@ -66,15 +66,6 @@ class AssetConfig:
 
 
 @dataclass
-class CatalogAssetAccessConfig:
-    """Configuration for a single catalog asset access/subscription request."""
-
-    selector: Dict[str, Any]
-    permission: str = "READ"
-    requestReason: str = "Required for pipeline deployment"
-
-
-@dataclass
 class CatalogAssetsConfig:
     """Catalog assets configuration for subscription requests only."""
 
@@ -92,21 +83,13 @@ class CatalogConfig:
     - connectionName (Optional[str]): Connection name for catalog access
     - assets (Optional[CatalogAssetsConfig]): For asset subscription requests only
 
-    NOTE: No filter fields (include, names, assetTypes, updatedAfter, etc.)
-    The --updated-after filter is a CLI-only option on the bundle command.
+    NOTE: No filter fields (include, names, assetTypes, etc.) are supported.
     """
 
     enabled: bool = False
     skipPublish: bool = False
     connectionName: Optional[str] = None
     assets: Optional[CatalogAssetsConfig] = None
-
-    @property
-    def accessAssets(self) -> List[AssetConfig]:
-        """Backward compatibility property for accessing asset access requests."""
-        if self.assets and self.assets.access:
-            return self.assets.access
-        return []
 
 
 @dataclass
@@ -327,65 +310,33 @@ class ApplicationManifest:
             assets_config = None
             assets_data = catalog_data.get("assets")
 
-            # Handle backward compatibility: check for old accessAssets field
-            old_access_assets = catalog_data.get("accessAssets", [])
-
-            if assets_data is not None or old_access_assets:
+            if assets_data is not None:
                 access_assets = []
+                access_data = assets_data.get("access", [])
+                for asset_data in access_data:
+                    selector_data = asset_data.get("selector", {})
 
-                # New location: assets.access
-                if assets_data is not None:
-                    access_data = assets_data.get("access", [])
-                    for asset_data in access_data:
-                        selector_data = asset_data.get("selector", {})
-
-                        # Parse search config if present
-                        search = None
-                        search_data = selector_data.get("search")
-                        if search_data:
-                            search = AssetSearchConfig(
-                                assetType=search_data.get("assetType"),
-                                identifier=search_data.get("identifier", ""),
-                            )
-
-                        selector = AssetSelectorConfig(
-                            assetId=selector_data.get("assetId"), search=search
+                    # Parse search config if present
+                    search = None
+                    search_data = selector_data.get("search")
+                    if search_data:
+                        search = AssetSearchConfig(
+                            assetType=search_data.get("assetType"),
+                            identifier=search_data.get("identifier", ""),
                         )
 
-                        asset = AssetConfig(
-                            selector=selector,
-                            permission=asset_data.get("permission", "READ"),
-                            requestReason=asset_data.get(
-                                "requestReason", "Required for pipeline deployment"
-                            ),
-                        )
-                        access_assets.append(asset)
+                    selector = AssetSelectorConfig(
+                        assetId=selector_data.get("assetId"), search=search
+                    )
 
-                # Old location: accessAssets (backward compatibility)
-                if old_access_assets and not access_assets:
-                    for asset_data in old_access_assets:
-                        selector_data = asset_data.get("selector", {})
-
-                        search = None
-                        search_data = selector_data.get("search")
-                        if search_data:
-                            search = AssetSearchConfig(
-                                assetType=search_data.get("assetType"),
-                                identifier=search_data.get("identifier", ""),
-                            )
-
-                        selector = AssetSelectorConfig(
-                            assetId=selector_data.get("assetId"), search=search
-                        )
-
-                        asset = AssetConfig(
-                            selector=selector,
-                            permission=asset_data.get("permission", "READ"),
-                            requestReason=asset_data.get(
-                                "requestReason", "Required for pipeline deployment"
-                            ),
-                        )
-                        access_assets.append(asset)
+                    asset = AssetConfig(
+                        selector=selector,
+                        permission=asset_data.get("permission", "READ"),
+                        requestReason=asset_data.get(
+                            "requestReason", "Required for pipeline deployment"
+                        ),
+                    )
+                    access_assets.append(asset)
 
                 assets_config = CatalogAssetsConfig(
                     access=access_assets if access_assets else None,
