@@ -382,9 +382,7 @@ def export_catalog(
 
     # Export resources using Search API
     for resource_type, search_scope in SEARCH_API_RESOURCE_TYPES.items():
-        items = _search_resources(
-            client, domain_id, project_id, search_scope
-        )
+        items = _search_resources(client, domain_id, project_id, search_scope)
         # Enrich assets with full details (search API doesn't return formsOutput)
         if resource_type == "assets" and items:
             items = _enrich_asset_items(client, domain_id, items)
@@ -397,9 +395,7 @@ def export_catalog(
 
     # Export resources using SearchTypes API
     for resource_type, search_scope in SEARCH_TYPES_API_RESOURCE_TYPES.items():
-        items = _search_type_resources(
-            client, domain_id, project_id, search_scope
-        )
+        items = _search_type_resources(client, domain_id, project_id, search_scope)
         result[resource_type] = [
             _serialize_resource(item, resource_type) for item in items
         ]

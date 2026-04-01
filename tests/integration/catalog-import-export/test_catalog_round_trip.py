@@ -13,15 +13,12 @@ Subtasks covered:
 """
 
 import importlib.util
-import json
 import os
 import shutil
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
 
 import pytest
-import yaml
 
 from tests.integration.base import IntegrationTestBase
 
@@ -98,14 +95,21 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         term_name = f"RoundTripTerm-{ts}"
 
         glossary = _h.create_glossary(
-            domain_id, project_id, glossary_name, region,
+            domain_id,
+            project_id,
+            glossary_name,
+            region,
             description="round-trip test glossary",
         )
         assert glossary, "Failed to create glossary"
 
         term = _h.create_glossary_term(
-            domain_id, glossary["id"], term_name,
-            "round-trip test term", region, project_id=project_id,
+            domain_id,
+            glossary["id"],
+            term_name,
+            "round-trip test term",
+            region,
+            project_id=project_id,
         )
 
         r = self.run_cli_command(["bundle", "--manifest", pf])
@@ -141,8 +145,15 @@ class TestCatalogRoundTrip(IntegrationTestBase):
 
         # Deploy to target
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
         assert r["success"], f"deploy to target failed: {r['output']}"
 
@@ -207,7 +218,10 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         ts = int(time.time())
         glossary_name = f"PublishRoundTrip-{ts}"
         glossary = _h.create_glossary(
-            domain_id, project_id, glossary_name, region,
+            domain_id,
+            project_id,
+            glossary_name,
+            region,
             description="publish round-trip test",
         )
         assert glossary
@@ -226,8 +240,15 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         )
 
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
         assert r["success"], f"deploy with publish failed: {r['output']}"
 
@@ -302,14 +323,24 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         bundle_path = _h.create_bundle_with_catalog(malformed_catalog)
 
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle_path,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle_path,
+                "--manifest",
+                pf,
+            ]
         )
 
         out = r["output"].lower()
         has_error = (
-            "error" in out or "invalid" in out or "missing" in out
-            or "validation" in out or not r["success"]
+            "error" in out
+            or "invalid" in out
+            or "missing" in out
+            or "validation" in out
+            or not r["success"]
         )
         assert has_error, "Deploy with malformed catalog JSON should report an error"
 
@@ -336,8 +367,12 @@ class TestCatalogRoundTrip(IntegrationTestBase):
                 "sourceDomainId": "nonexistent-domain",
                 "exportTimestamp": datetime.now(timezone.utc).isoformat(),
                 "resourceTypes": [
-                    "glossaries", "glossaryTerms", "formTypes",
-                    "assetTypes", "assets", "dataProducts",
+                    "glossaries",
+                    "glossaryTerms",
+                    "formTypes",
+                    "assetTypes",
+                    "assets",
+                    "dataProducts",
                 ],
             },
             "glossaries": [],
@@ -359,8 +394,15 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         bundle_path = _h.create_bundle_with_catalog(failing_catalog)
 
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle_path,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle_path,
+                "--manifest",
+                pf,
+            ]
         )
 
         out = r["output"].lower()

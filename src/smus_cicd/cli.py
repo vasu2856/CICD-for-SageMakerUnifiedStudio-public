@@ -200,9 +200,7 @@ def bundle(
         console.print(f"🔍 Bundle source: {bundle_source} target")
         console.print(f"📦 Bundle destination: {final_targets or 'default'}")
 
-    bundle_command(
-        bundle_source, manifest_file, output_dir, output
-    )
+    bundle_command(bundle_source, manifest_file, output_dir, output)
 
 
 @app.command(

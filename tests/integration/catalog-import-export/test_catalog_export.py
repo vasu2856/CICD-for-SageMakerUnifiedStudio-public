@@ -1,4 +1,4 @@
-    """Integration tests for catalog export during bundle.
+"""Integration tests for catalog export during bundle.
 
 Tests the simplified catalog export design:
 - content.catalog.enabled: true exports ALL project-owned resources
@@ -12,7 +12,6 @@ import json
 import os
 import zipfile
 
-import boto3
 import pytest
 
 from tests.integration.base import IntegrationTestBase
@@ -59,7 +58,10 @@ class TestCatalogExport(IntegrationTestBase):
 
         # Glossary
         g = _h.create_glossary(
-            domain_id, project_id, "TestGlossary", region,
+            domain_id,
+            project_id,
+            "TestGlossary",
+            region,
             description="Integration test glossary",
         )
         if g:
@@ -68,8 +70,12 @@ class TestCatalogExport(IntegrationTestBase):
         # GlossaryTerm
         if "glossary" in created:
             t = _h.create_glossary_term(
-                domain_id, created["glossary"], "TestTerm",
-                "Integration test term", region, project_id=project_id,
+                domain_id,
+                created["glossary"],
+                "TestTerm",
+                "Integration test term",
+                region,
+                project_id=project_id,
             )
             if t:
                 created["glossary_term"] = t["id"]

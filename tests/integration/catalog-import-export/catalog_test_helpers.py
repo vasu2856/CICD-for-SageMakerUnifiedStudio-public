@@ -20,10 +20,10 @@ import pytest
 import yaml
 from botocore.exceptions import ClientError
 
-
 # ------------------------------------------------------------------
 # Project / manifest helpers
 # ------------------------------------------------------------------
+
 
 def get_manifest_path(name: str) -> str:
     """Return absolute path to a manifest in the test directory."""
@@ -55,6 +55,7 @@ def get_project_info(pipeline_file: str, stage: str = "dev"):
 # DataZone client
 # ------------------------------------------------------------------
 
+
 def dz_client(region: str):
     """Create a DataZone client for the given region."""
     return boto3.client("datazone", region_name=region)
@@ -63,6 +64,7 @@ def dz_client(region: str):
 # ------------------------------------------------------------------
 # Search
 # ------------------------------------------------------------------
+
 
 def search_resources(
     domain_id: str,
@@ -98,6 +100,7 @@ def search_resources(
 # Bundle ZIP
 # ------------------------------------------------------------------
 
+
 def find_bundle_zip(prefix: str = "Catalog") -> Optional[str]:
     """Find the most recent bundle ZIP matching *prefix*."""
     for d in [".", "artifacts"]:
@@ -111,6 +114,7 @@ def find_bundle_zip(prefix: str = "Catalog") -> Optional[str]:
 # ------------------------------------------------------------------
 # Resource creation helpers
 # ------------------------------------------------------------------
+
 
 def create_glossary(
     domain_id: str,
@@ -169,9 +173,7 @@ def create_glossary_term(
         code = exc.response["Error"]["Code"]
         if code in ("AccessDeniedException", "ConflictException"):
             if code == "ConflictException" and project_id:
-                items = search_resources(
-                    domain_id, project_id, "GLOSSARY_TERM", region
-                )
+                items = search_resources(domain_id, project_id, "GLOSSARY_TERM", region)
                 for item in items:
                     t = item.get("glossaryTermItem", {})
                     if t.get("name") == name:
@@ -236,9 +238,7 @@ def publish_asset(domain_id: str, asset_id: str, region: str) -> bool:
         )
         for _ in range(30):
             time.sleep(2)
-            resp = client.get_asset(
-                domainIdentifier=domain_id, identifier=asset_id
-            )
+            resp = client.get_asset(domainIdentifier=domain_id, identifier=asset_id)
             if resp.get("listingStatus") == "ACTIVE":
                 return True
         return False
@@ -266,10 +266,10 @@ def delete_glossary_term(domain_id: str, term_id: str, region: str):
         pass
 
 
-
 # ------------------------------------------------------------------
 # Bundle read/create helpers
 # ------------------------------------------------------------------
+
 
 def read_catalog_from_bundle(bundle_path: str) -> Optional[Dict[str, Any]]:
     """Extract and return catalog_export.json from a bundle ZIP."""

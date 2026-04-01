@@ -71,9 +71,12 @@ class TestCatalogEdgeCases(IntegrationTestBase):
         return self.run_cli_command(
             [
                 "deploy",
-                "--targets", "test",
-                "--bundle-archive-path", bundle_path,
-                "--manifest", manifest_path,
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle_path,
+                "--manifest",
+                manifest_path,
             ]
         )
 
@@ -127,8 +130,9 @@ class TestCatalogEdgeCases(IntegrationTestBase):
 
         ts = int(time.time())
         gname = f"RetainIdGlossary-{ts}"
-        glossary = _h.create_glossary(domain_id, project_id, gname, region,
-                                      description="retain-id test")
+        glossary = _h.create_glossary(
+            domain_id, project_id, gname, region, description="retain-id test"
+        )
         assert glossary, "Failed to create glossary"
 
         # Re-bundle to include the new glossary
@@ -163,9 +167,9 @@ class TestCatalogEdgeCases(IntegrationTestBase):
                 second_id = g["id"]
                 break
         assert second_id, f"Glossary {gname} not found after re-deploy"
-        assert first_id == second_id, (
-            f"Target glossary ID changed after re-deploy: {first_id} -> {second_id}"
-        )
+        assert (
+            first_id == second_id
+        ), f"Target glossary ID changed after re-deploy: {first_id} -> {second_id}"
 
     # ==================================================================
     # I22 — Deploy with skipPublish: true skips all publishing
@@ -187,8 +191,9 @@ class TestCatalogEdgeCases(IntegrationTestBase):
 
         ts = int(time.time())
         asset_name = f"SkipPublishAsset-{ts}"
-        asset = _h.create_asset(domain_id, project_id, asset_name, region,
-                                description="skip-publish test")
+        asset = _h.create_asset(
+            domain_id, project_id, asset_name, region, description="skip-publish test"
+        )
         assert asset, "Failed to create asset"
 
         published = _h.publish_asset(domain_id, asset["id"], region)
@@ -209,13 +214,13 @@ class TestCatalogEdgeCases(IntegrationTestBase):
             with zf.open("catalog/catalog_export.json") as f:
                 catalog_data = json.load(f)
             active = [
-                a for a in catalog_data.get("assets", [])
-                if a.get("name") == asset_name
-                and a.get("listingStatus") == "ACTIVE"
+                a
+                for a in catalog_data.get("assets", [])
+                if a.get("name") == asset_name and a.get("listingStatus") == "ACTIVE"
             ]
-            assert active, (
-                f"Bundle should contain {asset_name} with ACTIVE listingStatus"
-            )
+            assert (
+                active
+            ), f"Bundle should contain {asset_name} with ACTIVE listingStatus"
 
         # Deploy with skipPublish: true
         r = self._deploy_to_test(pf, bundle)

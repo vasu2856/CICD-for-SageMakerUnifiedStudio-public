@@ -20,11 +20,9 @@ Subtasks covered:
 """
 
 import importlib.util
-import json
 import os
 import shutil
 import time
-from typing import Any, Dict, List, Optional
 
 import pytest
 import yaml
@@ -98,14 +96,21 @@ class TestCatalogImport(IntegrationTestBase):
 
         ts = int(time.time())
         glossary = _h.create_glossary(
-            domain_id, project_id, f"ImportGlossary-{ts}", region,
+            domain_id,
+            project_id,
+            f"ImportGlossary-{ts}",
+            region,
             description="e2e import test",
         )
         assert glossary, "Failed to create glossary"
 
         term = _h.create_glossary_term(
-            domain_id, glossary["id"], f"ImportTerm-{ts}",
-            "e2e term", region, project_id=project_id,
+            domain_id,
+            glossary["id"],
+            f"ImportTerm-{ts}",
+            "e2e term",
+            region,
+            project_id=project_id,
         )
 
         r = self.run_cli_command(["bundle", "--targets", "dev", "--manifest", pf])
@@ -121,8 +126,15 @@ class TestCatalogImport(IntegrationTestBase):
         assert catalog["metadata"]["sourceProjectId"] == project_id
 
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
         assert r["success"], f"deploy test failed: {r['output']}"
 
@@ -164,7 +176,11 @@ class TestCatalogImport(IntegrationTestBase):
         ts = int(time.time())
         gname = f"IdempotentGlossary-{ts}"
         glossary = _h.create_glossary(
-            domain_id, project_id, gname, region, description="idempotent test",
+            domain_id,
+            project_id,
+            gname,
+            region,
+            description="idempotent test",
         )
         assert glossary
 
@@ -175,8 +191,15 @@ class TestCatalogImport(IntegrationTestBase):
 
         # first deploy
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
         assert r["success"], f"First deploy failed: {r['output']}"
 
@@ -189,8 +212,15 @@ class TestCatalogImport(IntegrationTestBase):
 
         # second deploy
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
         assert r["success"], f"Second deploy failed: {r['output']}"
 
@@ -198,9 +228,9 @@ class TestCatalogImport(IntegrationTestBase):
         count_second = sum(
             1 for i in items if i.get("glossaryItem", {}).get("name") == gname
         )
-        assert count_second == 1, (
-            f"Expected 1 glossary after re-deploy, found {count_second} (duplicated)"
-        )
+        assert (
+            count_second == 1
+        ), f"Expected 1 glossary after re-deploy, found {count_second} (duplicated)"
 
     # ==================================================================
     # 8.3  Deletion of resources not in bundle
@@ -223,9 +253,15 @@ class TestCatalogImport(IntegrationTestBase):
         domain_id, project_id, region, _ = _h.get_project_info(pf, "dev")
 
         ts = int(time.time())
-        ga = _h.create_glossary(domain_id, project_id, f"GlossaryA-{ts}", region, description="A")
-        gb = _h.create_glossary(domain_id, project_id, f"GlossaryB-{ts}", region, description="B")
-        gc = _h.create_glossary(domain_id, project_id, f"GlossaryC-{ts}", region, description="C")
+        ga = _h.create_glossary(
+            domain_id, project_id, f"GlossaryA-{ts}", region, description="A"
+        )
+        gb = _h.create_glossary(
+            domain_id, project_id, f"GlossaryB-{ts}", region, description="B"
+        )
+        gc = _h.create_glossary(
+            domain_id, project_id, f"GlossaryC-{ts}", region, description="C"
+        )
         assert ga and gb and gc, "Failed to create source glossaries"
 
         r = self.run_cli_command(["bundle", "--targets", "dev", "--manifest", pf])
@@ -235,8 +271,15 @@ class TestCatalogImport(IntegrationTestBase):
 
         # first deploy
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
         assert r["success"], f"First deploy failed: {r['output']}"
 
@@ -244,33 +287,46 @@ class TestCatalogImport(IntegrationTestBase):
 
         # create extra resource D directly in target
         gd = _h.create_glossary(
-            t_domain, t_project, f"GlossaryD-{ts}", region, description="extra",
+            t_domain,
+            t_project,
+            f"GlossaryD-{ts}",
+            region,
+            description="extra",
         )
         if not gd:
             pytest.skip("Cannot create extra glossary in target")
 
         items = _h.search_resources(t_domain, t_project, "GLOSSARY", region)
         d_count = sum(
-            1 for i in items
+            1
+            for i in items
             if i.get("glossaryItem", {}).get("name") == f"GlossaryD-{ts}"
         )
         assert d_count == 1
 
         # re-deploy same bundle — D should be deleted
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
         assert r["success"], f"Re-deploy failed: {r['output']}"
 
         items = _h.search_resources(t_domain, t_project, "GLOSSARY", region)
         d_count_after = sum(
-            1 for i in items
+            1
+            for i in items
             if i.get("glossaryItem", {}).get("name") == f"GlossaryD-{ts}"
         )
-        assert d_count_after == 0, (
-            f"GlossaryD should have been deleted, found {d_count_after}"
-        )
+        assert (
+            d_count_after == 0
+        ), f"GlossaryD should have been deleted, found {d_count_after}"
         assert "deleted" in r["output"].lower()
 
     # ==================================================================
@@ -295,7 +351,10 @@ class TestCatalogImport(IntegrationTestBase):
 
         ts = int(time.time())
         glossary = _h.create_glossary(
-            domain_id, project_id, f"PublishGlossary-{ts}", region,
+            domain_id,
+            project_id,
+            f"PublishGlossary-{ts}",
+            region,
             description="publish test",
         )
         assert glossary
@@ -309,8 +368,15 @@ class TestCatalogImport(IntegrationTestBase):
         assert bundle
 
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
         assert r["success"], f"Deploy with publish failed: {r['output']}"
 
@@ -340,7 +406,10 @@ class TestCatalogImport(IntegrationTestBase):
 
         ts = int(time.time())
         _h.create_glossary(
-            domain_id, project_id, f"NoPublishGlossary-{ts}", region,
+            domain_id,
+            project_id,
+            f"NoPublishGlossary-{ts}",
+            region,
             description="no-publish test",
         )
 
@@ -350,8 +419,15 @@ class TestCatalogImport(IntegrationTestBase):
         assert bundle
 
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
         assert r["success"], f"Deploy failed: {r['output']}"
 
@@ -380,7 +456,10 @@ class TestCatalogImport(IntegrationTestBase):
 
         ts = int(time.time())
         _h.create_glossary(
-            domain_id, project_id, f"PublishFailGlossary-{ts}", region,
+            domain_id,
+            project_id,
+            f"PublishFailGlossary-{ts}",
+            region,
             description="publish-fail test",
         )
 
@@ -393,12 +472,19 @@ class TestCatalogImport(IntegrationTestBase):
         assert bundle
 
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
-        assert r["success"], (
-            f"Deploy should succeed even when some publishes fail: {r['output']}"
-        )
+        assert r[
+            "success"
+        ], f"Deploy should succeed even when some publishes fail: {r['output']}"
         assert "catalog" in r["output"].lower()
 
     # ==================================================================
@@ -423,7 +509,9 @@ class TestCatalogImport(IntegrationTestBase):
 
         ts = int(time.time())
         gname = f"DisabledGlossary-{ts}"
-        _h.create_glossary(domain_id, project_id, gname, region, description="disabled test")
+        _h.create_glossary(
+            domain_id, project_id, gname, region, description="disabled test"
+        )
 
         r = self.run_cli_command(["bundle", "--targets", "dev", "--manifest", pf])
         assert r["success"]
@@ -434,8 +522,15 @@ class TestCatalogImport(IntegrationTestBase):
         assert catalog, "Bundle should contain catalog_export.json"
 
         r = self.run_cli_command(
-            ["deploy", "--targets", "test-disabled", "--bundle-archive-path", bundle,
-             "--manifest", pf]
+            [
+                "deploy",
+                "--targets",
+                "test-disabled",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                pf,
+            ]
         )
         assert r["success"], f"Deploy failed: {r['output']}"
 
@@ -444,9 +539,9 @@ class TestCatalogImport(IntegrationTestBase):
         disabled_count = sum(
             1 for i in items if i.get("glossaryItem", {}).get("name") == gname
         )
-        assert disabled_count == 0, (
-            f"Expected 0 glossaries when disabled, found {disabled_count}"
-        )
+        assert (
+            disabled_count == 0
+        ), f"Expected 0 glossaries when disabled, found {disabled_count}"
 
         out = r["output"].lower()
         assert "catalog" in out and ("disabled" in out or "skip" in out)
@@ -492,12 +587,19 @@ class TestCatalogImport(IntegrationTestBase):
         assert catalog is None, "Bundle should NOT contain catalog_export.json"
 
         r = self.run_cli_command(
-            ["deploy", "--targets", "test", "--bundle-archive-path", bundle,
-             "--manifest", tmp_manifest]
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle,
+                "--manifest",
+                tmp_manifest,
+            ]
         )
-        assert r["success"], (
-            f"Deploy should succeed without catalog_export.json: {r['output']}"
-        )
+        assert r[
+            "success"
+        ], f"Deploy should succeed without catalog_export.json: {r['output']}"
 
         out = r["output"].lower()
         has_catalog_error = "catalog" in out and "error" in out

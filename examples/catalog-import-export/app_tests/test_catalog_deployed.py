@@ -126,9 +126,9 @@ def test_asset_names_match(datazone_client, domain_id, project_id):
             target_names.add(name)
 
     missing = expected_names - target_names
-    assert not missing, (
-        f"Assets from bundle missing in target project: {sorted(missing)}"
-    )
+    assert (
+        not missing
+    ), f"Assets from bundle missing in target project: {sorted(missing)}"
     print(
         f"✅ All {len(expected_names)} exported asset(s) found in target: "
         f"{', '.join(sorted(expected_names))}"
@@ -168,9 +168,9 @@ def test_publish_status_when_enabled(datazone_client, domain_id, project_id):
             target_published.add(name)
 
     missing = source_published - target_published
-    assert not missing, (
-        f"Assets published in source but not published in target: {sorted(missing)}"
-    )
+    assert (
+        not missing
+    ), f"Assets published in source but not published in target: {sorted(missing)}"
     print(
         f"✅ All {len(source_published)} source-published asset(s) "
         f"are published in target"
@@ -208,9 +208,7 @@ def test_form_types_exist(datazone_client, domain_id, project_id):
         return
 
     missing = expected_names - target_names
-    assert not missing, (
-        f"Form types from bundle missing in target project: {sorted(missing)}"
-    )
-    print(
-        f"✅ All {len(expected_names)} exported form type(s) found in target"
-    )
+    assert (
+        not missing
+    ), f"Form types from bundle missing in target project: {sorted(missing)}"
+    print(f"✅ All {len(expected_names)} exported form type(s) found in target")
