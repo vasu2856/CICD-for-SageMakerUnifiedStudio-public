@@ -53,15 +53,15 @@ suffix = f"{region}-{account_id}"
 bucket_name = f"mac-workshop-{suffix}"
 agent_foundation_models = [
     "us.anthropic.claude-3-haiku-20240307-v1:0",
-    "us.anthropic.claude-3-sonnet-20240307-v1:0",
+    "us.anthropic.claude-3-sonnet-20240229-v1:0",
     "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
     "us.anthropic.claude-3-5-haiku-20241022-v1:0",
     "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
 ]
 
 # DEFAULT_AGENT_MODEL = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
-DEFAULT_AGENT_MODEL = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
-DEFAULT_SUPERVISOR_MODEL = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+DEFAULT_AGENT_MODEL = "us.anthropic.claude-sonnet-4-6"
+DEFAULT_SUPERVISOR_MODEL = "us.anthropic.claude-sonnet-4-6"
 
 # "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
 # "us.anthropic.claude-3-5-sonnet-20241022-v1:0"
