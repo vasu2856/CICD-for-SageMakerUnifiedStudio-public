@@ -51,6 +51,8 @@ When you run the `deploy` command, the CLI:
 6. Publishes assets and data products that were published in the source project (unless `skipPublish: true` is configured), verifying each listing becomes ACTIVE before counting it as published
 7. Reports a summary of created, updated, skipped (extra in target), published, and failed resources
 
+> ⚠️ **No resources are ever deleted during import.** The import process only creates new resources or updates existing ones. Resources that exist in the target project but are not present in the bundle — including resources left over from previous deployments — are preserved and logged as "skipped (extra in target)". If you need to remove stale resources from a target project, you must delete them manually through the DataZone console or API.
+
 ## Configuration
 
 ### Manifest Configuration
@@ -198,7 +200,7 @@ The import process automatically resolves cross-references between resources:
 
 ### Extra Resources in Target
 
-During import, resources that exist in the target project but are NOT present in the bundle are **not deleted**. Instead, they are logged for visibility and counted as "skipped" in the import summary. This ensures that manually created resources in the target environment are preserved.
+During import, resources that exist in the target project but are NOT present in the bundle are **never deleted**. This includes resources created by previous deployments that are no longer in the source project. They are logged for visibility and counted as "skipped" in the import summary. This means the target project may accumulate resources over time as the source project evolves. If you need to clean up stale resources, delete them manually through the DataZone console or API.
 
 ## Export JSON Structure
 

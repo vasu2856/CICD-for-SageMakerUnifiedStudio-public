@@ -13,6 +13,7 @@ stages:
       name: dev-catalog-project
       owners:
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
     deployment_configuration:
       catalog: {}
   test:
@@ -26,6 +27,7 @@ stages:
       profileName: All capabilities
       owners:
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
     deployment_configuration:
       catalog: {}
   prod:
@@ -39,6 +41,7 @@ stages:
       profileName: All capabilities
       owners:
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
     deployment_configuration:
       catalog: {}
 tests:
