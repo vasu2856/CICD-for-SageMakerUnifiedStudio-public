@@ -1455,16 +1455,13 @@ def _import_catalog_from_bundle(
                     typer.echo("✅ Catalog import completed:")
                     typer.echo(f"   Created: {summary['created']}")
                     typer.echo(f"   Updated: {summary['updated']}")
-                    typer.echo(f"   Deleted: {summary['deleted']}")
+                    typer.echo(f"   Skipped (extra in target): {summary['skipped']}")
                     typer.echo(f"   Failed: {summary['failed']}")
                     typer.echo(f"   Published: {summary['published']}")
 
                     # Return False if all imports failed
                     total_attempted = (
-                        summary["created"]
-                        + summary["updated"]
-                        + summary["deleted"]
-                        + summary["failed"]
+                        summary["created"] + summary["updated"] + summary["failed"]
                     )
                     if total_attempted > 0 and summary["failed"] == total_attempted:
                         typer.echo("❌ All catalog imports failed")

@@ -127,7 +127,7 @@ def test_import_catalog_from_bundle_success(
             mock_import.return_value = {
                 "created": 2,
                 "updated": 0,
-                "deleted": 0,
+                "skipped": 0,
                 "failed": 0,
                 "published": 0,
             }
@@ -209,7 +209,7 @@ def test_import_catalog_from_bundle_all_failed(
             mock_import.return_value = {
                 "created": 0,
                 "updated": 0,
-                "deleted": 0,
+                "skipped": 0,
                 "failed": 2,
                 "published": 0,
             }
@@ -246,7 +246,7 @@ def test_import_catalog_from_bundle_partial_failure(
             mock_import.return_value = {
                 "created": 1,
                 "updated": 0,
-                "deleted": 0,
+                "skipped": 0,
                 "failed": 1,
                 "published": 0,
             }
@@ -320,10 +320,10 @@ def test_import_catalog_from_bundle_project_not_found(
         shutil.rmtree(temp_dir)
 
 
-def test_import_catalog_from_bundle_deletion_counts_reported(
+def test_import_catalog_from_bundle_skipped_counts_reported(
     mock_target_config, mock_config, sample_catalog_export, capsys
 ):
-    """Test that deletion counts are reported in the summary output."""
+    """Test that skipped (extra in target) counts are reported in the summary output."""
     bundle_path, temp_dir = create_bundle_with_catalog(sample_catalog_export)
 
     try:
@@ -339,7 +339,7 @@ def test_import_catalog_from_bundle_deletion_counts_reported(
             mock_import.return_value = {
                 "created": 1,
                 "updated": 1,
-                "deleted": 3,
+                "skipped": 3,
                 "failed": 0,
                 "published": 0,
             }
@@ -350,7 +350,7 @@ def test_import_catalog_from_bundle_deletion_counts_reported(
 
             assert result is True
             captured = capsys.readouterr()
-            assert "Deleted: 3" in captured.out
+            assert "Skipped (extra in target): 3" in captured.out
     finally:
         import shutil
 
@@ -377,7 +377,7 @@ def test_import_catalog_from_bundle_published_counts_with_skip_publish_false(
             mock_import.return_value = {
                 "created": 2,
                 "updated": 0,
-                "deleted": 0,
+                "skipped": 0,
                 "failed": 0,
                 "published": 2,
             }
@@ -427,7 +427,7 @@ def test_import_catalog_from_bundle_skip_publish_false_by_default(
             mock_import.return_value = {
                 "created": 1,
                 "updated": 0,
-                "deleted": 0,
+                "skipped": 0,
                 "failed": 0,
                 "published": 1,
             }
@@ -468,7 +468,7 @@ def test_import_catalog_from_bundle_skip_publish_false_no_manifest(
             mock_import.return_value = {
                 "created": 1,
                 "updated": 0,
-                "deleted": 0,
+                "skipped": 0,
                 "failed": 0,
                 "published": 1,
             }

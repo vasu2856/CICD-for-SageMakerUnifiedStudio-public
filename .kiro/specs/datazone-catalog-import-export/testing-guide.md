@@ -154,9 +154,9 @@ Validates the mapping from source identifiers to target identifiers and cross-re
 
 ---
 
-### Level 9 — Import Resource (Create/Update/Delete)
+### Level 9 — Import Resource (Create/Update)
 
-Validates individual resource create, update, and delete operations.
+Validates individual resource create and update operations.
 
 | # | Description | Key Assertions | Status |
 |---|-------------|----------------|--------|
@@ -166,9 +166,6 @@ Validates individual resource create, update, and delete operations.
 | U79 | An API failure during create/update returns `False` (no crash) | Returns `False` | ✅ |
 | U80 | Creating an asset includes the `externalIdentifier` field | `externalIdentifier` in API call | ✅ |
 | U81 | A resource with a missing `sourceId` returns `False` without calling any API | Returns `False`, no API call | ✅ |
-| U82 | Deleting a glossary calls `delete_glossary` with the correct identifier | API called | ✅ |
-| U83 | Deleting an asset calls `delete_asset` with the correct identifier | API called | ✅ |
-| U84 | A delete failure logs the error and returns `False` | Returns `False` | ✅ |
 
 ---
 
@@ -189,31 +186,31 @@ Validates the async publish flow: `create_listing_change_set` → poll → verif
 
 ---
 
-### Level 11 — Identify Resources to Delete
+### Level 11 — Identify Extra Resources in Target
 
-Validates detection of resources in the target that are not in the source bundle.
+Validates detection of resources in the target that are not in the source bundle (logged, not deleted).
 
 | # | Description | Key Assertions | Status |
 |---|-------------|----------------|--------|
-| U93 | Resources in the target project but not in the export JSON are identified for deletion | Extra resources returned | ✅ |
-| U94 | When all target resources match the export JSON, no deletions are identified | Empty deletion list | ✅ |
+| U93 | Resources in the target project but not in the export JSON are identified as extra | Extra resources returned | ✅ |
+| U94 | When all target resources match the export JSON, no extras are identified | Empty extras list | ✅ |
 
 ---
 
 ### Level 12 — Full Import Pipeline (End-to-End Unit)
 
-Validates the complete import flow: validate → map → create/update → delete → publish → summary.
+Validates the complete import flow: validate → map → create/update → log extras → publish → summary.
 
 | # | Description | Key Assertions | Status |
 |---|-------------|----------------|--------|
 | U95 | Resources are created in dependency order: Glossaries → GlossaryTerms → FormTypes → AssetTypes → Assets → DataProducts | Create calls in correct order | ✅ |
-| U96 | Resources are deleted in reverse dependency order: DataProducts → Assets → AssetTypes → FormTypes → GlossaryTerms → Glossaries | Delete calls in reverse order | ✅ |
+| U96 | Extra resources in target are logged but NOT deleted | No delete API calls, skipped count incremented | ✅ |
 | U97 | When source `listingStatus` is ACTIVE and `skipPublish` is false, assets/data products are published after creation | Publish called | ✅ |
 | U98 | When source `listingStatus` is not ACTIVE, no publish is attempted | No publish call | ✅ |
 | U99 | When `skipPublish` is true, no publish is attempted regardless of source state | No publish call | ✅ |
 | U100 | A publish failure increments the `failed` count in the summary | Failed count incremented | ✅ |
 | U101 | When one resource fails to create, remaining resources are still attempted (error resilience) | All resources attempted | ✅ |
-| U102 | The import summary reports correct counts of created, updated, deleted, and failed resources | Counts match actual operations | ✅ |
+| U102 | The import summary reports correct counts of created, updated, skipped, and failed resources | Counts match actual operations | ✅ |
 | U103 | Malformed JSON is rejected before any API calls are made | `ValueError` raised, no API calls | ✅ |
 
 ---
@@ -358,36 +355,32 @@ Validates identifier map building for all resource types and error handling.
 
 ---
 
-### Level 20 — Delete Resource (All Types) & Identify Resources to Delete
+### Level 20 — Identify Extra Resources in Target (All Types)
 
-Validates deletion for all resource types and identification of resources to delete.
+Validates identification of extra resources in target for all resource types (logged, not deleted).
 
 | # | Description | Key Assertions | Status |
 |---|-------------|----------------|--------|
-| U175 | Delete glossary term | API called | ✅ |
-| U176 | Delete form type | API called with formTypeIdentifier | ✅ |
-| U177 | Delete asset type | API called with assetTypeIdentifier | ✅ |
-| U178 | Delete data product | API called | ✅ |
-| U179 | Identify extra glossary terms for deletion | Extra terms returned | ✅ |
-| U180 | Identify extra form types for deletion | Extra form types returned | ✅ |
-| U181 | Identify extra asset types for deletion | Extra asset types returned | ✅ |
-| U182 | Identify extra assets for deletion | Extra assets returned | ✅ |
-| U183 | Identify extra data products for deletion | Extra data products returned | ✅ |
-| U184 | Search failure during deletion identification is graceful | No crash, empty list | ✅ |
-| U185–U190 | Individual search failure per resource type during deletion identification | Each type handled gracefully | ✅ |
+| U179 | Identify extra glossary terms in target | Extra terms returned | ✅ |
+| U180 | Identify extra form types in target | Extra form types returned | ✅ |
+| U181 | Identify extra asset types in target | Extra asset types returned | ✅ |
+| U182 | Identify extra assets in target | Extra assets returned | ✅ |
+| U183 | Identify extra data products in target | Extra data products returned | ✅ |
+| U184 | Search failure during extra resource identification is graceful | No crash, empty list | ✅ |
+| U185–U190 | Individual search failure per resource type during extra resource identification | Each type handled gracefully | ✅ |
 
 ---
 
 ### Level 21 — Full Import Pipeline (Second Pass & Integration)
 
-Validates the second pass termRelations update and full deletion integration.
+Validates the second pass termRelations update and extra resource logging.
 
 | # | Description | Key Assertions | Status |
 |---|-------------|----------------|--------|
 | U191 | Second pass updates glossary terms with resolved termRelations | update_glossary_term called with resolved IDs | ✅ |
 | U192 | Second pass termRelations update failure is logged, not fatal | No crash | ✅ |
 | U193 | Second pass skips terms with empty termRelations | No update call | ✅ |
-| U194 | Deletion failure increments failed counter | Failed count incremented | ✅ |
+| U194 | Extra resources in target are skipped, not deleted | Skipped count incremented, no delete calls | ✅ |
 | U195 | Second pass handles non-list termRelations values | Scalar preserved | ✅ |
 | U196 | Updated asset with ACTIVE listingStatus is published | Publish called | ✅ |
 | U197 | Second pass skips terms with no target mapping | No update call | ✅ |
@@ -434,7 +427,7 @@ Validates import correctness properties across randomly generated catalog data.
 | P10b | Asset `typeIdentifier` is resolved to the target asset type identifier | Resolved correctly | ✅ |
 | P10c | Unmapped cross-references are preserved as-is | Original reference kept | ✅ |
 | P11 | Resources are always created in dependency order regardless of input ordering | Dependency order respected | ✅ |
-| P12 | Resources are always deleted in reverse dependency order | Reverse order respected | ✅ |
+| P12 | Extra resources in target are logged but never deleted (no delete API calls) | No delete calls, skipped count matches extras | ✅ |
 | P13 | When random resources fail to create, all remaining resources are still attempted | All resources attempted | ✅ |
 | P14 | Summary counts (created + updated + failed) always equal total resources attempted | Counts add up | ✅ |
 | P15a | When source `listingStatus` is ACTIVE and `skipPublish` is false, publish is called | Publish invoked | ✅ |

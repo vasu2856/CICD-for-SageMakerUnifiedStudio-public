@@ -68,9 +68,9 @@ deployment_configuration:
 ## How It Works
 
 1. **Bundle**: Exports all project-owned catalog resources to `catalog/catalog_export.json` in the bundle ZIP
-2. **Deploy**: Reads the exported JSON, maps source identifiers to target identifiers, and creates/updates/deletes resources in dependency order (Glossaries → GlossaryTerms → FormTypes → AssetTypes → Assets → Data Products)
+2. **Deploy**: Reads the exported JSON, maps source identifiers to target identifiers, and creates/updates resources in dependency order (Glossaries → GlossaryTerms → FormTypes → AssetTypes → Assets → Data Products)
 3. **Publish** (default): Publishes assets and data products that were published in the source project (skip with `skipPublish: true`)
-4. **Delete**: Resources in the target project that are not in the bundle are deleted (reverse dependency order: Data Products → Assets → AssetTypes → FormTypes → GlossaryTerms → Glossaries)
+4. **Log extras**: Resources in the target project that are not in the bundle are logged for visibility but never deleted
 
 ## Resource Types
 

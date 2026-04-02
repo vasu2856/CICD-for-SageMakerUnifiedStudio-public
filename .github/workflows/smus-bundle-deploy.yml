@@ -183,7 +183,7 @@ jobs:
     name: Validate Manifest
     runs-on: ubuntu-latest
     needs: bundle
-    if: always()
+    if: ${{ needs.bundle.result == 'success' }}
     environment: test-aws-account
     
     steps:
@@ -223,7 +223,8 @@ jobs:
   deploy-test:
     name: Deploy to Test
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [bundle, validate]
+    if: ${{ needs.bundle.result == 'success' && needs.validate.result == 'success' }}
     environment: test-aws-account
     
     steps:
@@ -366,8 +367,8 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     needs: [bundle, validate, deploy-test]
-    # Run if tests are not skipped AND either deploy-test ran or was skipped
-    if: ${{ !inputs.skip_tests && (success() || needs.deploy-test.result == 'skipped') }}
+    # Run if tests are not skipped AND all upstream jobs succeeded
+    if: ${{ !inputs.skip_tests && needs.bundle.result == 'success' && needs.validate.result == 'success' && needs.deploy-test.result == 'success' }}
     environment: test-aws-account
     
     steps:
@@ -415,9 +416,9 @@ jobs:
   deploy-prod:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [bundle, deploy-test, test]
-    # Deploy to prod if enabled AND (tests passed OR tests were skipped OR deploy-test was skipped)
-    if: ${{ inputs.deploy_to_prod && (success() || inputs.skip_tests || needs.deploy-test.result == 'skipped') }}
+    needs: [bundle, validate, deploy-test, test]
+    # Deploy to prod if enabled AND all upstream jobs succeeded (or tests were skipped when skip_tests is true)
+    if: ${{ inputs.deploy_to_prod && needs.bundle.result == 'success' && needs.validate.result == 'success' && needs.deploy-test.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     environment: prod-aws-account
     
     steps:

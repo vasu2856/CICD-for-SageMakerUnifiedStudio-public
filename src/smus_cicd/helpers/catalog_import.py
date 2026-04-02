@@ -4,8 +4,9 @@ DataZone catalog import functionality for SMUS CI/CD CLI.
 This module provides functions to import catalog resources (Glossaries, GlossaryTerms,
 FormTypes, AssetTypes, Assets, and Data Products) into a DataZone project, mapping
 identifiers from source to target projects using externalIdentifier (with normalization)
-or name as fallback. Supports deletion of resources missing from the bundle and
-automatic publishing of assets and data products.
+or name as fallback. Resources in the target that are not present in the bundle are
+logged for visibility but never deleted. Supports automatic publishing of assets and
+data products.
 """
 
 import json
@@ -48,8 +49,8 @@ CREATION_ORDER = [
     "dataProducts",
 ]
 
-# Deletion order (reverse): DataProducts → Assets → AssetTypes → FormTypes → GlossaryTerms → Glossaries
-DELETION_ORDER = list(reversed(CREATION_ORDER))
+# Reverse dependency order: used for reporting extra resources in target
+RESOURCE_REPORT_ORDER = list(reversed(CREATION_ORDER))
 
 # Resource types that can be published
 PUBLISHABLE_TYPES = {"assets", "dataProducts"}
@@ -1068,7 +1069,7 @@ def _import_resource(
         return False, False
 
 
-def _identify_resources_to_delete(
+def _identify_extra_target_resources(
     client,
     domain_id: str,
     project_id: str,
@@ -1077,6 +1078,8 @@ def _identify_resources_to_delete(
     """
     Find resources in target project that are not present in the bundle.
 
+    These resources are reported for visibility but NOT deleted.
+
     Args:
         client: DataZone boto3 client
         domain_id: Target domain identifier
@@ -1084,9 +1087,9 @@ def _identify_resources_to_delete(
         catalog_data: Parsed catalog export JSON
 
     Returns:
-        Dict mapping resource types to lists of {id, name} dicts to delete
+        Dict mapping resource types to lists of {id, name} dicts found in target but not in bundle
     """
-    to_delete: Dict[str, List[Dict[str, str]]] = {rt: [] for rt in DELETION_ORDER}
+    extras: Dict[str, List[Dict[str, str]]] = {rt: [] for rt in RESOURCE_REPORT_ORDER}
 
     # Build sets of names from bundle for each resource type
     bundle_names = {}
@@ -1103,9 +1106,9 @@ def _identify_resources_to_delete(
         for item in target_glossaries:
             g = item.get("glossaryItem", {})
             if g.get("name") and g["name"] not in bundle_names["glossaries"]:
-                to_delete["glossaries"].append({"id": g.get("id"), "name": g["name"]})
+                extras["glossaries"].append({"id": g.get("id"), "name": g["name"]})
     except Exception as e:
-        logger.warning(f"Failed to search target glossaries for deletion: {e}")
+        logger.warning(f"Failed to search target glossaries: {e}")
 
     # Check glossary terms
     try:
@@ -1115,11 +1118,9 @@ def _identify_resources_to_delete(
         for item in target_terms:
             t = item.get("glossaryTermItem", {})
             if t.get("name") and t["name"] not in bundle_names["glossaryTerms"]:
-                to_delete["glossaryTerms"].append(
-                    {"id": t.get("id"), "name": t["name"]}
-                )
+                extras["glossaryTerms"].append({"id": t.get("id"), "name": t["name"]})
     except Exception as e:
-        logger.warning(f"Failed to search target glossary terms for deletion: {e}")
+        logger.warning(f"Failed to search target glossary terms: {e}")
 
     # Check form types
     try:
@@ -1129,11 +1130,11 @@ def _identify_resources_to_delete(
         for item in target_form_types:
             ft = item.get("formTypeItem", {})
             if ft.get("name") and ft["name"] not in bundle_names["formTypes"]:
-                to_delete["formTypes"].append(
+                extras["formTypes"].append(
                     {"id": ft.get("revision"), "name": ft["name"]}
                 )
     except Exception as e:
-        logger.warning(f"Failed to search target form types for deletion: {e}")
+        logger.warning(f"Failed to search target form types: {e}")
 
     # Check asset types
     try:
@@ -1143,11 +1144,11 @@ def _identify_resources_to_delete(
         for item in target_asset_types:
             at = item.get("assetTypeItem", {})
             if at.get("name") and at["name"] not in bundle_names["assetTypes"]:
-                to_delete["assetTypes"].append(
+                extras["assetTypes"].append(
                     {"id": at.get("revision"), "name": at["name"]}
                 )
     except Exception as e:
-        logger.warning(f"Failed to search target asset types for deletion: {e}")
+        logger.warning(f"Failed to search target asset types: {e}")
 
     # Check assets
     try:
@@ -1155,11 +1156,9 @@ def _identify_resources_to_delete(
         for item in target_assets:
             a = item.get("assetItem", {})
             if a.get("name") and a["name"] not in bundle_names["assets"]:
-                to_delete["assets"].append(
-                    {"id": a.get("identifier"), "name": a["name"]}
-                )
+                extras["assets"].append({"id": a.get("identifier"), "name": a["name"]})
     except Exception as e:
-        logger.warning(f"Failed to search target assets for deletion: {e}")
+        logger.warning(f"Failed to search target assets: {e}")
 
     # Check data products
     try:
@@ -1169,60 +1168,11 @@ def _identify_resources_to_delete(
         for item in target_dps:
             dp = item.get("dataProductItem", {})
             if dp.get("name") and dp["name"] not in bundle_names["dataProducts"]:
-                to_delete["dataProducts"].append(
-                    {"id": dp.get("id"), "name": dp["name"]}
-                )
+                extras["dataProducts"].append({"id": dp.get("id"), "name": dp["name"]})
     except Exception as e:
-        logger.warning(f"Failed to search target data products for deletion: {e}")
+        logger.warning(f"Failed to search target data products: {e}")
 
-    return to_delete
-
-
-def _delete_resource(
-    client,
-    domain_id: str,
-    project_id: str,
-    resource_id: str,
-    resource_type: str,
-) -> bool:
-    """
-    Delete a resource from the target project.
-
-    Args:
-        client: DataZone boto3 client
-        domain_id: Target domain identifier
-        project_id: Target project identifier
-        resource_id: Resource identifier to delete
-        resource_type: Type of resource
-
-    Returns:
-        True if deletion succeeded, False otherwise
-    """
-    try:
-        if resource_type == "glossaries":
-            client.delete_glossary(domainIdentifier=domain_id, identifier=resource_id)
-        elif resource_type == "glossaryTerms":
-            client.delete_glossary_term(
-                domainIdentifier=domain_id, identifier=resource_id
-            )
-        elif resource_type == "formTypes":
-            client.delete_form_type(
-                domainIdentifier=domain_id, formTypeIdentifier=resource_id
-            )
-        elif resource_type == "assetTypes":
-            client.delete_asset_type(
-                domainIdentifier=domain_id, assetTypeIdentifier=resource_id
-            )
-        elif resource_type == "assets":
-            client.delete_asset(domainIdentifier=domain_id, identifier=resource_id)
-        elif resource_type == "dataProducts":
-            client.delete_data_product(
-                domainIdentifier=domain_id, identifier=resource_id
-            )
-        return True
-    except Exception as e:
-        logger.error(f"Failed to delete {resource_type} {resource_id}: {e}")
-        return False
+    return extras
 
 
 def _publish_resource(
@@ -1323,8 +1273,11 @@ def import_catalog(
     """
     Import catalog resources into a target DataZone project.
 
-    Orchestrates: validate → map → create in dependency order → delete in reverse
-    order → optionally publish → return summary.
+    Orchestrates: validate → map → create in dependency order → log extra
+    resources in target (no deletion) → optionally publish → return summary.
+
+    Resources that exist in the target project but are NOT in the bundle are
+    logged for visibility but never deleted.
 
     Publishing behavior: By default, assets and data products are published only
     if they were published (listingStatus == "ACTIVE") in the source project.
@@ -1338,7 +1291,7 @@ def import_catalog(
         skip_publish: When True, skip all publishing regardless of source state
 
     Returns:
-        Dict with counts: {"created": N, "updated": N, "deleted": N, "failed": N, "published": N}
+        Dict with counts: {"created": N, "updated": N, "skipped": N, "failed": N, "published": N}
     """
     # Validate JSON structure
     _validate_catalog_json(catalog_data)
@@ -1365,7 +1318,7 @@ def import_catalog(
     # Initialize counters
     created = 0
     updated = 0
-    deleted = 0
+    skipped = 0
     failed = 0
     published = 0
 
@@ -1429,20 +1382,20 @@ def import_catalog(
                 "Failed to update termRelations for %s: %s", term.get("name"), e
             )
 
-    # Identify and delete resources not in bundle (reverse dependency order)
-    to_delete = _identify_resources_to_delete(
+    # Identify resources in target that are not in the bundle and log them.
+    # These resources are NOT deleted — they are only reported for visibility.
+    extra_resources = _identify_extra_target_resources(
         client, domain_id, project_id, catalog_data
     )
-    for resource_type in DELETION_ORDER:
-        for resource_info in to_delete.get(resource_type, []):
-            resource_id = resource_info.get("id")
-            if resource_id:
-                if _delete_resource(
-                    client, domain_id, project_id, resource_id, resource_type
-                ):
-                    deleted += 1
-                else:
-                    failed += 1
+    for resource_type in RESOURCE_REPORT_ORDER:
+        for resource_info in extra_resources.get(resource_type, []):
+            resource_name = resource_info.get("name", "unknown")
+            logger.info(
+                "Extra resource in target (not in bundle): %s '%s' — skipping deletion",
+                resource_type,
+                resource_name,
+            )
+            skipped += 1
 
     # Publish assets and data products unless skip_publish is set
     if not skip_publish:
@@ -1455,13 +1408,13 @@ def import_catalog(
 
     logger.info(
         f"Catalog import complete: {created} created, {updated} updated, "
-        f"{deleted} deleted, {failed} failed, {published} published"
+        f"{skipped} skipped (extra in target), {failed} failed, {published} published"
     )
 
     return {
         "created": created,
         "updated": updated,
-        "deleted": deleted,
+        "skipped": skipped,
         "failed": failed,
         "published": published,
     }

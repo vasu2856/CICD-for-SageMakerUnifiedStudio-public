@@ -2,7 +2,7 @@
 
 ## Overview
 
-This design adds catalog resource export/import capabilities to the SMUS CI/CD `bundle` and `deploy` commands. During bundling, a new `CatalogExporter` component queries the DataZone Search and SearchTypes APIs to retrieve Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products that are owned by the source project, serializing them into `catalog/catalog_export.json` within the bundle ZIP. The Search API supports `owningProjectIdentifier` as a request parameter for server-side ownership filtering, while the SearchTypes API requires client-side filtering by `owningProjectId` on response items (it does not support the `owningProjectIdentifier` parameter). For assets, an additional `get_asset` API call per item enriches search results with full details including `formsOutput`, since the Search API only returns summary data. The export captures each asset's and data product's `listingStatus` to preserve the source publish state. The manifest configuration is intentionally simple: only `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array) — no filter options of any kind exist in the manifest. During deployment, a new `CatalogImporter` component reads the exported JSON, builds an identifier mapping between source and target projects using externalIdentifier (with normalization) or name as fallback, creates or updates resources in dependency order via DataZone create/update APIs, and publishes assets and data products that were published (listingStatus == "ACTIVE") in the source project unless `skipPublish` is set to true.
+This design adds catalog resource export/import capabilities to the SMUS CI/CD `bundle` and `deploy` commands. During bundling, a new `CatalogExporter` component queries the DataZone Search and SearchTypes APIs to retrieve Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products that are owned by the source project, serializing them into `catalog/catalog_export.json` within the bundle ZIP. The Search API supports `owningProjectIdentifier` as a request parameter for server-side ownership filtering, while the SearchTypes API requires client-side filtering by `owningProjectId` on response items (it does not support the `owningProjectIdentifier` parameter). For assets, an additional `get_asset` API call per item enriches search results with full details including `formsOutput`, since the Search API only returns summary data. The export captures each asset's and data product's `listingStatus` to preserve the source publish state. The manifest configuration is intentionally simple: only `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array) — no filter options of any kind exist in the manifest. During deployment, a new `CatalogImporter` component reads the exported JSON, builds an identifier mapping between source and target projects using externalIdentifier (with normalization) or name as fallback, creates or updates resources in dependency order via DataZone create/update APIs, and publishes assets and data products that were published (listingStatus == "ACTIVE") in the source project unless `skipPublish` is set to true. Resources that exist in the target project but are not in the bundle are logged for visibility but never deleted.
 
 The design follows existing patterns in the codebase: helpers live in `src/smus_cicd/helpers/`, manifest configuration extends the existing schema, and the deploy command orchestrates import after storage and QuickSight deployments.
 
@@ -24,8 +24,9 @@ flowchart TD
         VAL --> IM[IdentifierMapper<br/>externalIdentifier + normalization<br/>or name fallback]
         IM -->|Search by normalized externalIdentifier or name| DZ2[(DataZone<br/>Target Project)]
         IM --> CI[CatalogImporter]
-        CI -->|Create/Update/Delete APIs<br/>Dependency-ordered| DZ2
-        CI --> SUM[Import Summary<br/>created/updated/deleted/failed]
+        CI -->|Create/Update APIs<br/>Dependency-ordered| DZ2
+        CI --> LOG[Log extra resources<br/>in target, no deletion]
+        CI --> SUM[Import Summary<br/>created/updated/skipped/failed]
     end
 
     Bundle --> Deploy
@@ -153,6 +154,9 @@ def import_catalog(
     """
     Import catalog resources into a target DataZone project.
 
+    Resources in the target that are not in the bundle are logged for
+    visibility but never deleted.
+
     Publishing behavior: By default, assets and data products are published only
     if they were published (listingStatus == "ACTIVE") in the source project.
     Set skip_publish=True to skip all publishing regardless of source state.
@@ -164,7 +168,7 @@ def import_catalog(
         region: AWS region
         skip_publish: When True, skip all publishing regardless of source state
 
-    Returns {"created": N, "updated": N, "deleted": N, "failed": N, "published": N}.
+    Returns {"created": N, "updated": N, "skipped": N, "failed": N, "published": N}.
     Logs errors per resource but continues processing.
     """
 ```
@@ -177,8 +181,7 @@ Internal helpers:
 | `_normalize_external_identifier(external_id)` | Remove AWS account ID and region information from externalIdentifier |
 | `_resolve_cross_references(resource, id_map)` | Replace source IDs in cross-reference fields (e.g., glossaryId in GlossaryTerm) with target IDs |
 | `_import_resource(client, domain_id, project_id, resource, resource_type, id_map)` | Call create or update API; handle ConflictException for idempotency |
-| `_delete_resource(client, domain_id, project_id, resource_id, resource_type)` | Call delete API for resources missing from bundle |
-| `_identify_resources_to_delete(client, domain_id, project_id, catalog_data)` | Query target project to find resources not present in bundle |
+| `_identify_extra_target_resources(client, domain_id, project_id, catalog_data)` | Query target project to find resources not present in bundle (logged, not deleted) |
 | `_publish_resource(client, domain_id, resource_id, resource_type, max_wait_seconds, poll_interval)` | Call publish API for assets and data products that were published in the source (listingStatus == "ACTIVE"), then poll to verify listing becomes ACTIVE before counting as published. Returns False if listing status is FAILED or verification times out. |
 | `_resolve_target_data_source(client, domain_id, project_id, source_ds_type, database_name)` | Find a data source in the target project that matches the source type and covers the asset's database. Matching priority: (1) exact `databaseName` match in `relationalFilterConfigurations`, (2) wildcard `"*"` database filter, (3) first candidate of same type. Returns `{dataSourceId, dataSourceRunId}` or None. |
 | `_normalize_forms_input_for_api(forms_input, resource_type, client, domain_id, project_id)` | Normalize formsInput for Create/Update APIs: rename `typeName` → `typeIdentifier`, remap `typeRevision` to target domain revision, and remap `DataSourceReferenceForm` content to the target domain's data source using `_resolve_target_data_source()`. Extracts `databaseName` from the asset's `GlueTableForm` to match the correct target data source. Strips the form if no matching data source is found. |
@@ -226,7 +229,7 @@ New function `_import_catalog_from_bundle`:
 4. Validate JSON structure
 5. Get `skipPublish` flag from `manifest.content.catalog.skipPublish` (default: false)
 6. Call `import_catalog()` with skip_publish flag
-7. Report summary counts (created/updated/deleted/failed/published)
+7. Report summary counts (created/updated/skipped/failed/published)
 8. If all fail, return False
 
 ## Data Models
@@ -314,9 +317,7 @@ graph TD
 
 Creation order: `Glossaries` → `GlossaryTerms` → (`FormTypes`, `AssetTypes` can reference terms) → `Assets` → `Data Products`
 
-Deletion order (reverse): `Data Products` → `Assets` → `AssetTypes` → `FormTypes` → `GlossaryTerms` → `Glossaries`
-
-Note: Assets and FormTypes can reference GlossaryTerms, so GlossaryTerms must be created before Assets and FormTypes, and deleted after them. Data Products can reference Assets, so they are created last and deleted first.
+Note: Resources in the target that are not in the bundle are logged for visibility but never deleted. Assets and FormTypes can reference GlossaryTerms, so GlossaryTerms must be created before Assets and FormTypes. Data Products can reference Assets, so they are created last.
 
 ## Correctness Properties
 
@@ -376,20 +377,20 @@ For all resources `R` that contain cross-resource references (GlossaryTerm.gloss
 
 For all import operations, the `CatalogImporter` SHALL invoke create APIs such that: every Glossary is created before any GlossaryTerm that references it, every GlossaryTerm is created before any Asset or FormType that references it, every FormType is created before any AssetType that references it, and every AssetType is created before any Asset that references it.
 
-### Property 12: Dependency-Ordered Deletion
-**Validates: Requirement 5.4, 5.5**
+### Property 12: Extra Resources Not Deleted
+**Validates: Requirement 5.4**
 
-For all import operations where resources exist in the target project but are NOT present in the bundle, the `CatalogImporter` SHALL invoke delete APIs in reverse dependency order: Assets before AssetTypes, AssetTypes before FormTypes, GlossaryTerms before Glossaries (to avoid breaking references).
+For all import operations where resources exist in the target project but are NOT present in the bundle, the `CatalogImporter` SHALL NOT invoke any delete APIs. Instead, it SHALL log each extra resource's name and type for visibility and count them as skipped.
 
 ### Property 13: Import Error Resilience
 **Validates: Requirements 5.10, 5.14, 7.3**
 
-For any import operation where `K` out of `N` resources fail during create/update/delete/publish API calls (where `0 < K < N`), the `CatalogImporter` SHALL still attempt to process all `N` resources, log each of the `K` failures with resource name, type, and error message, and report a summary containing the failure count.
+For any import operation where `K` out of `N` resources fail during create/update/publish API calls (where `0 < K < N`), the `CatalogImporter` SHALL still attempt to process all `N` resources, log each of the `K` failures with resource name, type, and error message, and report a summary containing the failure count.
 
 ### Property 14: Import Summary Counts
 **Validates: Requirement 5.12, 6.3**
 
-For all import operations, the `CatalogImporter` SHALL return counts `{created, updated, deleted, failed, published}` where `created + updated + deleted + failed` equals the total number of resources processed (resources in bundle + resources in target not in bundle), and `published` equals the number of assets and data products that were published in the source (listingStatus == "ACTIVE") and whose listing was verified as ACTIVE in the target when skipPublish is false.
+For all import operations, the `CatalogImporter` SHALL return counts `{created, updated, skipped, failed, published}` where `created + updated + failed` equals the total number of resources in the bundle, `skipped` equals the number of extra resources found in the target but not in the bundle, and `published` equals the number of assets and data products that were published in the source (listingStatus == "ACTIVE") and whose listing was verified as ACTIVE in the target when skipPublish is false.
 
 ### Property 15: Source-State-Based Publishing with skipPublish Override
 **Validates: Requirement 5.13**
@@ -418,7 +419,7 @@ For all JSON inputs `J` that are missing any of the required top-level keys `{me
 | Search/SearchTypes API error during export | Raise exception, abort export, no partial JSON produced |
 | No project-owned resources in source project | Produce valid JSON with empty arrays, log informational message |
 | ConflictException on create | Treat as existing resource, attempt update instead |
-| Create/update/delete API failure during import | Log error (resource name, type, message), continue with next resource |
+| Create/update API failure during import | Log error (resource name, type, message), continue with next resource |
 | Publish API failure during import | Log error (resource name, type, message), continue with next resource, increment failed count |
 | Publish listing verification FAILED | Log error indicating listing failed asynchronously, continue with next resource, increment failed count |
 | Publish listing verification timeout | Log error indicating listing did not become ACTIVE within timeout, continue with next resource, increment failed count |
@@ -426,8 +427,8 @@ For all JSON inputs `J` that are missing any of the required top-level keys `{me
 | Malformed catalog_export.json | Raise validation error before any API calls |
 | Missing catalog/catalog_export.json in bundle | Skip silently (backward compatible) |
 | `deployment_configuration.catalog.disable: true` | Skip catalog import, log message |
-| Resource exists in target but not in bundle | Delete resource in reverse dependency order |
-| Deletion fails due to dependency | Log error, continue with next resource, report in summary |
+| Resource exists in target but not in bundle | Log resource name and type for visibility, count as skipped (no deletion) |
+| ~~Deletion fails due to dependency~~ | _(Removed — resources are never deleted)_ |
 | Invalid timestamp format | Raise validation error with helpful message |
 | DataSourceReferenceForm with no matching target data source | Strip the form from the asset's formsInput, log warning |
 | DataSourceReferenceForm JSON parse failure | Strip the form from the asset's formsInput, log warning |
@@ -455,13 +456,13 @@ Located in `tests/unit/helpers/`:
   - Verify name-based identifier mapping fallback
   - Verify cross-reference resolution
   - Verify dependency-ordered creation
-  - Verify dependency-ordered deletion (reverse order)
+  - Verify extra resources in target are logged but not deleted
   - Verify source-state-based publishing (only LISTED resources published)
   - Verify skipPublish override skips all publishing
   - Verify error resilience (partial failures including publish failures)
   - Verify ConflictException handling
   - Verify validation of malformed JSON
-  - Verify deletion of resources not in bundle
+  - Verify extra resources in target are identified and counted as skipped
 
 ### Property-Based Tests
 
@@ -475,8 +476,8 @@ Located in `tests/unit/helpers/test_catalog_properties.py`:
 - Test round-trip serialization (Property 8)
 - Test externalIdentifier-based identifier mapping with normalization (Property 9)
 - Test dependency ordering invariant for creation (Property 11)
-- Test dependency ordering invariant for deletion (Property 12)
-- Test summary count arithmetic including deletions and publishes (Property 14)
+- Test extra resources are logged not deleted (Property 12)
+- Test summary count arithmetic including skipped and publishes (Property 14)
 - Test source-state-based publishing and skipPublish override (Property 15)
 - Test JSON validation rejects all malformed inputs (Property 17)
 
@@ -491,8 +492,7 @@ Located in `tests/integration/catalog-import-export/`:
   
 - `test_catalog_import.py` — End-to-end import into a target project
   - Verify resources are created/updated using externalIdentifier mapping
-  - Verify resources are deleted when missing from bundle
-  - Verify deletion happens in reverse dependency order
+  - Verify extra resources in target are logged but not deleted
   - Verify source-state-based publishing (only LISTED resources published)
   - Verify skipPublish override skips all publishing
   - Verify published assets and data products are accessible
