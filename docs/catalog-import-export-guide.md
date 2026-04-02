@@ -27,7 +27,7 @@ The catalog import/export feature supports the following DataZone resource types
 
 ## Key Assumption: Physical Resources Must Have the Same Name
 
-> ⚠️ **IMPORTANT**: Catalog import/export assumes that the underlying physical resources (e.g., Glue Tables, Glue Databases, S3 buckets) referenced by your catalog assets **have the same name in both source and target environments**. The import process matches assets across environments using normalized `externalIdentifier` values or resource names. If the physical resource names differ between environments (e.g., `my-table-dev` vs `my-table-prod`), the matching will fail and resources will be created as new rather than updated. **Additionally, any resources that exist in the target project but are not present in the bundle will be deleted during import.** This means mismatched names can cause the original target resource to be deleted and a duplicate to be created. Ensure your infrastructure provisioning uses consistent resource names across stages, or that your naming conventions allow the normalization logic (which strips AWS account IDs and region strings) to produce matching identifiers.
+> ⚠️ **IMPORTANT**: Catalog import/export assumes that the underlying physical resources (e.g., Glue Tables, Glue Databases, S3 buckets) referenced by your catalog assets **have the same name in both source and target environments**. The import process matches assets across environments using normalized `externalIdentifier` values or resource names. If the physical resource names differ between environments (e.g., `my-table-dev` vs `my-table-prod`), the matching will fail and resources will be created as new rather than updated. Ensure your infrastructure provisioning uses consistent resource names across stages, or that your naming conventions allow the normalization logic (which strips AWS account IDs and region strings) to produce matching identifiers.
 
 ## How It Works
 
@@ -45,10 +45,11 @@ When you run the `deploy` command, the CLI:
 
 1. Extracts the `catalog/catalog_export.json` file from the bundle
 2. Builds an identifier mapping between source and target projects using `externalIdentifier` (with normalization) or name as fallback
-3. Creates, updates, or deletes resources in the target project in dependency order
-4. Resolves cross-references (e.g., GlossaryTerm → Glossary, Asset → AssetType)
-5. Publishes assets and data products that were published in the source project (unless `skipPublish: true` is configured), verifying each listing becomes ACTIVE before counting it as published
-6. Reports a summary of created, updated, deleted, published, and failed resources
+3. Creates or updates resources in the target project in dependency order
+4. Logs any resources that exist in the target but are not in the bundle (these are left untouched)
+5. Resolves cross-references (e.g., GlossaryTerm → Glossary, Asset → AssetType)
+6. Publishes assets and data products that were published in the source project (unless `skipPublish: true` is configured), verifying each listing becomes ACTIVE before counting it as published
+7. Reports a summary of created, updated, skipped (extra in target), published, and failed resources
 
 ## Configuration
 
@@ -183,7 +184,7 @@ Resources are created in the following dependency order to ensure references are
 5. **Assets** (reference AssetTypes, may reference GlossaryTerms)
 6. **Data Products** (may reference Assets)
 
-Resources are deleted in reverse dependency order when they exist in the target but not in the bundle.
+Resources that exist in the target but are not in the bundle are logged for visibility but never deleted.
 
 ### Cross-Reference Resolution
 
@@ -195,16 +196,9 @@ The import process automatically resolves cross-references between resources:
 - **FormTypes/Assets** → **GlossaryTerms**: Glossary term references are remapped
 - **Data Products** → **Assets**: Item references within data products are preserved
 
-### Resource Deletion
+### Extra Resources in Target
 
-During import, resources that exist in the target project but are NOT present in the bundle are deleted. Deletion follows reverse dependency order to avoid breaking references:
-
-1. Data Products
-2. Assets
-3. AssetTypes
-4. FormTypes
-5. GlossaryTerms
-6. Glossaries
+During import, resources that exist in the target project but are NOT present in the bundle are **not deleted**. Instead, they are logged for visibility and counted as "skipped" in the import summary. This ensures that manually created resources in the target environment are preserved.
 
 ## Export JSON Structure
 
@@ -286,7 +280,6 @@ The exported `catalog/catalog_export.json` file has the following structure:
 | Publish API failure | Logs error, continues with remaining resources |
 | Publish listing verification FAILED | Listing failed asynchronously (e.g., missing physical resource); logged as publish failure |
 | Publish listing verification timeout | Listing did not become ACTIVE within timeout; logged as publish failure |
-| Deletion failure | Logs error, continues with remaining resources |
 
 ### Partial Failures
 
@@ -294,14 +287,14 @@ The import process is resilient to partial failures. If some resources fail to i
 
 1. The error is logged with resource name, type, and error message
 2. Processing continues with remaining resources
-3. A summary reports counts of created, updated, deleted, and failed resources
+3. A summary reports counts of created, updated, skipped, and failed resources
 
 **Example output:**
 ```
 Catalog import summary:
   Created: 15
   Updated: 8
-  Deleted: 2
+  Skipped (extra in target): 2
   Failed: 1
   Published: 12
 ```
@@ -356,7 +349,7 @@ Always review the import summary after deployment to ensure all resources were c
 Catalog import summary:
   Created: 10
   Updated: 5
-  Deleted: 0
+  Skipped (extra in target): 0
   Failed: 0
   Published: 8
 ```
@@ -375,7 +368,7 @@ Catalog import summary:
 **For Resource Renaming**: To rename a resource across environments:
 1. Create the resource with the new name in the source
 2. Export and deploy to target
-3. The old resource in the target will be deleted automatically (since it's no longer in the bundle)
+3. The old resource in the target will remain (it is not deleted automatically) — remove it manually if needed
 
 ## Troubleshooting
 
@@ -456,7 +449,7 @@ Failed to search target assets: An error occurred (ResourceNotFoundException) ..
 ✅ Catalog import completed:
    Created: 8
    Updated: 2
-   Deleted: 0
+   Skipped (extra in target): 0
    Failed: 3
    Published: 7
 ```
@@ -494,12 +487,12 @@ A `Failed` count greater than zero indicates some resources could not be importe
 - Verify your IAM role has DataZone permissions:
   - `datazone:Search`
   - `datazone:SearchTypes`
-  - `datazone:CreateGlossary`, `datazone:UpdateGlossary`, `datazone:DeleteGlossary`
-  - `datazone:CreateGlossaryTerm`, `datazone:UpdateGlossaryTerm`, `datazone:DeleteGlossaryTerm`
-  - `datazone:CreateFormType`, `datazone:UpdateFormType`, `datazone:DeleteFormType`
-  - `datazone:CreateAssetType`, `datazone:UpdateAssetType`, `datazone:DeleteAssetType`
-  - `datazone:CreateAsset`, `datazone:UpdateAsset`, `datazone:DeleteAsset`
-  - `datazone:CreateDataProduct`, `datazone:UpdateDataProduct`, `datazone:DeleteDataProduct`
+  - `datazone:CreateGlossary`, `datazone:UpdateGlossary`
+  - `datazone:CreateGlossaryTerm`, `datazone:UpdateGlossaryTerm`
+  - `datazone:CreateFormType`, `datazone:UpdateFormType`
+  - `datazone:CreateAssetType`, `datazone:UpdateAssetType`
+  - `datazone:CreateAsset`, `datazone:UpdateAsset`
+  - `datazone:CreateDataProduct`, `datazone:UpdateDataProduct`
 
 ### Problem: Published count is 0 even though source assets were published
 

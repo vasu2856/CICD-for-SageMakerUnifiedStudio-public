@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement catalog resource export during `bundle` and import during `deploy` by adding new helper modules, extending the manifest schema, and wiring into existing command flows. The simplified approach exports ALL catalog resources when enabled via a boolean flag, uses externalIdentifier (with normalization) or name for mapping, and supports full synchronization including deletion of resources missing from the bundle. The manifest `content.catalog` section only supports `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array for subscription requests) — no filter options of any kind. Publishing is source-state-based: assets and data products are published only if they were published (listingStatus == "ACTIVE") in the source project, unless `skipPublish` is set to true. After calling the asynchronous publish API, the importer polls to verify the listing becomes ACTIVE before counting it as published.
+Implement catalog resource export during `bundle` and import during `deploy` by adding new helper modules, extending the manifest schema, and wiring into existing command flows. The simplified approach exports ALL catalog resources when enabled via a boolean flag, uses externalIdentifier (with normalization) or name for mapping, and logs extra resources in the target project for visibility without deleting them. The manifest `content.catalog` section only supports `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array for subscription requests) — no filter options of any kind. Publishing is source-state-based: assets and data products are published only if they were published (listingStatus == "ACTIVE") in the source project, unless `skipPublish` is set to true. After calling the asynchronous publish API, the importer polls to verify the listing becomes ACTIVE before counting it as published.
 
 ## Tasks
 
@@ -103,39 +103,38 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
   - Verify all unit and property tests pass before proceeding to import implementation.
   - Files Changed: None (checkpoint only)
 
-- [x] 5. Implement CatalogImporter helper with externalIdentifier mapping, deletion support, and automatic publishing
-  - Create CatalogImporter that uses externalIdentifier (with normalization) or name for mapping, supports deletion of resources missing from bundle, and optionally publishes assets and data products.
+- [x] 5. Implement CatalogImporter helper with externalIdentifier mapping and automatic publishing
+  - Create CatalogImporter that uses externalIdentifier (with normalization) or name for mapping, logs extra resources in target (no deletion), and optionally publishes assets and data products.
   - [x] 5.1 Create `src/smus_cicd/helpers/catalog_import.py` with core import logic
     - Implement `_validate_catalog_json(catalog_data)` to check required keys
     - Implement `_normalize_external_identifier(external_id)` to remove AWS account ID and region
     - Implement `_build_identifier_map(client, domain_id, project_id, catalog_data)` to query target project using normalized externalIdentifier (when present) or name
     - Implement `_resolve_cross_references(resource, resource_type, id_map)` to replace source IDs
     - Implement `_import_resource(client, domain_id, project_id, resource, resource_type, id_map)` to call create or update API
-    - Implement `_identify_resources_to_delete(client, domain_id, project_id, catalog_data)` to find resources in target not in bundle
-    - Implement `_delete_resource(client, domain_id, project_id, resource_id, resource_type)` to call delete API
+    - Implement `_identify_extra_target_resources(client, domain_id, project_id, catalog_data)` to find resources in target not in bundle (logged, not deleted)
     - Implement `_publish_resource(client, domain_id, resource_id, resource_type)` to call publish API for assets and data products
-    - Implement `import_catalog(domain_id, project_id, catalog_data, region, publish=True)` orchestrating validation, mapping, creation, update, deletion, and optional publishing
+    - Implement `import_catalog(domain_id, project_id, catalog_data, region, publish=True)` orchestrating validation, mapping, creation, update, logging extras, and optional publishing
     - Creation order: Glossaries → GlossaryTerms → FormTypes → AssetTypes → Assets → Data Products
-    - Deletion order (reverse): Data Products → Assets → AssetTypes → FormTypes → GlossaryTerms → Glossaries
+    - Extra resources in target are logged for visibility but never deleted
     - When publish=True, publish assets and data products after creation/update
     - Preserve `inputForms` field when importing assets
     - Preserve `termRelations` field when importing glossary terms
-    - Log errors per resource, continue processing, return `{created, updated, deleted, failed, published}` summary
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.8, 5.9, 5.10, 5.11, 5.12, 5.13, 5.14, 5.15, 7.3, 7.4_
+    - Log errors per resource, continue processing, return `{created, updated, skipped, failed, published}` summary
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.1, 5.2, 5.3, 5.4, 5.6, 5.8, 5.9, 5.10, 5.11, 5.12, 5.13, 5.14, 5.15, 7.3, 7.4_
   - [x] 5.2 Write unit tests for CatalogImporter
     - Mock DataZone client with boto3 stubber
     - Test externalIdentifier-based mapping with normalization
     - Test name-based mapping fallback
     - Test cross-reference resolution
     - Test dependency ordering for creation
-    - Test dependency ordering for deletion (reverse)
+    - Test extra resources in target are logged but not deleted
     - Test automatic publishing when publish=True
     - Test publish API is not called when publish=False
     - Test error resilience (including publish failures)
     - Test ConflictException handling
     - Test JSON validation
-    - Test deletion of resources not in bundle
-    - _Requirements: 4.1, 4.2, 4.3, 4.5, 5.3, 5.4, 5.5, 5.6, 5.10, 5.13, 5.14, 7.4_
+    - Test identification of extra resources in target
+    - _Requirements: 4.1, 4.2, 4.3, 4.5, 5.3, 5.4, 5.6, 5.10, 5.13, 5.14, 7.4_
   - [x] 5.3 Write property test: ExternalIdentifier-based identifier mapping with normalization (Property 9)
     - **Property 9: ExternalIdentifier-Based Identifier Mapping with Normalization**
     - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5**
@@ -145,9 +144,9 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
   - [x] 5.5 Write property test: Dependency-ordered creation (Property 11)
     - **Property 11: Dependency-Ordered Creation**
     - **Validates: Requirement 5.6**
-  - [x] 5.6 Write property test: Dependency-ordered deletion (Property 12)
-    - **Property 12: Dependency-Ordered Deletion**
-    - **Validates: Requirements 5.4, 5.5**
+  - [x] 5.6 Write property test: Extra resources not deleted (Property 12)
+    - **Property 12: Extra Resources Not Deleted**
+    - **Validates: Requirement 5.4**
   - [x] 5.7 Write property test: Import error resilience (Property 13)
     - **Property 13: Import Error Resilience**
     - **Validates: Requirements 5.10, 5.14, 7.3**
@@ -164,7 +163,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
   - Files Changed: `src/smus_cicd/helpers/catalog_import.py`, `tests/unit/helpers/test_catalog_import.py`, `tests/unit/helpers/test_catalog_import_properties.py`
 
 - [x] 6. Integrate CatalogImporter into deploy command with publish support
-  - Wire catalog import with deletion and automatic publishing support into deploy command flow.
+  - Wire catalog import with automatic publishing support into deploy command flow. Extra resources in target are logged, not deleted.
   - [x] 6.1 Add `_import_catalog_from_bundle()` function to `deploy.py`
     - Extract `catalog/catalog_export.json` from bundle ZIP
     - Skip silently if file not present (backward compatible)
@@ -172,7 +171,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - Validate JSON
     - Get `skipPublish` flag from `manifest.content.catalog.skipPublish` (default: false)
     - Call `import_catalog()` with skip_publish flag
-    - Report summary counts including deletions and publishes
+    - Report summary counts including skipped (extra in target) and publishes
     - Return False if all imports fail
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 5.13_
   - [x] 6.2 Wire `_import_catalog_from_bundle()` into `_deploy_bundle_to_target()`
@@ -184,7 +183,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
     - Verify skip when file is absent
     - Verify skip when catalog.disable is true
     - Verify failure reporting when all imports fail
-    - Verify deletion counts are reported
+    - Verify skipped counts are reported for extra resources in target
     - Verify published counts are reported when publish=true
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 5.13_
   - [x] 6.4 Document changes in `TASK_6_CHANGES.md` and update `CHANGES_MASTER.md`
@@ -216,27 +215,27 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
   - [x] 7.5 Document changes in `TASK_7_CHANGES.md` and update `CHANGES_MASTER.md`
   - Files Changed: `tests/integration/catalog-import-export/manifest.yaml`, `tests/integration/catalog-import-export/test_catalog_export.py`
 
-- [x] 8. Integration tests for catalog import with deletion and publishing
-  - End-to-end tests for catalog import with externalIdentifier mapping, deletion support, and automatic publishing.
+- [x] 8. Integration tests for catalog import with publishing
+  - End-to-end tests for catalog import with externalIdentifier mapping and automatic publishing. Extra resources in target are logged, not deleted.
   - [x] 8.1 Write integration test: end-to-end catalog import during deploy
     - Bundle from source project
     - Deploy to target project
     - Verify resources are created via DataZone APIs
     - Verify externalIdentifier-based mapping works
-    - Verify deploy output reports created/updated/deleted/failed counts
+    - Verify deploy output reports created/updated/skipped/failed counts
     - _Requirements: 5.1, 5.2, 5.3, 5.6, 6.1, 6.3_
   - [x] 8.2 Write integration test: idempotent re-deploy (update existing resources)
     - Deploy same bundle twice to same target project
     - Verify second deploy updates existing resources
     - Verify ConflictException handling works
     - _Requirements: 5.2, 5.10_
-  - [x] 8.3 Write integration test: deletion of resources not in bundle
+  - [x] 8.3 Write integration test: extra resources in target are logged not deleted
     - Deploy bundle with resources A, B, C
     - Create additional resource D directly in target project
     - Deploy bundle again (still only A, B, C)
-    - Verify resource D is deleted
-    - Verify deletion happens in reverse dependency order
-    - _Requirements: 5.4, 5.5, 5.12_
+    - Verify resource D is NOT deleted
+    - Verify resource D is logged as extra in target
+    - _Requirements: 5.4, 5.12_
   - [x] 8.4 Write integration test: source-state-based publishing
     - Deploy with `skipPublish: false` (default) in manifest
     - Verify only assets and data products with listingStatus == "ACTIVE" in source are published
@@ -270,7 +269,7 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
   - Files Changed: `tests/integration/catalog-import-export/test_catalog_import.py`
 
 - [x] 9. Integration test: full round-trip export → import → verify with publishing
-  - Comprehensive end-to-end validation including externalIdentifier mapping, deletion, and automatic publishing.
+  - Comprehensive end-to-end validation including externalIdentifier mapping and automatic publishing.
   - [x] 9.1 Write integration test: export from source, import to target, verify resources exist
     - Bundle from source project with all resource types
     - Deploy to target project
@@ -354,6 +353,6 @@ Implement catalog resource export during `bundle` and import during `deploy` by 
 
 7. **Asset enrichment via GetAsset API**: The Search API only returns summary data for assets without `formsOutput`. The `_enrich_asset_items()` function calls `get_asset` per asset to retrieve full details. The GetAsset API returns `id` instead of `identifier`, so `_serialize_resource` handles both via `identifier` or `id` fallback for the `sourceId` field.
 
-8. **Deletion support**: Deploy command now deletes resources in target project that are missing from the bundle, using reverse dependency order.
+8. **No deletion of extra resources**: Resources in the target project that are not in the bundle are logged for visibility but never deleted. The `_delete_resource` function has been removed and `_identify_resources_to_delete` has been renamed to `_identify_extra_target_resources`.
 
 9. **Updated dependency graph**: Assets and FormTypes can reference GlossaryTerms, and Data Products can reference Assets, so dependency order is: Glossaries → GlossaryTerms → (FormTypes, AssetTypes can reference terms) → Assets → Data Products.
