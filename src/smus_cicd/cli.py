@@ -17,6 +17,7 @@ from .commands.deploy import deploy_command
 
 # Import command functions
 from .commands.describe import describe_command
+from .commands.destroy import destroy_command
 from .commands.dry_run.engine import DryRunEngine
 from .commands.integrate import integrate_qcli
 from .commands.logs import logs_command
@@ -480,6 +481,31 @@ def delete(
     """Delete projects and environments that were deployed during initialize."""
     configure_logging(output, LOG_LEVEL)
     delete_command(pipeline, targets, force, async_mode, output)
+
+
+@app.command(
+    "destroy",
+    help="8. Destroy all resources deployed by the manifest. Example: aws-smus-cicd-cli destroy --manifest manifest.yaml --targets dev --force",
+    rich_help_panel="Pipeline Commands",
+)
+def destroy(
+    manifest: str = typer.Option(
+        "manifest.yaml", "--manifest", "-m", help="Path to application manifest file"
+    ),
+    targets: str = typer.Option(
+        None,
+        "--targets",
+        "-t",
+        help="Target name(s) - single target or comma-separated list",
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
+    output: str = typer.Option(
+        "TEXT", "--output", "-o", help="Output format: TEXT (default) or JSON"
+    ),
+):
+    """Destroy all resources deployed by the manifest."""
+    configure_logging(output, LOG_LEVEL)
+    destroy_command(manifest, targets, force, output)
 
 
 @app.command(

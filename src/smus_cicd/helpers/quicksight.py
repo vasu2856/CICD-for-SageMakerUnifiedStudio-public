@@ -707,6 +707,94 @@ def trigger_dataset_ingestion(
         )
 
 
+def list_dashboards(
+    aws_account_id: str,
+    region: str,
+) -> List[Dict[str, Any]]:
+    """
+    List all QuickSight dashboards in the account.
+
+    Args:
+        aws_account_id: AWS account ID
+        region: AWS region
+
+    Returns:
+        List of dashboard summaries
+
+    Raises:
+        QuickSightDeploymentError: If listing fails
+    """
+    try:
+        client = boto3.client("quicksight", region_name=region)
+        dashboards = []
+        next_token = None
+
+        while True:
+            params = {"AwsAccountId": aws_account_id}
+            if next_token:
+                params["NextToken"] = next_token
+
+            response = client.list_dashboards(**params)
+            dashboards.extend(response.get("DashboardSummaryList", []))
+
+            next_token = response.get("NextToken")
+            if not next_token:
+                break
+
+        return dashboards
+
+    except ClientError as e:
+        error_code = e.response["Error"]["Code"]
+        error_msg = e.response["Error"]["Message"]
+        raise QuickSightDeploymentError(
+            f"Failed to list dashboards: {error_code} - {error_msg}"
+        )
+
+
+def list_data_sources(
+    aws_account_id: str,
+    region: str,
+) -> List[Dict[str, Any]]:
+    """
+    List all QuickSight data sources in the account.
+
+    Args:
+        aws_account_id: AWS account ID
+        region: AWS region
+
+    Returns:
+        List of data sources
+
+    Raises:
+        QuickSightDeploymentError: If listing fails
+    """
+    try:
+        client = boto3.client("quicksight", region_name=region)
+        data_sources = []
+        next_token = None
+
+        while True:
+            params = {"AwsAccountId": aws_account_id}
+            if next_token:
+                params["NextToken"] = next_token
+
+            response = client.list_data_sources(**params)
+            data_sources.extend(response.get("DataSources", []))
+
+            next_token = response.get("NextToken")
+            if not next_token:
+                break
+
+        return data_sources
+
+    except ClientError as e:
+        error_code = e.response["Error"]["Code"]
+        error_msg = e.response["Error"]["Message"]
+        raise QuickSightDeploymentError(
+            f"Failed to list data sources: {error_code} - {error_msg}"
+        )
+
+
 def list_datasets(
     aws_account_id: str,
     region: str,

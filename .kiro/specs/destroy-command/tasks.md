@@ -6,21 +6,21 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
 
 ## Tasks
 
-- [ ] 1. Create operator registry module
+- [x] 1. Create operator registry module
   - Create `src/smus_cicd/helpers/operator_registry.py` with a module-level `OPERATOR_REGISTRY` dict
   - Add the initial entry: `"airflow.providers.amazon.aws.operators.glue.GlueJobOperator"` → `{"resource_name_field": "job_name", "delete_fn": _delete_glue_job}`
   - Implement `_delete_glue_job(resource_name, region)` calling `boto3.client('glue').delete_job(JobName=resource_name)`; treat `EntityNotFoundException` as not-found (return without raising)
   - _Requirements: 12.1_
 
-- [ ] 2. Add QuickSight list helpers
-  - [ ] 2.1 Add `list_dashboards(aws_account_id, region) -> List[Dict]` to `src/smus_cicd/helpers/quicksight.py`
+- [x] 2. Add QuickSight list helpers
+  - [x] 2.1 Add `list_dashboards(aws_account_id, region) -> List[Dict]` to `src/smus_cicd/helpers/quicksight.py`
     - Paginate `client.list_dashboards()` using `NextToken`, following the same pattern as the existing `list_datasets` function
     - Return list of `DashboardSummaryList` entries
     - _Requirements: 6.2_
   - [ ]* 2.2 Write property test for `list_dashboards` pagination
     - **Property: `list_dashboards` with multiple pages returns all items across all pages**
     - **Validates: Requirements 6.2**
-  - [ ] 2.3 Add `list_data_sources(aws_account_id, region) -> List[Dict]` to `src/smus_cicd/helpers/quicksight.py`
+  - [x] 2.3 Add `list_data_sources(aws_account_id, region) -> List[Dict]` to `src/smus_cicd/helpers/quicksight.py`
     - Paginate `client.list_data_sources()` using `NextToken`, following the same pattern as `list_datasets`
     - Return list of `DataSources` entries
     - _Requirements: 6.2_
@@ -28,7 +28,7 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
     - **Property: `list_data_sources` with multiple pages returns all items across all pages**
     - **Validates: Requirements 6.2**
 
-- [ ] 3. Implement data models and pure helper functions in `destroy.py`
+- [x] 3. Implement data models and pure helper functions in `destroy.py`
   - Create `src/smus_cicd/commands/destroy.py`
   - Define dataclasses: `ResourceToDelete`, `S3Target`, `ValidationResult`, `ResourceResult`
   - Implement `_resolve_resource_prefix(stage_name, qs_config) -> str` — reads `overrideParameters.ResourceIdOverrideConfiguration.PrefixForAllResources` and replaces `{stage.name}` with `stage_name`
@@ -52,7 +52,7 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
     - **Property 15: Workflow YAML parsing extracts all registry-matching tasks** — N tasks with registry operators → exactly N `ResourceToDelete` entries
     - **Validates: Requirements 12.2**
 
-- [ ] 4. Implement validation phase (`_validate_stage` and `_parse_workflow_yaml_from_s3`)
+- [x] 4. Implement validation phase (`_validate_stage` and `_parse_workflow_yaml_from_s3`)
   - Implement `_parse_workflow_yaml_from_s3(bucket, key, region) -> dict` — fetches object from S3 and parses YAML; returns empty dict on any error (logs warning)
   - Implement `_validate_stage(stage_name, stage_config, manifest, region) -> ValidationResult`:
     - Resolve domain + project IDs via `get_domain_from_target_config`
@@ -73,7 +73,7 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
     - Multiple workflows match reconstructed name → validation error recorded
     - _Requirements: 3.12_
 
-- [ ] 5. Implement destruction phase (`_get_active_workflow_runs` and `_destroy_stage`)
+- [x] 5. Implement destruction phase (`_get_active_workflow_runs` and `_destroy_stage`)
   - Implement `_get_active_workflow_runs(workflow_arn, region) -> List[str]` — calls `list_workflow_runs`, filters using `is_workflow_run_active`, returns list of active run IDs
   - Implement `_destroy_stage(stage_name, stage_config, manifest, validation_result, region, output) -> List[ResourceResult]`:
     - **Step a**: Re-query live run status for each workflow via `_get_active_workflow_runs`; call `stop_workflow_run` for each still-active run; if `stop_workflow_run` fails, record `error` and skip `delete_workflow` for that workflow
@@ -106,7 +106,7 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
     - **Property 12: Non-recoverable errors continue processing and set exit code** — one resource fails → remaining resources processed, exit code 1
     - **Validates: Requirements 9.3, 9.4**
 
-- [ ] 6. Implement `destroy_command` entry point and CLI wiring
+- [x] 6. Implement `destroy_command` entry point and CLI wiring
   - Implement `destroy_command(manifest, targets, force, output)` in `destroy.py`:
     - Parse manifest via `ApplicationManifest.from_file`; exit 1 on failure
     - Resolve target list; validate all stage names exist in manifest; exit 1 with error listing invalid names and available names if any are invalid
@@ -135,10 +135,10 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
     - `--force` set but validation has collision error → still aborts, no deletion calls
     - _Requirements: 3.3_
 
-- [ ] 7. Checkpoint — Ensure all unit tests pass
+- [x] 7. Checkpoint — Ensure all unit tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 8. Extend integration test with destroy steps
+- [x] 8. Extend integration test with destroy steps
   - In `tests/integration/examples-analytics-workflows/dashboard-glue-quick/test_dashboard_glue_quick_workflow.py`, extend `test_dashboard_glue_quick_workflow_deployment` after the existing Step 9:
   - **Step 10**: Run `destroy --targets test --manifest <manifest_file> --force`; assert exit code 0
   - **Step 11**: Verify resources are gone:
@@ -150,7 +150,7 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
   - **Step 12**: Run destroy again with `--force`; assert exit code 0 and all resource results have `status == "not_found"` (idempotency check)
   - _Requirements: 9.1, 9.2, 9.5_
 
-- [ ] 9. Final checkpoint — Ensure all tests pass
+- [x] 9. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
