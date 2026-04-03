@@ -153,6 +153,15 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
 - [x] 9. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
+- [x] 10. Implement Bootstrap Connection deletion
+  - In `_validate_stage`: scan `stage_config.bootstrap.actions` for `type: datazone.create_connection` entries; skip `default.*` names; skip if `project.create: true`; call `get_project_connections` to check existence; add found connections to `ValidationResult.resources` as `datazone_connection` type with connection ID in metadata
+  - In `_destroy_stage`: add step (d) between Airflow workflow deletion and QuickSight deletion — for each `datazone_connection` resource, call `datazone_client.delete_connection(domainIdentifier=domain_id, identifier=connection_id)`; treat `ResourceNotFoundException` as `not_found`; never delete `default.*` connections
+  - Add unit tests covering: connection discovery from bootstrap actions, `default.*` skip, `project.create=true` skip, successful deletion, not-found handling
+  - _Requirements: 13.1–13.8_
+
+- [x] 11. Final checkpoint after connection deletion
+  - Ensure all tests pass, ask the user if questions arise.
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP
@@ -161,3 +170,13 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
 - Property tests validate universal correctness properties defined in the design document
 - The `--force` flag bypasses the confirmation prompt but never bypasses collision errors
 - Workflow run re-check at destruction time (not just at validation time) is required by Property 6
+
+- [x] 12. Implement Catalog resource deletion
+  - In `_validate_stage`: when `deployment_configuration.catalog` is present and not disabled, call `_search_target_resources` and `_search_target_type_resources` (from `catalog_import.py`) to enumerate all project-owned catalog resources; add them to `ValidationResult.resources` as typed entries (`catalog_glossary`, `catalog_glossary_term`, `catalog_form_type`, `catalog_asset_type`, `catalog_asset`, `catalog_data_product`); filter out managed form/asset types (`amazon.datazone.*`); add a warning to the destruction plan: "All project-owned catalog resources will be deleted, including any created manually. To skip catalog resource deletion, set `disable: true` under `deployment_configuration.catalog` in your manifest."
+  - In `_destroy_stage`: add step (g) after S3 deletion — delete catalog resources in reverse dependency order: data products → assets → asset types → form types → glossary terms → glossaries; use the appropriate DataZone delete API for each type; treat not-found as `not_found`; remove the existing catalog warning from `_validate_stage` (it's now replaced by the destruction plan warning)
+  - Update destruction ordering in `_destroy_stage` step labels (f→S3, g→catalog, h→project)
+  - Add unit tests covering: catalog resource discovery when catalog config present, skip when absent/disabled, deletion ordering, not-found handling, managed resource filtering
+  - _Requirements: 14.1–14.7, 15.1–15.2_
+
+- [x] 13. Final checkpoint after catalog deletion
+  - Ensure all tests pass, ask the user if questions arise.

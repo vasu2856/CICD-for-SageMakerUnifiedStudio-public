@@ -44,6 +44,7 @@ def _delete_glue_job(resource_name: str, region: str) -> None:
 
 OPERATOR_REGISTRY = {
     "airflow.providers.amazon.aws.operators.glue.GlueJobOperator": {
+        "resource_type": "glue_job",
         "resource_name_field": "job_name",
         "delete_fn": _delete_glue_job,
     },

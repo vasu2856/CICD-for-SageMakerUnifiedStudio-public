@@ -39,6 +39,7 @@ from ..helpers.quicksight import (
     list_data_sources,
     list_datasets,
 )
+from ..helpers import s3 as s3_helper
 
 logger = get_logger("destroy")
 console = Console()
@@ -188,9 +189,8 @@ def _discover_workflow_created_resources(
                 )
                 continue
 
-            # Determine resource_type from operator key
-            # For now only GlueJobOperator is registered → glue_job
-            resource_type = "glue_job"
+            # Determine resource_type from registry entry
+            resource_type = registry_entry.get("resource_type", "unknown_resource")
             resources.append(
                 ResourceToDelete(
                     resource_type=resource_type,
@@ -694,14 +694,143 @@ def _validate_stage(
         except Exception as e:
             warnings.append(f"[{stage_name}] Could not resolve S3 targets: {e}")
 
-    # --- Catalog resources (not supported by destroy) ---
     if dc and dc.catalog is not None:
-        warnings.append(
-            f"[{stage_name}] ⚠️  This stage has catalog resources "
-            "(deployment_configuration.catalog) that will NOT be deleted by destroy. "
-            "DataZone catalog resources (glossaries, assets, form types, etc.) require "
-            "manual cleanup or a dedicated catalog-destroy command."
-        )
+        catalog_config = dc.catalog if isinstance(dc.catalog, dict) else {}
+        catalog_disabled = catalog_config.get("disable", False)
+        if not catalog_disabled and project_id and domain_id:
+            # Enumerate all project-owned catalog resources
+            try:
+                from ..helpers.catalog_import import (
+                    _is_managed_resource,
+                    _search_target_resources,
+                    _search_target_type_resources,
+                )
+                dz_client = boto3.client("datazone", region_name=effective_region)
+
+                # Glossaries
+                for item in _search_target_resources(dz_client, domain_id, project_id, "GLOSSARY"):
+                    g = item.get("glossaryItem", {})
+                    if g.get("id"):
+                        resources.append(ResourceToDelete(
+                            resource_type="catalog_glossary",
+                            resource_id=g["id"],
+                            stage=stage_name,
+                            metadata={"name": g.get("name", ""), "domain_id": domain_id},
+                        ))
+
+                # Glossary Terms
+                for item in _search_target_resources(dz_client, domain_id, project_id, "GLOSSARY_TERM"):
+                    t = item.get("glossaryTermItem", {})
+                    if t.get("id"):
+                        resources.append(ResourceToDelete(
+                            resource_type="catalog_glossary_term",
+                            resource_id=t["id"],
+                            stage=stage_name,
+                            metadata={"name": t.get("name", ""), "domain_id": domain_id},
+                        ))
+
+                # Form Types (custom only)
+                for item in _search_target_type_resources(dz_client, domain_id, project_id, "FORM_TYPE"):
+                    ft = item.get("formTypeItem", {})
+                    name = ft.get("name", "")
+                    if name and not _is_managed_resource(name):
+                        resources.append(ResourceToDelete(
+                            resource_type="catalog_form_type",
+                            resource_id=name,
+                            stage=stage_name,
+                            metadata={"name": name, "domain_id": domain_id},
+                        ))
+
+                # Asset Types (custom only)
+                for item in _search_target_type_resources(dz_client, domain_id, project_id, "ASSET_TYPE"):
+                    at = item.get("assetTypeItem", {})
+                    name = at.get("name", "")
+                    if name and not _is_managed_resource(name):
+                        resources.append(ResourceToDelete(
+                            resource_type="catalog_asset_type",
+                            resource_id=name,
+                            stage=stage_name,
+                            metadata={"name": name, "domain_id": domain_id},
+                        ))
+
+                # Assets
+                for item in _search_target_resources(dz_client, domain_id, project_id, "ASSET"):
+                    a = item.get("assetItem", {})
+                    if a.get("identifier"):
+                        resources.append(ResourceToDelete(
+                            resource_type="catalog_asset",
+                            resource_id=a["identifier"],
+                            stage=stage_name,
+                            metadata={"name": a.get("name", ""), "domain_id": domain_id},
+                        ))
+
+                # Data Products
+                for item in _search_target_resources(dz_client, domain_id, project_id, "DATA_PRODUCT"):
+                    dp = item.get("dataProductItem", {})
+                    if dp.get("id"):
+                        resources.append(ResourceToDelete(
+                            resource_type="catalog_data_product",
+                            resource_id=dp["id"],
+                            stage=stage_name,
+                            metadata={"name": dp.get("name", ""), "domain_id": domain_id},
+                        ))
+
+                if any(r.resource_type.startswith("catalog_") for r in resources):
+                    warnings.append(
+                        f"[{stage_name}] All project-owned catalog resources will be deleted, "
+                        "including any created manually. "
+                        "To skip catalog resource deletion, set `disable: true` under "
+                        "`deployment_configuration.catalog` in your manifest."
+                    )
+
+            except Exception as e:
+                warnings.append(f"[{stage_name}] Could not enumerate catalog resources: {e}")
+        elif catalog_disabled:
+            warnings.append(
+                f"[{stage_name}] Catalog deletion is disabled (disable: true) — skipping."
+            )
+
+    # --- Bootstrap connections ---
+    # Only discover if project is NOT being deleted (project deletion cascades to connections)
+    if not stage_config.project.create and stage_config.bootstrap:
+        for action in stage_config.bootstrap.actions or []:
+            if action.type != "datazone.create_connection":
+                continue
+            conn_name = action.parameters.get("name", "")
+            if not conn_name:
+                continue
+            # Never touch built-in default.* connections
+            if conn_name.startswith("default."):
+                warnings.append(
+                    f"[{stage_name}] Skipping built-in connection '{conn_name}' "
+                    "(default.* connections are never deleted by destroy)"
+                )
+                continue
+            # Check if connection exists in the project
+            if conn_name in connections:
+                conn_info = connections[conn_name]
+                connection_id = conn_info.get("connectionId", "")
+                if connection_id:
+                    resources.append(
+                        ResourceToDelete(
+                            resource_type="datazone_connection",
+                            resource_id=conn_name,
+                            stage=stage_name,
+                            metadata={
+                                "connection_id": connection_id,
+                                "domain_id": domain_id,
+                            },
+                        )
+                    )
+                else:
+                    warnings.append(
+                        f"[{stage_name}] Connection '{conn_name}' found but has no ID — skipping"
+                    )
+            else:
+                warnings.append(
+                    f"[{stage_name}] Bootstrap connection '{conn_name}' not found in project "
+                    "— already deleted or never created"
+                )
 
     return ValidationResult(
         errors=errors,
@@ -835,18 +964,24 @@ def _destroy_stage(
     # -----------------------------------------------------------------------
     # Step b: Delete workflow-created resources (e.g. Glue jobs)
     # -----------------------------------------------------------------------
+    # Derive the set of resource types handled by the registry dynamically
+    _registry_resource_types = {
+        entry["resource_type"] for entry in OPERATOR_REGISTRY.values()
+    }
+    # Build a reverse map: resource_type → registry entry for fast lookup
+    _resource_type_to_registry = {
+        entry["resource_type"]: entry for entry in OPERATOR_REGISTRY.values()
+    }
+
     for resource in validation_result.resources:
-        if resource.resource_type not in ("glue_job",):
+        if resource.resource_type not in _registry_resource_types:
             continue
 
+        # Look up registry entry by operator key first, then fall back to resource_type
         operator_key = resource.metadata.get("operator", "")
         registry_entry = OPERATOR_REGISTRY.get(operator_key)
         if not registry_entry:
-            # Fallback: find by resource_type
-            for key, entry in OPERATOR_REGISTRY.items():
-                if resource.resource_type == "glue_job":
-                    registry_entry = entry
-                    break
+            registry_entry = _resource_type_to_registry.get(resource.resource_type)
 
         if not registry_entry:
             results.append(
@@ -988,7 +1123,78 @@ def _destroy_stage(
                 )
 
     # -----------------------------------------------------------------------
-    # Step d: Delete QuickSight (dashboards → datasets → data sources)
+    # Step d: Delete Bootstrap_Connections
+    # -----------------------------------------------------------------------
+    for resource in validation_result.resources:
+        if resource.resource_type != "datazone_connection":
+            continue
+
+        conn_name = resource.resource_id
+        connection_id = resource.metadata.get("connection_id", "")
+        domain_id = resource.metadata.get("domain_id", "")
+
+        if not connection_id or not domain_id:
+            _log(f"  [yellow]⚠️  Skipping connection '{conn_name}' — missing ID or domain[/yellow]")
+            results.append(
+                ResourceResult(
+                    resource_type="datazone_connection",
+                    resource_id=conn_name,
+                    status="skipped",
+                    message="Missing connection ID or domain ID",
+                )
+            )
+            continue
+
+        try:
+            dz_client = boto3.client("datazone", region_name=effective_region)
+            dz_client.delete_connection(
+                domainIdentifier=domain_id,
+                identifier=connection_id,
+            )
+            _log(f"  ✅ Deleted DataZone connection: {conn_name} ({connection_id})")
+            results.append(
+                ResourceResult(
+                    resource_type="datazone_connection",
+                    resource_id=conn_name,
+                    status="deleted",
+                    message="Deleted successfully",
+                )
+            )
+        except ClientError as e:
+            code = e.response["Error"]["Code"]
+            if code in ("ResourceNotFoundException", "EntityNotFoundException"):
+                _log(f"  [yellow]⚠️  Connection not found: {conn_name}[/yellow]")
+                results.append(
+                    ResourceResult(
+                        resource_type="datazone_connection",
+                        resource_id=conn_name,
+                        status="not_found",
+                        message="Connection not found",
+                    )
+                )
+            else:
+                _log(f"  [red]❌ Error deleting connection '{conn_name}': {e}[/red]")
+                results.append(
+                    ResourceResult(
+                        resource_type="datazone_connection",
+                        resource_id=conn_name,
+                        status="error",
+                        message=str(e),
+                    )
+                )
+        except Exception as e:
+            _log(f"  [red]❌ Error deleting connection '{conn_name}': {e}[/red]")
+            results.append(
+                ResourceResult(
+                    resource_type="datazone_connection",
+                    resource_id=conn_name,
+                    status="error",
+                    message=str(e),
+                )
+            )
+
+    # -----------------------------------------------------------------------
+    # Step e: Delete QuickSight (dashboards → datasets → data sources)
     # -----------------------------------------------------------------------
     effective_region_qs = effective_region
     try:
@@ -1067,10 +1273,8 @@ def _destroy_stage(
                 )
 
     # -----------------------------------------------------------------------
-    # Step e: Delete S3 objects
+    # Step f: Delete S3 objects (using s3 helper)
     # -----------------------------------------------------------------------
-    s3_client = boto3.client("s3", region_name=effective_region)
-
     for resource in validation_result.resources:
         if resource.resource_type != "s3_prefix":
             continue
@@ -1082,14 +1286,11 @@ def _destroy_stage(
             continue
 
         try:
-            # List all objects under prefix
-            paginator = s3_client.get_paginator("list_objects_v2")
-            pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
-
-            object_keys = []
-            for page in pages:
-                for obj in page.get("Contents", []):
-                    object_keys.append(obj["Key"])
+            # Use existing s3 helper for list + delete
+            object_keys = [
+                obj["Key"]
+                for obj in s3_helper.list_objects(bucket, prefix, region=effective_region)
+            ]
 
             if not object_keys:
                 _log(f"  [yellow]⚠️  S3 prefix empty: s3://{bucket}/{prefix}[/yellow]")
@@ -1103,15 +1304,7 @@ def _destroy_stage(
                 )
                 continue
 
-            # Delete in batches of 1000 (S3 API limit)
-            batch_size = 1000
-            for i in range(0, len(object_keys), batch_size):
-                batch = object_keys[i : i + batch_size]
-                s3_client.delete_objects(
-                    Bucket=bucket,
-                    Delete={"Objects": [{"Key": k} for k in batch]},
-                )
-
+            s3_helper.delete_objects(bucket, object_keys, region=effective_region)
             _log(
                 f"  ✅ Deleted {len(object_keys)} objects from "
                 f"s3://{bucket}/{prefix}"
@@ -1139,7 +1332,94 @@ def _destroy_stage(
             )
 
     # -----------------------------------------------------------------------
-    # Step f: Delete DataZone project (only if project.create=True)
+    # Step g: Delete catalog resources (reverse dependency order)
+    # -----------------------------------------------------------------------
+    # Deletion order: data products → assets → asset types → form types →
+    #                 glossary terms → glossaries
+    CATALOG_DELETION_ORDER = [
+        "catalog_data_product",
+        "catalog_asset",
+        "catalog_asset_type",
+        "catalog_form_type",
+        "catalog_glossary_term",
+        "catalog_glossary",
+    ]
+    CATALOG_DELETE_API = {
+        "catalog_data_product": lambda dz, domain_id, rid: dz.delete_data_product(
+            domainIdentifier=domain_id, identifier=rid
+        ),
+        "catalog_asset": lambda dz, domain_id, rid: dz.delete_asset(
+            domainIdentifier=domain_id, identifier=rid
+        ),
+        "catalog_asset_type": lambda dz, domain_id, rid: dz.delete_asset_type(
+            domainIdentifier=domain_id, identifier=rid
+        ),
+        "catalog_form_type": lambda dz, domain_id, rid: dz.delete_form_type(
+            domainIdentifier=domain_id, formTypeIdentifier=rid
+        ),
+        "catalog_glossary_term": lambda dz, domain_id, rid: dz.delete_glossary_term(
+            domainIdentifier=domain_id, identifier=rid
+        ),
+        "catalog_glossary": lambda dz, domain_id, rid: dz.delete_glossary(
+            domainIdentifier=domain_id, identifier=rid
+        ),
+    }
+
+    for catalog_type in CATALOG_DELETION_ORDER:
+        for resource in validation_result.resources:
+            if resource.resource_type != catalog_type:
+                continue
+            resource_id = resource.resource_id
+            domain_id_for_catalog = resource.metadata.get("domain_id", "")
+            resource_name = resource.metadata.get("name", resource_id)
+            if not domain_id_for_catalog:
+                _log(f"  [yellow]⚠️  Skipping {catalog_type} '{resource_name}' — missing domain ID[/yellow]")
+                results.append(ResourceResult(
+                    resource_type=catalog_type,
+                    resource_id=resource_id,
+                    status="skipped",
+                    message="Missing domain ID",
+                ))
+                continue
+            try:
+                dz_client = boto3.client("datazone", region_name=effective_region)
+                CATALOG_DELETE_API[catalog_type](dz_client, domain_id_for_catalog, resource_id)
+                _log(f"  ✅ Deleted {catalog_type}: {resource_name} ({resource_id})")
+                results.append(ResourceResult(
+                    resource_type=catalog_type,
+                    resource_id=resource_id,
+                    status="deleted",
+                    message="Deleted successfully",
+                ))
+            except ClientError as e:
+                code = e.response["Error"]["Code"]
+                if code in ("ResourceNotFoundException", "EntityNotFoundException"):
+                    _log(f"  [yellow]⚠️  {catalog_type} not found: {resource_name}[/yellow]")
+                    results.append(ResourceResult(
+                        resource_type=catalog_type,
+                        resource_id=resource_id,
+                        status="not_found",
+                        message="Resource not found",
+                    ))
+                else:
+                    _log(f"  [red]❌ Error deleting {catalog_type} '{resource_name}': {e}[/red]")
+                    results.append(ResourceResult(
+                        resource_type=catalog_type,
+                        resource_id=resource_id,
+                        status="error",
+                        message=str(e),
+                    ))
+            except Exception as e:
+                _log(f"  [red]❌ Error deleting {catalog_type} '{resource_name}': {e}[/red]")
+                results.append(ResourceResult(
+                    resource_type=catalog_type,
+                    resource_id=resource_id,
+                    status="error",
+                    message=str(e),
+                ))
+
+    # -----------------------------------------------------------------------
+    # Step h: Delete DataZone project (only if project.create=True)
     # -----------------------------------------------------------------------
     if stage_config.project.create is True:
         try:
@@ -1322,7 +1602,8 @@ def destroy_command(
         validation_results[stage_name] = vr
 
         for warning in vr.warnings:
-            _out(f"  [yellow]⚠️  {warning}[/yellow]")
+            from rich.markup import escape as _escape_markup
+            _out(f"  [yellow]⚠️  {_escape_markup(warning)}[/yellow]")
 
     # -----------------------------------------------------------------------
     # 5. Check for validation errors
@@ -1334,7 +1615,8 @@ def destroy_command(
     if all_errors:
         _out("\n[red]❌ Validation errors found — aborting before any deletion:[/red]")
         for err in all_errors:
-            _out(f"  [red]• {err}[/red]")
+            from rich.markup import escape as _escape_markup
+            _out(f"  [red]• {_escape_markup(err)}[/red]")
         raise typer.Exit(1)
 
     # -----------------------------------------------------------------------
@@ -1381,7 +1663,7 @@ def destroy_command(
                     "before deletion.[/yellow]"
                 )
             console.print(
-                "[red]⚠️  WARNING: This will permanently delete the above "
+                "[yellow]⚠️  WARNING: This will permanently delete the above "
                 "resources![/yellow]"
             )
             confirmed = Confirm.ask(

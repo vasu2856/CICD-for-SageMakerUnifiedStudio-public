@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The `destroy` command is the inverse of the `deploy` command for the SMUS CI/CD CLI tool. It reads a manifest file, identifies the target stage(s), and deletes all resources that were directly created by `deploy` — including QuickSight dashboards/datasets/data sources, S3 objects at declared target paths, Airflow serverless workflows, and optionally the DataZone project. It respects a strict dependency ordering to ensure safe teardown, collects all user confirmations before any destructive action begins, and is idempotent: resources already absent are logged as warnings rather than errors.
+The `destroy` command is the inverse of the `deploy` command for the SMUS CI/CD CLI tool. It reads a manifest file, identifies the target stage(s), and deletes all resources that were directly created by `deploy` — including QuickSight dashboards/datasets/data sources, S3 objects at declared target paths, Airflow serverless workflows, DataZone connections created by bootstrap actions, and optionally the DataZone project. It respects a strict dependency ordering to ensure safe teardown, collects all user confirmations before any destructive action begins, and is idempotent: resources already absent are logged as warnings rather than errors.
 
 The `destroy` command is distinct from the existing `delete` command. The `delete` command only removes the DataZone project and its environments. The `destroy` command removes all deployed content resources (QuickSight, S3, Airflow workflows, workflow-created resources) and conditionally removes the DataZone project.
 
@@ -39,6 +39,7 @@ For resources created by Airflow workflow runs (e.g. Glue jobs), destroy uses an
 - **Operator_Registry**: A mapping of Airflow operator class names to deletion handlers. Each entry defines which task field contains the resource name and how to delete that resource type. The initial registry contains one entry: `GlueJobOperator` → delete Glue job by `job_name` field.
 - **Workflow_YAML**: A YAML file in the format parsed by the SMUS CI/CD workflow engine, containing a top-level workflow key with `dag_id` and `tasks`. Each task has an `operator` field and operator-specific parameters.
 - **Workflow_Created_Resource**: A cloud resource whose creation is triggered by an Airflow task at workflow runtime, identified by parsing the Workflow_YAML and matching the task's operator against the Operator_Registry.
+- **Bootstrap_Connection**: A DataZone connection created by a `datazone.create_connection` bootstrap action, identified by the `name` field in the action parameters. Connections whose names match `default.*` are built-in environment connections and are never deleted by destroy.
 
 ---
 
@@ -102,9 +103,10 @@ For resources created by Airflow workflow runs (e.g. Glue jobs), destroy uses an
    a. Stop active Workflow_Runs (if confirmed or forced)
    b. Delete Workflow_Created_Resources identified from workflow YAML files (e.g. Glue jobs)
    c. Delete Airflow_Workflows
-   d. Delete QuickSight dashboards, then datasets, then data sources
-   e. Delete S3 objects at all declared S3_Target paths (storage and git)
-   f. Delete the DataZone_Project (only if `project.create: true`)
+   d. Delete Bootstrap_Connections created by `datazone.create_connection` bootstrap actions (skip if `project.create: true`)
+   e. Delete QuickSight dashboards, then datasets, then data sources
+   f. Delete S3 objects at all declared S3_Target paths (storage and git)
+   g. Delete the DataZone_Project (only if `project.create: true`)
 2. THE Destroy_Command SHALL NOT delete the DataZone_Project before all content resources (QuickSight, S3, Airflow) for that stage have been processed.
 3. THE Destroy_Command SHALL NOT begin destruction of any resource until the pre-destruction validation and confirmation phase (Requirement 3) is fully complete.
 
@@ -218,3 +220,55 @@ For resources created by Airflow workflow runs (e.g. Glue jobs), destroy uses an
 5. WHEN a `job_name` field in a `GlueJobOperator` task contains unresolved template variables (e.g. `{proj.name}`), THE Destroy_Command SHALL log a warning that the resource name could not be statically determined and skip that task.
 6. Workflow_Created_Resources SHALL be deleted before the Airflow_Workflow itself is deleted and before S3 objects are deleted, so that the workflow definition is still available for parsing during the destroy run.
 7. THE Destroy_Command SHALL include all discovered Workflow_Created_Resources in the destruction plan printed during the validation phase (Requirement 3.4), so the user can review them before confirming.
+
+---
+
+### Requirement 13: Bootstrap Connection Deletion
+
+**User Story:** As a DevOps engineer, I want DataZone connections created by `datazone.create_connection` bootstrap actions to be deleted as part of destroy, so that no orphaned connections remain in the project after destroy runs.
+
+#### Acceptance Criteria
+
+1. DURING the validation phase, FOR EACH stage targeted for destruction, THE Destroy_Command SHALL inspect `stages[stage_name].bootstrap.actions` and collect all actions whose `type` is `datazone.create_connection`.
+2. FOR EACH collected action, THE Destroy_Command SHALL skip any connection whose `name` matches the pattern `default.*` — these are built-in environment connections that must never be deleted by destroy.
+3. FOR EACH non-built-in connection name, THE Destroy_Command SHALL call `get_project_connections` to check whether a connection with that name currently exists in the project, and if so, add it to the destruction plan as a `datazone_connection` resource with its connection ID.
+4. WHEN `project.create` is `true` for a stage, THE Destroy_Command SHALL NOT add Bootstrap_Connections to the destruction plan for that stage, because project deletion will cascade-delete all connections.
+5. WHEN `project.create` is `false` or absent, THE Destroy_Command SHALL include discovered Bootstrap_Connections in the destruction plan and delete them individually using the DataZone `delete_connection(domainIdentifier, identifier)` API.
+6. Bootstrap_Connections SHALL be deleted after Airflow_Workflows are deleted and before QuickSight deletion begins (per Requirement 4 ordering).
+7. WHEN a Bootstrap_Connection is not found at deletion time, THE Destroy_Command SHALL record the result as `not_found`, log a warning, and continue without treating the absence as a fatal error.
+8. THE Destroy_Command SHALL NEVER call `delete_connection` for a connection whose name matches `default.*`, regardless of how it appears in the manifest.
+
+---
+
+### Requirement 14: Catalog Resource Deletion
+
+**User Story:** As a DevOps engineer, I want DataZone catalog resources imported by deploy to be deleted as part of destroy, so that the target project is fully cleaned up.
+
+#### Acceptance Criteria
+
+1. WHEN `deployment_configuration.catalog` is present and not disabled (`disable: true`) for a stage, THE Destroy_Command SHALL enumerate all catalog resources owned by the target project using the DataZone Search API, and include them in the destruction plan.
+2. THE Destroy_Command SHALL enumerate the following resource types: glossaries, glossary terms, form types (custom only, not `amazon.datazone.*`), asset types (custom only), assets, and data products.
+3. THE Destroy_Command SHALL delete catalog resources in reverse dependency order: data products → assets → asset types → form types → glossary terms → glossaries.
+4. WHEN `deployment_configuration.catalog` is absent or `disable: true` for a stage, THE Destroy_Command SHALL skip catalog deletion for that stage and remove the existing warning about manual cleanup.
+5. WHEN a catalog resource is not found at deletion time, THE Destroy_Command SHALL record the result as `not_found` and continue without treating the absence as a fatal error.
+6. THE Destroy_Command SHALL warn the user in the destruction plan that all project-owned catalog resources will be deleted, including any that were created manually (not by deploy), since there is no way to distinguish imported resources from manually-created ones. The warning SHALL include the message: "To skip catalog resource deletion, set `disable: true` under `deployment_configuration.catalog` in your manifest."
+7. Catalog resource deletion SHALL occur after S3 object deletion and before DataZone project deletion in the destruction ordering.
+
+---
+
+### Requirement 15: Catalog Deletion Ordering
+
+**User Story:** As a DevOps engineer, I want catalog resources deleted in the correct order so that dependent resources are removed before the resources they depend on.
+
+#### Acceptance Criteria
+
+1. THE Destroy_Command SHALL update the destruction ordering to include catalog deletion as step (g), making the full order:
+   a. Stop active Workflow_Runs
+   b. Delete Workflow_Created_Resources
+   c. Delete Airflow_Workflows
+   d. Delete Bootstrap_Connections
+   e. Delete QuickSight dashboards → datasets → data sources
+   f. Delete S3 objects
+   g. Delete catalog resources (data products → assets → asset types → form types → glossary terms → glossaries)
+   h. Delete DataZone project (only if `project.create: true`)
+2. THE Destroy_Command SHALL delete catalog resources after S3 objects are deleted, since catalog assets may reference S3 data sources.

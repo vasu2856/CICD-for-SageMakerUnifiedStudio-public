@@ -39,9 +39,11 @@ flowchart TD
     L0 --> L1[Stop runs still active after re-check]
     L1 --> L2[Delete Workflow_Created_Resources]
     L2 --> L3[Delete Airflow_Workflows]
-    L3 --> L4[Delete QuickSight dashboards → datasets → data sources]
+    L3 --> L3b[Delete Bootstrap_Connections]
+    L3b --> L4[Delete QuickSight dashboards → datasets → data sources]
     L4 --> L5[Delete S3 objects at targetDirectory prefixes]
-    L5 --> L6[Delete DataZone project if project.create=true]
+    L5 --> L5b[Delete catalog resources in reverse dependency order]
+    L5b --> L6[Delete DataZone project if project.create=true]
     L6 --> M[Print summary, exit 0 or 1]
 ```
 
@@ -52,6 +54,8 @@ flowchart TD
 - **Operator registry pattern**: Workflow-created resources are discovered by parsing YAML files and matching operator class names against a plain dict registry. Adding support for a new operator type requires only a new dict entry.
 - **Prefix-based QuickSight enumeration**: Rather than tracking deployed resource IDs, destroy scans all QuickSight resources and filters by the `Resource_Prefix`. This is resilient to state drift but requires the prefix to be unique.
 - **S3 paths resolved from live connections**: S3 bucket/prefix is resolved via `get_project_connections` at destroy time, not inferred from the manifest alone. This matches how deploy resolves paths.
+- **Bootstrap connection deletion**: Connections created by `datazone.create_connection` bootstrap actions are deleted after Airflow workflows (which may use them) and before QuickSight/S3. Built-in `default.*` connections are never touched. When `project.create: true`, connection deletion is skipped since project deletion cascades.
+- **Catalog resource deletion**: All project-owned catalog resources (glossaries, glossary terms, form types, asset types, assets, data products) are deleted when `deployment_configuration.catalog` is present and not disabled. Since there is no way to distinguish imported resources from manually-created ones, all project-owned resources are deleted. Users are warned in the destruction plan with a note that they can set `disable: true` under `deployment_configuration.catalog` to skip catalog deletion. Managed resources (`amazon.datazone.*`) are never deleted. Deletion follows reverse dependency order.
 - **Workflow run re-check before stopping**: The validation phase records active workflow runs at discovery time, but the user may take time to review the plan before confirming. At the start of the destruction phase, the live run status is re-queried for each workflow before calling `stop_workflow_run`. Runs that completed naturally in the interim are skipped; any new runs that started after validation are also caught and stopped.
 
 ---

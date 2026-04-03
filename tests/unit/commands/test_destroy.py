@@ -167,6 +167,9 @@ class TestOperatorRegistry:
     def test_u2_glue_entry_resource_name_field(self):
         assert OPERATOR_REGISTRY[GLUE_OPERATOR_KEY]["resource_name_field"] == "job_name"
 
+    def test_u2b_glue_entry_resource_type(self):
+        assert OPERATOR_REGISTRY[GLUE_OPERATOR_KEY]["resource_type"] == "glue_job"
+
     def test_u3_glue_entry_delete_fn_is_callable(self):
         assert callable(OPERATOR_REGISTRY[GLUE_OPERATOR_KEY]["delete_fn"])
 
@@ -552,10 +555,6 @@ class TestDestroyOrdering:
         sts_client = MagicMock()
         sts_client.get_caller_identity.return_value = {"Account": "111122223333"}
         qs_client = MagicMock()
-        s3_client = MagicMock()
-        paginator = MagicMock()
-        paginator.paginate.return_value = iter([{"Contents": [{"Key": "k1"}]}])
-        s3_client.get_paginator.return_value = paginator
 
         def client_factory(service, region_name=None):
             if service == "sts":
@@ -563,9 +562,6 @@ class TestDestroyOrdering:
             if service == "quicksight":
                 qs_client.delete_dashboard.side_effect = lambda **kw: call_order.append("delete_dashboard")
                 return qs_client
-            if service == "s3":
-                s3_client.delete_objects.side_effect = lambda **kw: call_order.append("delete_s3")
-                return s3_client
             return MagicMock()
 
         mock_boto3.client.side_effect = client_factory
@@ -576,15 +572,18 @@ class TestDestroyOrdering:
 
         with patch("smus_cicd.helpers.operator_registry.boto3") as mock_glue_boto3:
             mock_glue_boto3.client.return_value = glue_client
-            wf_arn = "arn:aws:airflow:us-east-1:111:workflow/wf1"
-            resources = [
-                ResourceToDelete("airflow_workflow", wf_arn, "dev", {"workflow_name": "App_proj_dag"}),
-                ResourceToDelete("glue_job", "my-glue-job", "dev", {"operator": GLUE_OPERATOR_KEY, "task_name": "t1"}),
-                ResourceToDelete("quicksight_dashboard", "deployed-dev-dash1", "dev", {}),
-                ResourceToDelete("s3_prefix", "s3://bucket/prefix", "dev", {"bucket": "bucket", "prefix": "prefix"}),
-            ]
-            vr = _make_vr(resources=resources, active_runs={"App_proj_dag": ["run-001"]})
-            _destroy_stage("dev", _make_stage_config(create=True), _simple_manifest(), vr, "us-east-1", "TEXT")
+            with patch("smus_cicd.commands.destroy.s3_helper") as mock_s3:
+                mock_s3.list_objects.return_value = [{"Key": "k1"}]
+                mock_s3.delete_objects.side_effect = lambda *a, **kw: call_order.append("delete_s3")
+                wf_arn = "arn:aws:airflow:us-east-1:111:workflow/wf1"
+                resources = [
+                    ResourceToDelete("airflow_workflow", wf_arn, "dev", {"workflow_name": "App_proj_dag"}),
+                    ResourceToDelete("glue_job", "my-glue-job", "dev", {"operator": GLUE_OPERATOR_KEY, "task_name": "t1"}),
+                    ResourceToDelete("quicksight_dashboard", "deployed-dev-dash1", "dev", {}),
+                    ResourceToDelete("s3_prefix", "s3://bucket/prefix", "dev", {"bucket": "bucket", "prefix": "prefix"}),
+                ]
+                vr = _make_vr(resources=resources, active_runs={"App_proj_dag": ["run-001"]})
+                _destroy_stage("dev", _make_stage_config(create=True), _simple_manifest(), vr, "us-east-1", "TEXT")
 
         assert call_order.index("stop_run") < call_order.index("delete_workflow")
         assert call_order.index("delete_glue") < call_order.index("delete_workflow")
@@ -774,19 +773,19 @@ class TestErrorResilience:
     def test_u49_s3_deletion_scoped_to_prefix(self, mock_boto3):
         sts = MagicMock()
         sts.get_caller_identity.return_value = {"Account": "111122223333"}
+        mock_boto3.client.return_value = sts
         deleted_keys = []
-        s3 = MagicMock()
-        paginator = MagicMock()
-        paginator.paginate.side_effect = lambda Bucket, Prefix: (
-            iter([{"Contents": [{"Key": "base/bundle/f1.py"}, {"Key": "base/bundle/f2.py"}]}])
-            if Prefix == "base/bundle" else iter([{}])
-        )
-        s3.get_paginator.return_value = paginator
-        s3.delete_objects.side_effect = lambda Bucket, Delete: deleted_keys.extend(o["Key"] for o in Delete["Objects"])
-        mock_boto3.client.side_effect = lambda s, region_name=None: sts if s == "sts" else s3
-        vr = _make_vr(resources=[ResourceToDelete("s3_prefix", "s3://bkt/base/bundle", "dev",
-                                                   {"bucket": "bkt", "prefix": "base/bundle"})])
-        _destroy_stage("dev", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
+
+        with patch("smus_cicd.commands.destroy.s3_helper") as mock_s3:
+            mock_s3.list_objects.side_effect = lambda bucket, prefix, region=None: (
+                [{"Key": "base/bundle/f1.py"}, {"Key": "base/bundle/f2.py"}]
+                if prefix == "base/bundle" else []
+            )
+            mock_s3.delete_objects.side_effect = lambda bucket, keys, region=None: deleted_keys.extend(keys)
+            vr = _make_vr(resources=[ResourceToDelete("s3_prefix", "s3://bkt/base/bundle", "dev",
+                                                       {"bucket": "bkt", "prefix": "base/bundle"})])
+            _destroy_stage("dev", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
+
         assert all(k.startswith("base/bundle") for k in deleted_keys)
         assert "base/bundle/f1.py" in deleted_keys
 
@@ -1027,3 +1026,370 @@ class TestEdgeCases:
         assert mock_validate.call_count == 3
         assert mock_destroy.call_count == 3
 
+
+
+# ---------------------------------------------------------------------------
+# Task 10: Bootstrap Connection deletion tests
+# ---------------------------------------------------------------------------
+
+class TestBootstrapConnectionDiscovery:
+    """Validation phase: connection discovery from bootstrap actions."""
+
+    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_LIST_RUNS, return_value=[])
+    @patch(PATCH_LIST_WORKFLOWS, return_value=[])
+    @patch(PATCH_CONNECTIONS)
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    def test_connection_added_to_plan_when_exists(self, mock_domain, mock_project,
+                                                   mock_conns, *_):
+        """Connection declared in bootstrap and found in project → added to plan."""
+        mock_conns.return_value = {
+            "mlflow-server": {"connectionId": "conn-abc", "type": "MLFLOW"},
+        }
+        from smus_cicd.application.application_manifest import (
+            StageConfig, ProjectConfig, DomainConfig, DeploymentConfiguration
+        )
+        from smus_cicd.bootstrap.models import BootstrapAction, BootstrapConfig
+        sc = StageConfig(
+            project=ProjectConfig(name="test-project", create=False),
+            domain=DomainConfig(region="us-east-1"),
+            stage="TEST",
+            deployment_configuration=DeploymentConfiguration(),
+            bootstrap=BootstrapConfig(actions=[
+                BootstrapAction(type="datazone.create_connection",
+                                parameters={"name": "mlflow-server", "connection_type": "MLFLOW"})
+            ]),
+        )
+        result = _validate_stage("test", sc, _make_manifest(), "us-east-1")
+        conn_resources = [r for r in result.resources if r.resource_type == "datazone_connection"]
+        assert len(conn_resources) == 1
+        assert conn_resources[0].resource_id == "mlflow-server"
+        assert conn_resources[0].metadata["connection_id"] == "conn-abc"
+
+    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_LIST_RUNS, return_value=[])
+    @patch(PATCH_LIST_WORKFLOWS, return_value=[])
+    @patch(PATCH_CONNECTIONS, return_value={})
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    def test_connection_not_found_records_warning(self, *_):
+        """Connection declared but not in project → warning, not in plan."""
+        from smus_cicd.application.application_manifest import (
+            StageConfig, ProjectConfig, DomainConfig, DeploymentConfiguration
+        )
+        from smus_cicd.bootstrap.models import BootstrapAction, BootstrapConfig
+        sc = StageConfig(
+            project=ProjectConfig(name="test-project", create=False),
+            domain=DomainConfig(region="us-east-1"),
+            stage="TEST",
+            deployment_configuration=DeploymentConfiguration(),
+            bootstrap=BootstrapConfig(actions=[
+                BootstrapAction(type="datazone.create_connection",
+                                parameters={"name": "mlflow-server", "connection_type": "MLFLOW"})
+            ]),
+        )
+        result = _validate_stage("test", sc, _make_manifest(), "us-east-1")
+        conn_resources = [r for r in result.resources if r.resource_type == "datazone_connection"]
+        assert conn_resources == []
+        assert any("mlflow-server" in w for w in result.warnings)
+
+    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_LIST_RUNS, return_value=[])
+    @patch(PATCH_LIST_WORKFLOWS, return_value=[])
+    @patch(PATCH_CONNECTIONS)
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    def test_default_connection_skipped_with_warning(self, mock_domain, mock_project,
+                                                      mock_conns, *_):
+        """default.* connections are never added to the plan."""
+        mock_conns.return_value = {
+            "default.s3_shared": {"connectionId": "conn-builtin"},
+        }
+        from smus_cicd.application.application_manifest import (
+            StageConfig, ProjectConfig, DomainConfig, DeploymentConfiguration
+        )
+        from smus_cicd.bootstrap.models import BootstrapAction, BootstrapConfig
+        sc = StageConfig(
+            project=ProjectConfig(name="test-project", create=False),
+            domain=DomainConfig(region="us-east-1"),
+            stage="TEST",
+            deployment_configuration=DeploymentConfiguration(),
+            bootstrap=BootstrapConfig(actions=[
+                BootstrapAction(type="datazone.create_connection",
+                                parameters={"name": "default.s3_shared", "connection_type": "S3"})
+            ]),
+        )
+        result = _validate_stage("test", sc, _make_manifest(), "us-east-1")
+        conn_resources = [r for r in result.resources if r.resource_type == "datazone_connection"]
+        assert conn_resources == []
+        assert any("default.s3_shared" in w for w in result.warnings)
+
+    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_LIST_RUNS, return_value=[])
+    @patch(PATCH_LIST_WORKFLOWS, return_value=[])
+    @patch(PATCH_CONNECTIONS)
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    def test_project_create_true_skips_connections(self, mock_domain, mock_project,
+                                                    mock_conns, *_):
+        """When project.create=true, connections are not added (project deletion cascades)."""
+        mock_conns.return_value = {
+            "mlflow-server": {"connectionId": "conn-abc"},
+        }
+        from smus_cicd.application.application_manifest import (
+            StageConfig, ProjectConfig, DomainConfig, DeploymentConfiguration
+        )
+        from smus_cicd.bootstrap.models import BootstrapAction, BootstrapConfig
+        sc = StageConfig(
+            project=ProjectConfig(name="test-project", create=True),
+            domain=DomainConfig(region="us-east-1"),
+            stage="TEST",
+            deployment_configuration=DeploymentConfiguration(),
+            bootstrap=BootstrapConfig(actions=[
+                BootstrapAction(type="datazone.create_connection",
+                                parameters={"name": "mlflow-server", "connection_type": "MLFLOW"})
+            ]),
+        )
+        result = _validate_stage("test", sc, _make_manifest(), "us-east-1")
+        conn_resources = [r for r in result.resources if r.resource_type == "datazone_connection"]
+        assert conn_resources == []
+
+
+class TestBootstrapConnectionDeletion:
+    """Destruction phase: connection deletion."""
+
+    @patch(PATCH_BOTO3)
+    def test_connection_deleted_successfully(self, mock_boto3):
+        """Connection in plan → delete_connection called, status deleted."""
+        sts = MagicMock()
+        sts.get_caller_identity.return_value = {"Account": "111122223333"}
+        dz = MagicMock()
+        mock_boto3.client.side_effect = lambda s, region_name=None: sts if s == "sts" else dz
+
+        vr = _make_vr(resources=[
+            ResourceToDelete("datazone_connection", "mlflow-server", "test",
+                             {"connection_id": "conn-abc", "domain_id": "dom-123"})
+        ])
+        results = _destroy_stage("test", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
+        dz.delete_connection.assert_called_once_with(
+            domainIdentifier="dom-123", identifier="conn-abc"
+        )
+        assert any(r.status == "deleted" and r.resource_type == "datazone_connection" for r in results)
+
+    @patch(PATCH_BOTO3)
+    def test_connection_not_found_recorded(self, mock_boto3):
+        """ResourceNotFoundException → not_found, no error."""
+        sts = MagicMock()
+        sts.get_caller_identity.return_value = {"Account": "111122223333"}
+        dz = MagicMock()
+        dz.delete_connection.side_effect = ClientError(
+            {"Error": {"Code": "ResourceNotFoundException", "Message": "Not found"}},
+            "DeleteConnection",
+        )
+        mock_boto3.client.side_effect = lambda s, region_name=None: sts if s == "sts" else dz
+
+        vr = _make_vr(resources=[
+            ResourceToDelete("datazone_connection", "mlflow-server", "test",
+                             {"connection_id": "conn-abc", "domain_id": "dom-123"})
+        ])
+        results = _destroy_stage("test", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
+        assert any(r.status == "not_found" and r.resource_type == "datazone_connection" for r in results)
+
+    @patch(PATCH_BOTO3)
+    def test_connection_api_error_recorded(self, mock_boto3):
+        """Non-recoverable API error → error status, processing continues."""
+        sts = MagicMock()
+        sts.get_caller_identity.return_value = {"Account": "111122223333"}
+        dz = MagicMock()
+        dz.delete_connection.side_effect = ClientError(
+            {"Error": {"Code": "AccessDeniedException", "Message": "Denied"}},
+            "DeleteConnection",
+        )
+        mock_boto3.client.side_effect = lambda s, region_name=None: sts if s == "sts" else dz
+
+        vr = _make_vr(resources=[
+            ResourceToDelete("datazone_connection", "mlflow-server", "test",
+                             {"connection_id": "conn-abc", "domain_id": "dom-123"})
+        ])
+        results = _destroy_stage("test", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
+        assert any(r.status == "error" and r.resource_type == "datazone_connection" for r in results)
+
+
+# ---------------------------------------------------------------------------
+# Task 12: Catalog resource deletion tests
+# ---------------------------------------------------------------------------
+
+class TestCatalogResourceDiscovery:
+    """Validation phase: catalog resource discovery."""
+
+    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_LIST_RUNS, return_value=[])
+    @patch(PATCH_LIST_WORKFLOWS, return_value=[])
+    @patch(PATCH_CONNECTIONS, return_value={})
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    def test_catalog_resources_added_to_plan(self, *_):
+        """Catalog resources are discovered and added to the destruction plan."""
+        from smus_cicd.application.application_manifest import (
+            StageConfig, ProjectConfig, DomainConfig, DeploymentConfiguration
+        )
+        sc = StageConfig(
+            project=ProjectConfig(name="test-project", create=False),
+            domain=DomainConfig(region="us-east-1"),
+            stage="TEST",
+            deployment_configuration=DeploymentConfiguration(catalog={}),
+        )
+        mock_search = MagicMock(return_value=[
+            {"glossaryItem": {"id": "g-1", "name": "MyGlossary"}},
+        ])
+        mock_search_types = MagicMock(return_value=[])
+        with patch("smus_cicd.commands.destroy.boto3") as mock_boto3:
+            sts = MagicMock()
+            sts.get_caller_identity.return_value = {"Account": "111122223333"}
+            dz = MagicMock()
+            mock_boto3.client.side_effect = lambda s, region_name=None: sts if s == "sts" else dz
+            with patch("smus_cicd.helpers.catalog_import._search_target_resources", mock_search):
+                with patch("smus_cicd.helpers.catalog_import._search_target_type_resources", mock_search_types):
+                    result = _validate_stage("test", sc, _make_manifest(), "us-east-1")
+        catalog_resources = [r for r in result.resources if r.resource_type.startswith("catalog_")]
+        assert len(catalog_resources) == 1
+        assert catalog_resources[0].resource_type == "catalog_glossary"
+        assert catalog_resources[0].resource_id == "g-1"
+
+    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_LIST_RUNS, return_value=[])
+    @patch(PATCH_LIST_WORKFLOWS, return_value=[])
+    @patch(PATCH_CONNECTIONS, return_value={})
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    def test_catalog_disabled_skips_discovery(self, *_):
+        """When catalog.disable=true, no catalog resources are added."""
+        from smus_cicd.application.application_manifest import (
+            StageConfig, ProjectConfig, DomainConfig, DeploymentConfiguration
+        )
+        sc = StageConfig(
+            project=ProjectConfig(name="test-project", create=False),
+            domain=DomainConfig(region="us-east-1"),
+            stage="TEST",
+            deployment_configuration=DeploymentConfiguration(catalog={"disable": True}),
+        )
+        result = _validate_stage("test", sc, _make_manifest(), "us-east-1")
+        catalog_resources = [r for r in result.resources if r.resource_type.startswith("catalog_")]
+        assert catalog_resources == []
+        assert any("disabled" in w.lower() or "disable" in w.lower() for w in result.warnings)
+
+    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_LIST_RUNS, return_value=[])
+    @patch(PATCH_LIST_WORKFLOWS, return_value=[])
+    @patch(PATCH_CONNECTIONS, return_value={})
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    def test_catalog_absent_skips_discovery(self, *_):
+        """When deployment_configuration.catalog is absent, no catalog resources added."""
+        from smus_cicd.application.application_manifest import (
+            StageConfig, ProjectConfig, DomainConfig, DeploymentConfiguration
+        )
+        sc = StageConfig(
+            project=ProjectConfig(name="test-project", create=False),
+            domain=DomainConfig(region="us-east-1"),
+            stage="TEST",
+            deployment_configuration=DeploymentConfiguration(catalog=None),
+        )
+        result = _validate_stage("test", sc, _make_manifest(), "us-east-1")
+        catalog_resources = [r for r in result.resources if r.resource_type.startswith("catalog_")]
+        assert catalog_resources == []
+
+    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_LIST_RUNS, return_value=[])
+    @patch(PATCH_LIST_WORKFLOWS, return_value=[])
+    @patch(PATCH_CONNECTIONS, return_value={})
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    def test_managed_form_types_filtered_out(self, *_):
+        """Managed form types (amazon.datazone.*) are not added to the plan."""
+        from smus_cicd.application.application_manifest import (
+            StageConfig, ProjectConfig, DomainConfig, DeploymentConfiguration
+        )
+        sc = StageConfig(
+            project=ProjectConfig(name="test-project", create=False),
+            domain=DomainConfig(region="us-east-1"),
+            stage="TEST",
+            deployment_configuration=DeploymentConfiguration(catalog={}),
+        )
+        mock_search = MagicMock(return_value=[])
+        mock_search_types = MagicMock(return_value=[
+            {"formTypeItem": {"name": "amazon.datazone.ManagedForm", "owningProjectId": "proj-123"}},
+            {"formTypeItem": {"name": "MyCustomForm", "owningProjectId": "proj-123"}},
+        ])
+        with patch("smus_cicd.commands.destroy.boto3") as mock_boto3:
+            sts = MagicMock()
+            sts.get_caller_identity.return_value = {"Account": "111122223333"}
+            dz = MagicMock()
+            mock_boto3.client.side_effect = lambda s, region_name=None: sts if s == "sts" else dz
+            with patch("smus_cicd.helpers.catalog_import._search_target_resources", mock_search):
+                with patch("smus_cicd.helpers.catalog_import._search_target_type_resources", mock_search_types):
+                    result = _validate_stage("test", sc, _make_manifest(), "us-east-1")
+        form_types = [r for r in result.resources if r.resource_type == "catalog_form_type"]
+        assert len(form_types) == 1
+        assert form_types[0].resource_id == "MyCustomForm"
+
+
+class TestCatalogResourceDeletion:
+    """Destruction phase: catalog resource deletion."""
+
+    @patch(PATCH_BOTO3)
+    def test_catalog_glossary_deleted(self, mock_boto3):
+        """Glossary in plan → delete_glossary called."""
+        sts = MagicMock()
+        sts.get_caller_identity.return_value = {"Account": "111122223333"}
+        dz = MagicMock()
+        mock_boto3.client.side_effect = lambda s, region_name=None: sts if s == "sts" else dz
+
+        vr = _make_vr(resources=[
+            ResourceToDelete("catalog_glossary", "g-1", "test",
+                             {"name": "MyGlossary", "domain_id": "dom-123"})
+        ])
+        results = _destroy_stage("test", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
+        dz.delete_glossary.assert_called_once_with(domainIdentifier="dom-123", identifier="g-1")
+        assert any(r.status == "deleted" and r.resource_type == "catalog_glossary" for r in results)
+
+    @patch(PATCH_BOTO3)
+    def test_catalog_asset_not_found_recorded(self, mock_boto3):
+        """ResourceNotFoundException → not_found, no error."""
+        sts = MagicMock()
+        sts.get_caller_identity.return_value = {"Account": "111122223333"}
+        dz = MagicMock()
+        dz.delete_asset.side_effect = ClientError(
+            {"Error": {"Code": "ResourceNotFoundException", "Message": "Not found"}},
+            "DeleteAsset",
+        )
+        mock_boto3.client.side_effect = lambda s, region_name=None: sts if s == "sts" else dz
+
+        vr = _make_vr(resources=[
+            ResourceToDelete("catalog_asset", "a-1", "test",
+                             {"name": "MyAsset", "domain_id": "dom-123"})
+        ])
+        results = _destroy_stage("test", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
+        assert any(r.status == "not_found" and r.resource_type == "catalog_asset" for r in results)
+
+    @patch(PATCH_BOTO3)
+    def test_catalog_deletion_order(self, mock_boto3):
+        """Data products deleted before assets, assets before glossaries."""
+        sts = MagicMock()
+        sts.get_caller_identity.return_value = {"Account": "111122223333"}
+        dz = MagicMock()
+        call_order = []
+        dz.delete_data_product.side_effect = lambda **kw: call_order.append("data_product")
+        dz.delete_asset.side_effect = lambda **kw: call_order.append("asset")
+        dz.delete_glossary.side_effect = lambda **kw: call_order.append("glossary")
+        mock_boto3.client.side_effect = lambda s, region_name=None: sts if s == "sts" else dz
+
+        vr = _make_vr(resources=[
+            ResourceToDelete("catalog_glossary", "g-1", "test", {"name": "G", "domain_id": "dom-123"}),
+            ResourceToDelete("catalog_asset", "a-1", "test", {"name": "A", "domain_id": "dom-123"}),
+            ResourceToDelete("catalog_data_product", "dp-1", "test", {"name": "DP", "domain_id": "dom-123"}),
+        ])
+        _destroy_stage("test", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
+        assert call_order.index("data_product") < call_order.index("asset")
+        assert call_order.index("asset") < call_order.index("glossary")
