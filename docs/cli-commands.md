@@ -2,7 +2,7 @@
 
 ← [Back to Main README](../README.md)
 
-The SMUS CI/CD CLI provides eight main commands for managing CI/CD pipelines in SageMaker Unified Studio.
+The SMUS CI/CD CLI provides nine main commands for managing CI/CD pipelines in SageMaker Unified Studio.
 
 ## Global Options
 
@@ -49,7 +49,8 @@ aws-smus-cicd-cli describe --manifest manifest.yaml
 | `monitor` | Monitor workflow status | `aws-smus-cicd-cli monitor --manifest manifest.yaml` |
 | `test` | Run tests for pipeline targets | `aws-smus-cicd-cli test --targets marketing-test-stage` |
 | `integrate` | Integrate with external tools (Q CLI) | `aws-smus-cicd-cli integrate qcli` |
-| `delete` | Remove target environments | `aws-smus-cicd-cli delete --targets marketing-test-stage --force` |
+| `delete` | Remove target environments | `aws-smus-cicd-cli delete --stages marketing-test-stage --force` |
+| `destroy` | Delete all resources deployed by the manifest | `aws-smus-cicd-cli destroy --targets test --force` |
 
 ## Detailed Command Examples
 
@@ -116,13 +117,13 @@ aws-smus-cicd-cli bundle --targets dev,test --output-dir /tmp/bundles
 ### 3. Deploy Bundle
 ```bash
 # Deploy using auto-created bundle
-aws-smus-cicd-cli deploy --targets test
+aws-smus-cicd-cli deploy --stages test
 
 # Deploy using pre-created bundle file
-aws-smus-cicd-cli deploy --targets test --manifest /path/to/bundle.zip
+aws-smus-cicd-cli deploy --stages test --manifest /path/to/bundle.zip
 
 # Deploy with JSON output
-aws-smus-cicd-cli deploy --targets test --manifest bundle.zip --output JSON
+aws-smus-cicd-cli deploy --stages test --manifest bundle.zip --output JSON
 ```
 
 ### 4. Run Commands and Workflows
@@ -145,7 +146,7 @@ aws-smus-cicd-cli run --workflow sample_dag --command "dags state sample_dag"
 aws-smus-cicd-cli run --workflow test_dag
 
 # Trigger workflow on specific target
-aws-smus-cicd-cli run --workflow test_dag --targets prod
+aws-smus-cicd-cli run --workflow test_dag --stages prod
 
 # Trigger with JSON output
 aws-smus-cicd-cli run --workflow test_dag --output JSON
@@ -232,7 +233,7 @@ aws-smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789
 aws-smus-cicd-cli monitor --manifest manifest.yaml
 
 # Monitor specific targets with JSON output
-aws-smus-cicd-cli monitor --targets test --output JSON
+aws-smus-cicd-cli monitor --stages test --output JSON
 ```
 
 ### 6. Test Pipeline
@@ -241,10 +242,10 @@ aws-smus-cicd-cli monitor --targets test --output JSON
 aws-smus-cicd-cli test --manifest manifest.yaml
 
 # Run tests for specific targets with verbose output
-aws-smus-cicd-cli test --targets test --verbose
+aws-smus-cicd-cli test --stages test --verbose
 
 # Stream test output directly to console
-aws-smus-cicd-cli test --targets test --test-output console
+aws-smus-cicd-cli test --stages test --test-output console
 ```
 
 ### 8. Integrate with External Tools
@@ -286,13 +287,13 @@ Q: [Validates and reports any schema errors]
 ### 9. Delete Resources
 ```bash
 # Delete with confirmation
-aws-smus-cicd-cli delete --targets test
+aws-smus-cicd-cli delete --stages test
 
 # Force delete without confirmation
-aws-smus-cicd-cli delete --targets test --force
+aws-smus-cicd-cli delete --stages test --force
 
 # Async delete (don't wait for completion)
-aws-smus-cicd-cli delete --targets test --force --async
+aws-smus-cicd-cli delete --stages test --force --async
 ```
 
 ## Universal Options
@@ -302,7 +303,7 @@ All commands support these universal options:
 | Option | Short | Description | Example |
 |--------|-------|-------------|---------|
 | `--manifest` | `-p` | Path to bundle manifest file | `--manifest my-manifest.yaml` |
-| `--targets` | `-t` | Target environment(s) | `--targets dev,test` |
+| `--stages` | `-t` | Target environment(s) | `--stages dev,test` |
 | `--output` | `-o` | Output format (TEXT/JSON) | `--output JSON` |
 
 ## Output Formats
@@ -404,18 +405,10 @@ Bundle creation complete for target: dev
 
 ### 3. Deploy to Test Environment
 ```bash
-aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml
 ```
 **Example Output:**
 ```
-Running pre-deployment validation...
-  ✅ Manifest loaded and validated
-  ✅ Bundle artifacts verified (18 files)
-  ✅ IAM permissions verified
-  ✅ DataZone domain and project reachable
-  ✅ S3 buckets accessible
-Pre-deployment validation passed. 0 warning(s). Proceeding with deployment.
-
 Deploying to target: test
 Project: integration-test-test
 Domain: cicd-test-domain
@@ -489,7 +482,7 @@ Domain: cicd-test-domain (us-east-1)
 
 ### 5. Trigger Workflow Execution
 ```bash
-aws-smus-cicd-cli run --manifest manifest.yaml --targets test --workflow test_dag --command trigger
+aws-smus-cicd-cli run --manifest manifest.yaml --stages test --workflow test_dag --command trigger
 ```
 **Example Output:**
 ```
@@ -504,7 +497,7 @@ aws-smus-cicd-cli run --manifest manifest.yaml --targets test --workflow test_da
 
 ### 7. Run Tests
 ```bash
-aws-smus-cicd-cli test --manifest manifest.yaml --targets marketing-test-stage
+aws-smus-cicd-cli test --manifest manifest.yaml --stages marketing-test-stage
 ```
 **Example Output:**
 ```
@@ -527,8 +520,44 @@ Domain: cicd-test-domain (us-east-1)
 **What this shows:** The test command runs Python tests from the configured test folder against your deployed bundle. Tests receive environment variables with domain ID, project ID, and other context information to validate the deployment. This ensures your pipeline is working correctly after deployment and provides automated validation of your data workflows.
 
 ### 8. Clean Up Resources
+
+Use `delete` to remove the DataZone project only, or `destroy` to remove all deployed resources (QuickSight, S3, Airflow workflows, Glue jobs, catalog resources, and optionally the project).
+
 ```bash
-aws-smus-cicd-cli delete --targets test --manifest manifest.yaml --force
+# Remove all deployed resources for a stage (recommended for full cleanup)
+aws-smus-cicd-cli destroy --targets test --manifest manifest.yaml --force
+```
+**Example Output:**
+```
+🔍 Validating 1 stage(s)...
+  Validating stage 'test'...
+
+📋 Destruction plan:
+
+  Stage: test
+    airflow_workflow:
+      - IntegrationTestMultiTarget_integration-test-test_test_dag
+    s3_prefix:
+      - src
+      - workflows
+
+  Total resources to process: 3
+
+⚠️  WARNING: This will permanently delete the above resources!
+
+🗑️  Starting destruction...
+
+  Stage: test
+
+📊 Destruction Summary
+  test: deleted=3 not_found=0 skipped=0 error=0
+```
+
+**What this shows:** The destroy command removes all resources deployed by the manifest for the targeted stage — Airflow workflows, S3 objects, QuickSight dashboards, Glue jobs, catalog resources, and optionally the DataZone project. It validates first (read-only), prints a full destruction plan, then prompts for confirmation before deleting anything. Use `--force` to skip the prompt in CI/CD pipelines.
+
+```bash
+# Remove only the DataZone project (leaves deployed content in place)
+aws-smus-cicd-cli delete --stages test --manifest manifest.yaml --force
 ```
 **Example Output:**
 ```
@@ -545,7 +574,7 @@ Targets to delete:
   ✅ test: Project deleted successfully
 ```
 
-**What this shows:** The delete command removes SageMaker Unified Studio projects and their associated resources. It provides a summary of deletion operations, showing which projects were successfully removed. This is useful for cleaning up test environments and managing resource lifecycle in your CI/CD pipeline.
+**What this shows:** The delete command removes only the SageMaker Unified Studio project and its associated CloudFormation stacks. Use this when you want to remove the project but leave deployed content (S3 files, QuickSight dashboards, etc.) intact.
 
 ```bash
 aws-smus-cicd-cli --help
@@ -561,6 +590,7 @@ aws-smus-cicd-cli --help
 5. **`run`** - Run workflow commands
 6. **`logs`** - Fetch workflow logs from CloudWatch
 7. **`delete`** - Delete projects and environments
+8. **`destroy`** - Destroy all resources deployed by the manifest
 
 ## Command Details
 
@@ -604,7 +634,7 @@ aws-smus-cicd-cli describe [OPTIONS]
 
 #### Options
 - **`-p, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
-- **`-t, --targets`**: Target name(s) - single target or comma-separated list (optional, defaults to all targets)
+- **`-t, --stages`**: Target name(s) - single target or comma-separated list (optional, defaults to all targets)
 - **`-o, --output`**: Output format: TEXT (default) or JSON
 - **`-w, --workflows`**: Show workflow information
 - **`-c, --connections`**: Show connection information
@@ -688,7 +718,6 @@ aws-smus-cicd-cli bundle dev
 
 Deploys bundle files to target environments (auto-initializes if needed). The deploy command performs the following operations:
 
-0. **Pre-Deployment Validation (automatic)**: Runs a best-effort dry-run validation before deployment to catch errors early. If any blocking errors are found, the deployment is aborted before any resources are created or modified. This prevents partial deployments that leave resources in an inconsistent state. Note that a passing validation does not guarantee deployment success — transient errors or state changes may still occur. Skip with `--skip-validation`.
 1. **Bundle Deployment**: Uploads workflow and storage files to target project connections
 2. **Catalog Asset Access**: Processes catalog assets defined in the bundle manifest:
    - Searches for assets in the DataZone catalog
@@ -711,11 +740,8 @@ aws-smus-cicd-cli deploy [OPTIONS] [TARGET_POSITIONAL]
 
 #### Options
 - **`-p, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
-- **`-t, --targets`**: Target name(s) - single target or comma-separated list (uses default target if not specified)
+- **`-t, --stages`**: Target name(s) - single target or comma-separated list (uses default target if not specified)
 - **`-b, --manifest`**: Path to pre-created bundle file (optional)
-- **`--dry-run`**: Preview the deployment without making any changes. Validates the manifest, bundle, IAM permissions, resource reachability, catalog dependencies, and workflow definitions, then produces a structured report of what would happen and any issues detected. No resources are created, modified, or deleted. This is a best-effort check — a passing dry run does not guarantee deployment success.
-- **`--output`**: Output format for the dry-run report: `text` (default, human-readable) or `json` (machine-readable). Only applies when `--dry-run` is used.
-- **`--skip-validation`**: Skip the automatic pre-deployment dry-run validation step and proceed directly to deployment. Useful when you have already validated with `--dry-run` or need to bypass validation for speed.
 - **`--emit-events`**: Enable EventBridge event emission for deployment tracking
 - **`--no-events`**: Disable EventBridge event emission
 - **`--event-bus-name`**: Custom EventBridge event bus name
@@ -751,146 +777,17 @@ See [Bundle Deployment Metrics](pipeline-deployment-metrics.md) for complete set
 aws-smus-cicd-cli deploy
 
 # Deploy to specific targets
-aws-smus-cicd-cli deploy --targets test,prod
+aws-smus-cicd-cli deploy --stages test,prod
 
 # Deploy with pre-created bundle
-aws-smus-cicd-cli deploy --targets test --manifest /path/to/bundle.zip
+aws-smus-cicd-cli deploy --stages test --manifest /path/to/bundle.zip
 
 # Deploy with EventBridge monitoring enabled
-aws-smus-cicd-cli deploy --targets prod --emit-events
+aws-smus-cicd-cli deploy --stages prod --emit-events
 
 # Deploy using positional argument (backward compatibility)
 aws-smus-cicd-cli deploy test
-
-# Preview deployment without making changes (dry run)
-aws-smus-cicd-cli deploy --dry-run --targets test
-
-# Dry run with JSON output for automation
-aws-smus-cicd-cli deploy --dry-run --targets test --output json
-
-# Skip pre-deployment validation for faster deployment
-aws-smus-cicd-cli deploy --targets test --skip-validation
 ```
-
-#### Dry Run Mode
-
-Use `--dry-run` to preview a deployment without creating, modifying, or deleting any resources. The dry run walks through every deployment phase in read-only mode:
-
-> **Note:** The dry run is a best-effort validation. A passing dry run significantly reduces the risk of deployment failure but does not guarantee success. Conditions such as transient AWS service errors, IAM policy changes between validation and deployment, concurrent resource modifications, eventual consistency delays, and service quota limits may cause a deployment to fail even after a clean dry-run report.
-
-1. **Manifest Validation** — Loads and validates the manifest YAML, resolves the target stage, builds domain configuration, checks environment variable references
-2. **Bundle Exploration** — Opens the bundle archive, enumerates files, validates catalog export data if present
-3. **Permission Verification** — Uses `iam:SimulatePrincipalPolicy` to check that the current IAM identity has all required permissions (S3, DataZone, Glue, IAM, QuickSight, Airflow, etc.). Also checks DataZone policy grants on the project's domain unit when catalog resources are present. Resolves domain IDs via tags when not directly configured.
-4. **Connectivity & Reachability** — Verifies that the DataZone domain and project are reachable, S3 buckets are accessible (resolved via project connections), and Airflow environments respond
-5. **Project Initialization** — Checks whether the target project exists or would need to be created
-6. **Deployment Simulation** — Simulates each deployment phase (QuickSight, storage, git, catalog import, workflows, bootstrap actions) and reports what would happen
-7. **Dependency Validation** — Checks that pre-existing AWS resources referenced by catalog export data (Glue tables/views/databases, data sources, custom form types, custom asset types) exist in the target environment
-8. **Workflow Validation** — Validates workflow YAML files for correct syntax, required Airflow DAG keys, and environment variable references
-
-The report ends with a **Resource Deployment Outlook** section that groups resources by deployment phase and shows which will deploy successfully vs. which will fail.
-
-**Example Dry Run Output (text):**
-```
-Dry Run Report
-========================================
-
---- Manifest Validation ---
-  ✅ Manifest loaded successfully from manifest.yaml
-  ✅ Target stage 'test' resolved successfully
-  ✅ Domain configuration built successfully
-  ✅ All environment variable references are resolved
-
---- Bundle Exploration ---
-  ✅ Bundle resolved from ./artifacts: ./artifacts/MyApp.zip
-  ✅ Bundle contains 1 file(s)
-  ✅ Catalog export validated: 19 resource(s) found
-
---- Permission Verification ---
-  ✅ Caller identity: arn:aws:sts::123456789012:assumed-role/Admin/session
-  ✅ Permission 'datazone:GetDomain' allowed on *
-  ✅ Permission 'datazone:GetProject' allowed on *
-  ✅ Permission 's3:PutObject' allowed on arn:aws:s3:::my-bucket/*
-  ✅ Permission 'glue:GetTable' allowed on arn:aws:glue:us-east-1:123456789012:*
-  ⚠️  Could not verify quicksight:DescribeDashboard: AccessDenied
-
---- Connectivity & Reachability ---
-  ✅ DataZone domain 'dzd-abc123' is reachable
-  ✅ DataZone project 'my-project' exists in domain 'dzd-abc123'
-  ✅ S3 bucket 'my-bucket' is accessible
-
---- Project Initialization ---
-  ✅ Project 'my-project' exists in domain 'dzd-abc123'. No creation needed.
-
---- Catalog Import ---
-  ✅ Catalog import would process 19 resource(s): 1 glossaries, 3 glossary terms, ...
-  ✅ Glossaries 'Business_Glossary' ready for import
-  ✅ Assets 'my_dataset' ready for import
-
---- Workflow Validation ---
-  ✅ No workflows configured; skipping.
-
---- Bootstrap Actions ---
-  ✅ No bootstrap actions configured.
-
-========================================
-Resource Deployment Outlook
-----------------------------------------
-  Will deploy (15):
-    [Catalog Import]
-      ✅ Business_Glossary  (glossaries)
-      ✅ my_dataset  (assets)
-      ...
-  Will fail (1):
-    [Permission Verification]
-      ❌ CREATE_GLOSSARY  (datazone)
-         └─ DataZone policy grant 'CREATE_GLOSSARY' is MISSING on domain unit 'dpxyz123'.
-========================================
-Summary: 48 OK, 1 warning(s), 1 error(s)
-```
-
-**Note on DataZone permissions:** When the manifest identifies the domain by tags (rather than a direct `domain: id:`), the dry run automatically resolves the domain ID via DataZone API. For `SimulatePrincipalPolicy`, if the domain ID or account ID cannot be resolved, a wildcard resource ARN (`*`) is used instead of a partial-wildcard ARN to avoid false-positive permission denials.
-
-**Example Dry Run Output (json):**
-```json
-{
-  "summary": { "ok": 48, "warnings": 1, "errors": 1 },
-  "phases": {
-    "Manifest Validation": [
-      { "severity": "OK", "message": "Manifest loaded successfully from manifest.yaml" },
-      { "severity": "OK", "message": "Target stage 'test' resolved successfully" }
-    ],
-    "Permission Verification": [
-      { "severity": "OK", "message": "Permission 'datazone:GetDomain' allowed on *" },
-      { "severity": "WARNING", "message": "Could not verify quicksight:DescribeDashboard: AccessDenied" }
-    ],
-    "Connectivity & Reachability": [
-      { "severity": "OK", "message": "DataZone domain 'dzd-abc123' is reachable" },
-      { "severity": "OK", "message": "DataZone project 'my-project' exists in domain 'dzd-abc123'" }
-    ]
-  },
-  "resource_outlook": {
-    "will_deploy": [
-      { "resource": "Business_Glossary", "type": "glossaries", "phase": "Catalog Import" }
-    ],
-    "will_fail": [
-      { "resource": "CREATE_GLOSSARY", "service": "datazone", "phase": "Permission Verification",
-        "message": "DataZone policy grant 'CREATE_GLOSSARY' is MISSING on domain unit 'dpxyz123'." }
-    ]
-  }
-}
-```
-
-**Exit codes:**
-- `0` — All checks passed (zero errors). Deployment is likely to succeed, though transient issues or state changes between validation and deployment may still cause failures.
-- `1` — One or more blocking errors detected. Deployment would fail.
-
-#### Pre-Deployment Validation
-
-By default, every `deploy` invocation (without `--dry-run`) automatically runs a dry-run validation step before beginning the actual deployment. This catches errors early and prevents partial deployments. Note that this validation is best-effort — it cannot detect transient failures or state changes that occur after validation completes.
-
-- If the validation finds **errors**, the deployment is aborted and the report is displayed.
-- If the validation finds only **warnings** or passes cleanly, the deployment proceeds normally.
-- Use `--skip-validation` to bypass this step when you've already validated or need faster deployments.
 
 ### 4. monitor - Monitor Workflow Status
 
@@ -902,7 +799,7 @@ aws-smus-cicd-cli monitor [OPTIONS]
 
 #### Options
 - **`-p, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
-- **`-t, --targets`**: Target name(s) - single target or comma-separated list (shows all targets if not specified)
+- **`-t, --stages`**: Target name(s) - single target or comma-separated list (shows all targets if not specified)
 - **`-l, --live`**: Keep monitoring until all workflows complete
 - **`-o, --output`**: Output format: TEXT (default) or JSON
 - **`--help`**: Show command help
@@ -1003,7 +900,7 @@ aws-smus-cicd-cli run [OPTIONS]
 #### Options
 - **`-w, --workflow`**: Workflow name to run (optional)
 - **`-c, --command`**: Airflow CLI command to execute (optional)
-- **`-t, --targets`**: Target name(s) - single target or comma-separated list (optional, defaults to first available)
+- **`-t, --stages`**: Target name(s) - single target or comma-separated list (optional, defaults to first available)
 - **`-p, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
 - **`-o, --output`**: Output format: TEXT (default) or JSON
 - **`--help`**: Show command help
@@ -1018,7 +915,7 @@ aws-smus-cicd-cli run --workflow my_dag
 aws-smus-cicd-cli run --workflow my_dag --command version
 
 # Run on specific target with JSON output
-aws-smus-cicd-cli run --workflow my_dag --targets prod --output JSON
+aws-smus-cicd-cli run --workflow my_dag --stages prod --output JSON
 ```
 
 ### 6. logs - Fetch Workflow Logs
@@ -1059,7 +956,7 @@ aws-smus-cicd-cli delete [OPTIONS]
 
 #### Options
 - **`-p, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
-- **`-t, --targets`**: Target name(s) - single target or comma-separated list (required)
+- **`-t, --stages`**: Target name(s) - single target or comma-separated list (required)
 - **`-f, --force`**: Skip confirmation prompt
 - **`--async`**: Don't wait for deletion to complete
 - **`-o, --output`**: Output format: TEXT (default) or JSON
@@ -1092,6 +989,160 @@ aws-smus-cicd-cli delete -t test --force -o JSON
 - Some DataZone projects cannot be deleted if they contain MetaDataForms
 - CloudFormation stacks are deleted automatically when projects are removed
 - Use `--async` for faster execution when managing multiple targets
+
+### 9. destroy - Destroy All Deployed Resources
+
+Deletes all resources previously deployed by the manifest: QuickSight dashboards/datasets/data sources, S3 objects at declared target paths, Airflow serverless workflows, workflow-created resources (e.g. Glue jobs), DataZone catalog resources, and optionally the DataZone project. This is the inverse of `deploy`.
+
+> **Note:** `destroy` is distinct from `delete`. The `delete` command only removes the DataZone project. The `destroy` command removes all deployed content resources and conditionally removes the project.
+
+```bash
+aws-smus-cicd-cli destroy [OPTIONS]
+```
+
+#### Options
+
+| Option | Short | Description | Example |
+|--------|-------|-------------|---------|
+| `--manifest` | `-m` | Path to application manifest file (default: `manifest.yaml`) | `--manifest manifest.yaml` |
+| `--targets` | `-t` | Stage name(s) — single or comma-separated (default: all stages) | `--targets test` |
+| `--force` | `-f` | Skip confirmation prompt | `--force` |
+| `--output` | `-o` | Output format: TEXT (default) or JSON | `--output JSON` |
+| `--help` | | Show command help | |
+
+#### Examples
+
+```bash
+# Destroy all stages with confirmation prompt
+aws-smus-cicd-cli destroy --manifest manifest.yaml
+
+# Destroy a specific stage
+aws-smus-cicd-cli destroy --targets test --manifest manifest.yaml
+
+# Destroy multiple stages
+aws-smus-cicd-cli destroy --targets test,prod --manifest manifest.yaml
+
+# Destroy without confirmation (CI/CD pipelines)
+aws-smus-cicd-cli destroy --targets test --force
+
+# Destroy with JSON output for automation
+aws-smus-cicd-cli destroy --targets test --force --output JSON
+```
+
+#### Example Output (TEXT format)
+
+```
+🔍 Validating 1 stage(s)...
+  Validating stage 'test'...
+
+📋 Destruction plan:
+
+  Stage: test
+    airflow_workflow:
+      - MyApp_test-project_my_dag
+    glue_job:
+      - setup-covid-db-job
+      - summary-glue-job
+    quicksight_dashboard:
+      - deployed-test-covid-TotalDeathByCountry
+    quicksight_dataset:
+      - deployed-test-covid-TotalDeathByCountry
+    quicksight_data_source:
+      - deployed-test-covid-TotalDeathByCountry
+    s3_prefix:
+      - dashboard-glue-quick/bundle
+      - repos
+
+  Total resources to process: 7
+
+⚠️  WARNING: This will permanently delete the above resources!
+Are you sure you want to proceed with destruction? [y/n]: y
+
+🗑️  Starting destruction...
+
+  Stage: test
+
+📊 Destruction Summary
+  test: deleted=7 not_found=0 skipped=0 error=0
+```
+
+#### Example Output (JSON format)
+
+```json
+{
+  "application_name": "MyApp",
+  "targets": ["test"],
+  "stages": {
+    "test": [
+      {
+        "resource_type": "airflow_workflow",
+        "resource_id": "MyApp_test-project_my_dag",
+        "status": "deleted",
+        "message": "Workflow deleted"
+      },
+      {
+        "resource_type": "glue_job",
+        "resource_id": "setup-covid-db-job",
+        "status": "deleted",
+        "message": "Glue job deleted"
+      },
+      {
+        "resource_type": "s3_prefix",
+        "resource_id": "dashboard-glue-quick/bundle",
+        "status": "deleted",
+        "message": "S3 objects deleted"
+      }
+    ]
+  }
+}
+```
+
+#### Behavior
+
+The command follows a strict two-phase model:
+
+**Phase 1 — Validation (read-only):**
+- Resolves domain and project IDs via DataZone
+- Resolves S3 connections to determine bucket/prefix targets
+- Enumerates QuickSight resources by prefix and detects collisions
+- Checks for active Airflow workflow runs
+- Fetches and parses workflow YAML files from S3 to discover workflow-created resources (e.g. Glue jobs)
+- Collects ALL errors across ALL stages before aborting — no early exit
+
+**Phase 2 — Destruction (after confirmation):**
+
+Resources are deleted in this fixed dependency order per stage:
+1. Stop active Airflow workflow runs
+2. Delete workflow-created resources (Glue jobs, etc.)
+3. Delete Airflow workflows
+4. Delete bootstrap connections (created by `datazone.create_connection` actions)
+5. Delete QuickSight dashboards → datasets → data sources
+6. Delete S3 objects at declared `targetDirectory` prefixes
+7. Delete catalog resources (glossaries, terms, form types, asset types, assets, data products) in reverse dependency order
+8. Delete DataZone project (only if `project.create: true` in manifest)
+
+**Key behaviors:**
+- **Idempotent**: Resources already absent are logged as `not_found`, not errors. Safe to run multiple times.
+- **Single confirmation gate**: All confirmations happen in one prompt after the full plan is printed.
+- **Active run re-check**: Live workflow run status is re-queried at destruction time to catch runs that started or completed after validation.
+- **Collision detection**: If more QuickSight resources or Airflow workflows match than declared in the manifest, destroy aborts before deleting anything.
+- **Built-in connections protected**: `default.*` connections are never deleted.
+- **Managed catalog resources protected**: Resources with `amazon.datazone.*` namespace are never deleted.
+- **Always synchronous**: No `--async` mode. Each deletion step completes before the next begins.
+- **Catalog warning**: When `deployment_configuration.catalog` is present, all project-owned catalog resources are deleted (not just imported ones). Set `disable: true` under `deployment_configuration.catalog` to skip catalog deletion.
+
+#### Use Cases
+
+- **Clean re-deployment**: Destroy a stage and redeploy from scratch to resolve state drift
+- **Environment teardown**: Remove test or staging environments after validation
+- **Rollback**: Remove a failed deployment before re-deploying a previous version
+- **Project cleanup**: Remove all resources before deleting the project
+
+#### Notes
+- Requires sufficient IAM permissions to list and delete all resource types declared in the manifest (QuickSight, S3, Airflow Serverless, DataZone, Glue)
+- S3 bucket and prefix resolution requires a live DataZone API call — the project must be reachable at destroy time
+- Use `--force` in CI/CD pipelines to skip the interactive confirmation prompt; note that `--force` with `--output JSON` is required since JSON mode cannot prompt interactively
+- The `Resource_Prefix` configured in `deployment_configuration.quicksight.overrideParameters` must be unique to avoid collision errors
 
 ## Global Options
 
@@ -1141,9 +1192,31 @@ aws-smus-cicd-cli run --workflow my_dag --command "dags list" --targets test
 
 ### Cleanup Workflow
 ```bash
-# Delete test environment
+# Delete test environment (DataZone project only)
 aws-smus-cicd-cli delete -t test --force
 
 # Delete multiple environments
 aws-smus-cicd-cli delete -t test,staging --force --async
+
+# Destroy all deployed resources (QuickSight, S3, Airflow, Glue, catalog, project)
+aws-smus-cicd-cli destroy --targets test --force
+
+# Destroy specific stage for clean re-deployment
+aws-smus-cicd-cli destroy --targets test --manifest manifest.yaml
 ```
+
+### Rollback Workflow
+```bash
+# Option 1: Redeploy previous bundle (no destroy needed if no resource conflicts)
+#   Download the versioned bundle, then deploy
+aws s3 cp s3://bucket/bundles/MyApp-v1.2.0.zip ./artifacts/MyApp.zip
+aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+
+# Option 2: Destroy bad deployment then redeploy previous version (clean slate)
+aws-smus-cicd-cli destroy --targets prod --force
+aws s3 cp s3://bucket/bundles/MyApp-v1.2.0.zip ./artifacts/MyApp.zip
+aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+aws-smus-cicd-cli test --stages prod
+```
+
+**See more:** [Rollback Guide](rollback-guide.md)

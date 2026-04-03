@@ -43,37 +43,40 @@ aws-smus-cicd-cli describe --bundle "$PIPELINE_FILE" --targets || echo "  No tar
 
 echo ""
 echo "🗑️  Cleaning up demo resources..."
-
-# Delete test target (most common demo target)
 echo ""
-echo "Deleting test target..."
-aws-smus-cicd-cli delete \
-  --bundle "$PIPELINE_FILE" \
+echo "ℹ️  Use 'destroy' to remove all deployed resources (S3, Airflow, QuickSight, Glue, catalog)."
+echo "   Use 'delete' to remove only the DataZone project."
+echo ""
+
+# Destroy all deployed resources for test target (most common demo target)
+echo "Destroying test target resources..."
+aws-smus-cicd-cli destroy \
+  --manifest "$PIPELINE_FILE" \
   --targets test \
   --force || echo "  No test target to clean up"
 
-# Delete staging target if it exists
+# Destroy staging target if it exists
 echo ""
-echo "Deleting staging target..."
-aws-smus-cicd-cli delete \
-  --bundle "$PIPELINE_FILE" \
+echo "Destroying staging target resources..."
+aws-smus-cicd-cli destroy \
+  --manifest "$PIPELINE_FILE" \
   --targets staging \
   --force || echo "  No staging target to clean up"
 
-# Delete prod target if it exists
+# Destroy prod target if it exists
 echo ""
-echo "Deleting prod target..."
-aws-smus-cicd-cli delete \
-  --bundle "$PIPELINE_FILE" \
+echo "Destroying prod target resources..."
+aws-smus-cicd-cli destroy \
+  --manifest "$PIPELINE_FILE" \
   --targets prod \
   --force || echo "  No prod target to clean up"
 
-# Delete any other common demo targets
+# Destroy any other common demo targets
 echo ""
-echo "Deleting other demo targets..."
+echo "Destroying other demo targets..."
 for target in demo example marketing analytics; do
-    aws-smus-cicd-cli delete \
-      --bundle "$PIPELINE_FILE" \
+    aws-smus-cicd-cli destroy \
+      --manifest "$PIPELINE_FILE" \
       --targets "$target" \
       --force 2>/dev/null || echo "  No $target target to clean up"
 done
@@ -90,4 +93,4 @@ echo "🔍 To verify cleanup, run:"
 echo "  aws-smus-cicd-cli describe --bundle $PIPELINE_FILE --targets --connect"
 echo ""
 echo "💡 To clean up specific targets manually:"
-echo "  aws-smus-cicd-cli delete --bundle $PIPELINE_FILE --targets <target-name> --force"
+echo "  aws-smus-cicd-cli destroy --manifest $PIPELINE_FILE --targets <target-name> --force"

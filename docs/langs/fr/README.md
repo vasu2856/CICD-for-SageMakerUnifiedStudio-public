@@ -67,6 +67,9 @@ aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run validation tests
 aws-smus-cicd-cli test --manifest manifest.yaml --targets test
+
+# Nettoyer quand c'est terminé
+aws-smus-cicd-cli destroy --targets test --force
 ```
 
 **See it in action:** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
