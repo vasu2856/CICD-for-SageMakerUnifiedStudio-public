@@ -14,6 +14,7 @@ import typer
 import yaml
 from botocore.exceptions import ClientError
 from rich.console import Console
+from rich.markup import escape as _escape_markup
 from rich.prompt import Confirm
 
 from ..application import ApplicationManifest
@@ -705,75 +706,112 @@ def _validate_stage(
                     _search_target_resources,
                     _search_target_type_resources,
                 )
+
                 dz_client = boto3.client("datazone", region_name=effective_region)
 
                 # Glossaries
-                for item in _search_target_resources(dz_client, domain_id, project_id, "GLOSSARY"):
+                for item in _search_target_resources(
+                    dz_client, domain_id, project_id, "GLOSSARY"
+                ):
                     g = item.get("glossaryItem", {})
                     if g.get("id"):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_glossary",
-                            resource_id=g["id"],
-                            stage=stage_name,
-                            metadata={"name": g.get("name", ""), "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_glossary",
+                                resource_id=g["id"],
+                                stage=stage_name,
+                                metadata={
+                                    "name": g.get("name", ""),
+                                    "domain_id": domain_id,
+                                },
+                            )
+                        )
 
                 # Glossary Terms
-                for item in _search_target_resources(dz_client, domain_id, project_id, "GLOSSARY_TERM"):
+                for item in _search_target_resources(
+                    dz_client, domain_id, project_id, "GLOSSARY_TERM"
+                ):
                     t = item.get("glossaryTermItem", {})
                     if t.get("id"):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_glossary_term",
-                            resource_id=t["id"],
-                            stage=stage_name,
-                            metadata={"name": t.get("name", ""), "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_glossary_term",
+                                resource_id=t["id"],
+                                stage=stage_name,
+                                metadata={
+                                    "name": t.get("name", ""),
+                                    "domain_id": domain_id,
+                                },
+                            )
+                        )
 
                 # Form Types (custom only)
-                for item in _search_target_type_resources(dz_client, domain_id, project_id, "FORM_TYPE"):
+                for item in _search_target_type_resources(
+                    dz_client, domain_id, project_id, "FORM_TYPE"
+                ):
                     ft = item.get("formTypeItem", {})
                     name = ft.get("name", "")
                     if name and not _is_managed_resource(name):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_form_type",
-                            resource_id=name,
-                            stage=stage_name,
-                            metadata={"name": name, "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_form_type",
+                                resource_id=name,
+                                stage=stage_name,
+                                metadata={"name": name, "domain_id": domain_id},
+                            )
+                        )
 
                 # Asset Types (custom only)
-                for item in _search_target_type_resources(dz_client, domain_id, project_id, "ASSET_TYPE"):
+                for item in _search_target_type_resources(
+                    dz_client, domain_id, project_id, "ASSET_TYPE"
+                ):
                     at = item.get("assetTypeItem", {})
                     name = at.get("name", "")
                     if name and not _is_managed_resource(name):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_asset_type",
-                            resource_id=name,
-                            stage=stage_name,
-                            metadata={"name": name, "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_asset_type",
+                                resource_id=name,
+                                stage=stage_name,
+                                metadata={"name": name, "domain_id": domain_id},
+                            )
+                        )
 
                 # Assets
-                for item in _search_target_resources(dz_client, domain_id, project_id, "ASSET"):
+                for item in _search_target_resources(
+                    dz_client, domain_id, project_id, "ASSET"
+                ):
                     a = item.get("assetItem", {})
                     if a.get("identifier"):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_asset",
-                            resource_id=a["identifier"],
-                            stage=stage_name,
-                            metadata={"name": a.get("name", ""), "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_asset",
+                                resource_id=a["identifier"],
+                                stage=stage_name,
+                                metadata={
+                                    "name": a.get("name", ""),
+                                    "domain_id": domain_id,
+                                },
+                            )
+                        )
 
                 # Data Products
-                for item in _search_target_resources(dz_client, domain_id, project_id, "DATA_PRODUCT"):
+                for item in _search_target_resources(
+                    dz_client, domain_id, project_id, "DATA_PRODUCT"
+                ):
                     dp = item.get("dataProductItem", {})
                     if dp.get("id"):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_data_product",
-                            resource_id=dp["id"],
-                            stage=stage_name,
-                            metadata={"name": dp.get("name", ""), "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_data_product",
+                                resource_id=dp["id"],
+                                stage=stage_name,
+                                metadata={
+                                    "name": dp.get("name", ""),
+                                    "domain_id": domain_id,
+                                },
+                            )
+                        )
 
                 if any(r.resource_type.startswith("catalog_") for r in resources):
                     warnings.append(
@@ -784,7 +822,9 @@ def _validate_stage(
                     )
 
             except Exception as e:
-                warnings.append(f"[{stage_name}] Could not enumerate catalog resources: {e}")
+                warnings.append(
+                    f"[{stage_name}] Could not enumerate catalog resources: {e}"
+                )
         elif catalog_disabled:
             warnings.append(
                 f"[{stage_name}] Catalog deletion is disabled (disable: true) — skipping."
@@ -1134,7 +1174,9 @@ def _destroy_stage(
         domain_id = resource.metadata.get("domain_id", "")
 
         if not connection_id or not domain_id:
-            _log(f"  [yellow]⚠️  Skipping connection '{conn_name}' — missing ID or domain[/yellow]")
+            _log(
+                f"  [yellow]⚠️  Skipping connection '{conn_name}' — missing ID or domain[/yellow]"
+            )
             results.append(
                 ResourceResult(
                     resource_type="datazone_connection",
@@ -1289,7 +1331,9 @@ def _destroy_stage(
             # Use existing s3 helper for list + delete
             object_keys = [
                 obj["Key"]
-                for obj in s3_helper.list_objects(bucket, prefix, region=effective_region)
+                for obj in s3_helper.list_objects(
+                    bucket, prefix, region=effective_region
+                )
             ]
 
             if not object_keys:
@@ -1373,50 +1417,70 @@ def _destroy_stage(
             domain_id_for_catalog = resource.metadata.get("domain_id", "")
             resource_name = resource.metadata.get("name", resource_id)
             if not domain_id_for_catalog:
-                _log(f"  [yellow]⚠️  Skipping {catalog_type} '{resource_name}' — missing domain ID[/yellow]")
-                results.append(ResourceResult(
-                    resource_type=catalog_type,
-                    resource_id=resource_id,
-                    status="skipped",
-                    message="Missing domain ID",
-                ))
+                _log(
+                    f"  [yellow]⚠️  Skipping {catalog_type} '{resource_name}' — missing domain ID[/yellow]"
+                )
+                results.append(
+                    ResourceResult(
+                        resource_type=catalog_type,
+                        resource_id=resource_id,
+                        status="skipped",
+                        message="Missing domain ID",
+                    )
+                )
                 continue
             try:
                 dz_client = boto3.client("datazone", region_name=effective_region)
-                CATALOG_DELETE_API[catalog_type](dz_client, domain_id_for_catalog, resource_id)
+                CATALOG_DELETE_API[catalog_type](
+                    dz_client, domain_id_for_catalog, resource_id
+                )
                 _log(f"  ✅ Deleted {catalog_type}: {resource_name} ({resource_id})")
-                results.append(ResourceResult(
-                    resource_type=catalog_type,
-                    resource_id=resource_id,
-                    status="deleted",
-                    message="Deleted successfully",
-                ))
+                results.append(
+                    ResourceResult(
+                        resource_type=catalog_type,
+                        resource_id=resource_id,
+                        status="deleted",
+                        message="Deleted successfully",
+                    )
+                )
             except ClientError as e:
                 code = e.response["Error"]["Code"]
                 if code in ("ResourceNotFoundException", "EntityNotFoundException"):
-                    _log(f"  [yellow]⚠️  {catalog_type} not found: {resource_name}[/yellow]")
-                    results.append(ResourceResult(
-                        resource_type=catalog_type,
-                        resource_id=resource_id,
-                        status="not_found",
-                        message="Resource not found",
-                    ))
+                    _log(
+                        f"  [yellow]⚠️  {catalog_type} not found: {resource_name}[/yellow]"
+                    )
+                    results.append(
+                        ResourceResult(
+                            resource_type=catalog_type,
+                            resource_id=resource_id,
+                            status="not_found",
+                            message="Resource not found",
+                        )
+                    )
                 else:
-                    _log(f"  [red]❌ Error deleting {catalog_type} '{resource_name}': {e}[/red]")
-                    results.append(ResourceResult(
+                    _log(
+                        f"  [red]❌ Error deleting {catalog_type} '{resource_name}': {e}[/red]"
+                    )
+                    results.append(
+                        ResourceResult(
+                            resource_type=catalog_type,
+                            resource_id=resource_id,
+                            status="error",
+                            message=str(e),
+                        )
+                    )
+            except Exception as e:
+                _log(
+                    f"  [red]❌ Error deleting {catalog_type} '{resource_name}': {e}[/red]"
+                )
+                results.append(
+                    ResourceResult(
                         resource_type=catalog_type,
                         resource_id=resource_id,
                         status="error",
                         message=str(e),
-                    ))
-            except Exception as e:
-                _log(f"  [red]❌ Error deleting {catalog_type} '{resource_name}': {e}[/red]")
-                results.append(ResourceResult(
-                    resource_type=catalog_type,
-                    resource_id=resource_id,
-                    status="error",
-                    message=str(e),
-                ))
+                    )
+                )
 
     # -----------------------------------------------------------------------
     # Step h: Delete DataZone project (only if project.create=True)
@@ -1602,7 +1666,6 @@ def destroy_command(
         validation_results[stage_name] = vr
 
         for warning in vr.warnings:
-            from rich.markup import escape as _escape_markup
             _out(f"  [yellow]⚠️  {_escape_markup(warning)}[/yellow]")
 
     # -----------------------------------------------------------------------
@@ -1615,7 +1678,6 @@ def destroy_command(
     if all_errors:
         _out("\n[red]❌ Validation errors found — aborting before any deletion:[/red]")
         for err in all_errors:
-            from rich.markup import escape as _escape_markup
             _out(f"  [red]• {_escape_markup(err)}[/red]")
         raise typer.Exit(1)
 
