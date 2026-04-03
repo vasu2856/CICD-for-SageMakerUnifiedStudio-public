@@ -18,6 +18,7 @@ from rich.markup import escape as _escape_markup
 from rich.prompt import Confirm
 
 from ..application import ApplicationManifest
+from ..helpers import s3 as s3_helper
 from ..helpers.airflow_serverless import (
     delete_workflow,
     generate_workflow_name,
@@ -40,7 +41,6 @@ from ..helpers.quicksight import (
     list_data_sources,
     list_datasets,
 )
-from ..helpers import s3 as s3_helper
 
 logger = get_logger("destroy")
 console = Console()
