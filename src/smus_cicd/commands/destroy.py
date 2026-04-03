@@ -385,7 +385,9 @@ def _find_workflow_yaml_by_dag_id(
                         ):
                             logger.info(
                                 "Found workflow YAML for dag_id '%s' at s3://%s/%s",
-                                dag_id, bucket, key,
+                                dag_id,
+                                bucket,
+                                key,
                             )
                             return content
                 except Exception as e:
@@ -644,7 +646,9 @@ def _validate_stage(
                 target_dir = (workflows_storage.targetDirectory or "").strip("/")
                 if base_prefix:
                     search_prefix = (
-                        f"{base_prefix}/{target_dir}/" if target_dir else f"{base_prefix}/"
+                        f"{base_prefix}/{target_dir}/"
+                        if target_dir
+                        else f"{base_prefix}/"
                     )
                 else:
                     search_prefix = f"{target_dir}/" if target_dir else ""

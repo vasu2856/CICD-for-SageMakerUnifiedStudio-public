@@ -4,12 +4,8 @@ on:
   push:
     branches:
       - main
-      - feat/destroy-command
+      - test
     paths:
-      - 'src/smus_cicd/commands/destroy.py'
-      - 'src/smus_cicd/helpers/operator_registry.py'
-      - 'src/smus_cicd/helpers/quicksight.py'
-      - 'examples/analytic-workflow/dashboard-glue-quick/**'
       - 'src/**'
       - '.github/workflows/test-destroy-command.yml'
   workflow_dispatch:
