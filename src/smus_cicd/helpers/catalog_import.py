@@ -4,8 +4,9 @@ DataZone catalog import functionality for SMUS CI/CD CLI.
 This module provides functions to import catalog resources (Glossaries, GlossaryTerms,
 FormTypes, AssetTypes, Assets, and Data Products) into a DataZone project, mapping
 identifiers from source to target projects using externalIdentifier (with normalization)
-or name as fallback. Supports deletion of resources missing from the bundle and
-automatic publishing of assets and data products.
+or name as fallback. Resources in the target that are not present in the bundle are
+logged for visibility but never deleted. Supports automatic publishing of assets and
+data products.
 """
 
 import json
@@ -48,18 +49,8 @@ CREATION_ORDER = [
     "dataProducts",
 ]
 
-# Human-readable display names for each resource type key
-RESOURCE_TYPE_DISPLAY_NAMES = {
-    "glossaries": "glossaries",
-    "glossaryTerms": "glossary terms",
-    "formTypes": "form types",
-    "assetTypes": "custom asset types",
-    "assets": "assets",
-    "dataProducts": "data products",
-}
-
-# Deletion order (reverse): DataProducts → Assets → AssetTypes → FormTypes → GlossaryTerms → Glossaries
-DELETION_ORDER = list(reversed(CREATION_ORDER))
+# Reverse dependency order: used for reporting extra resources in target
+RESOURCE_REPORT_ORDER = list(reversed(CREATION_ORDER))
 
 # Resource types that can be published
 PUBLISHABLE_TYPES = {"assets", "dataProducts"}
@@ -132,147 +123,10 @@ _POLICY_DETAIL_KEY = {
 # Prefix for managed/system form types that cannot be used in custom asset types
 _MANAGED_FORM_TYPE_PREFIX = "amazon.datazone."
 
-# Valid data source statuses for candidate filtering
-DATA_SOURCE_VALID_STATUSES = {"READY", "RUNNING"}
-
-# Cross-reference field definitions: maps resource type to a list of
-# (field_name, target_resource_type) tuples describing which fields
-# reference identifiers in other resource types.
-# Used by both the import flow and the dry-run checker to stay in sync.
-CROSS_REFERENCE_FIELDS = {
-    "glossaryTerms": [
-        # glossaryId references a glossary's sourceId
-        ("glossaryId", "glossaries"),
-    ],
-    "assets": [
-        # typeIdentifier references an assetType's sourceId
-        ("typeIdentifier", "assetTypes"),
-    ],
-    # dataProducts reference assets via items[].identifier — handled separately
-    # because the structure is nested, not a simple top-level field.
-}
-
-# Form type reference fields in formsInput — used to check cross-references
-# for form types referenced by assets (list format) and assetTypes (dict format).
-FORM_TYPE_REF_FIELDS = ("typeIdentifier", "typeName")
-
-# Well-known managed form type identifiers used for special handling.
-# Shared across import flow and dry-run checkers to prevent drift.
-GLUE_TABLE_FORM_TYPE = "amazon.datazone.GlueTableFormType"
-DATA_SOURCE_REF_FORM_TYPE = "amazon.datazone.DataSourceReferenceFormType"
-
 
 def _is_managed_resource(name: str) -> bool:
     """Return True if the resource name belongs to a managed/system type."""
     return name.startswith(_MANAGED_FORM_TYPE_PREFIX) if name else False
-
-
-def get_form_type_ref(form: dict) -> str:
-    """Extract form type identifier from a form dict using the shared field names.
-
-    Checks ``typeIdentifier`` first, then ``typeName`` as fallback.
-    Returns empty string if neither is present.
-
-    Args:
-        form: A single form dict from formsInput
-
-    Returns:
-        The form type identifier string, or ""
-    """
-    for field in FORM_TYPE_REF_FIELDS:
-        val = form.get(field, "")
-        if val:
-            return val
-    return ""
-
-
-def has_glue_references(catalog_data: dict) -> bool:
-    """Check whether any asset in catalog_data references Glue resources.
-
-    Scans assets (from both the keyed format and legacy flat format) for
-    formsInput entries containing GlueTableFormType.
-
-    Args:
-        catalog_data: Parsed catalog export dict
-
-    Returns:
-        True if at least one asset references a Glue table/view
-    """
-    if not catalog_data:
-        return False
-
-    # Collect assets from both formats
-    assets = []
-    # Real keyed format
-    for item in catalog_data.get("assets", []):
-        if isinstance(item, dict):
-            assets.append(item)
-    # Legacy flat format
-    for item in catalog_data.get("resources", []):
-        if isinstance(item, dict) and item.get("type") == "assets":
-            assets.append(item)
-
-    for asset in assets:
-        forms_input = asset.get("formsInput")
-        if not isinstance(forms_input, list):
-            continue
-        for form in forms_input:
-            if not isinstance(form, dict):
-                continue
-            type_id = get_form_type_ref(form)
-            if GLUE_TABLE_FORM_TYPE in type_id:
-                return True
-    return False
-
-
-def parse_form_content(content) -> Optional[Dict[str, Any]]:
-    """
-    Parse a form's JSON content string, returning None on failure.
-
-    Handles content that is already a dict, a JSON string, or None/empty.
-    Returns None for non-dict parsed values (arrays, numbers, etc.).
-
-    Args:
-        content: Raw form content (str, dict, or None)
-
-    Returns:
-        Parsed dict or None
-    """
-    if not content:
-        return None
-    if isinstance(content, dict):
-        return content
-    try:
-        parsed = json.loads(content)
-        return parsed if isinstance(parsed, dict) else None
-    except (json.JSONDecodeError, TypeError):
-        return None
-
-
-def extract_database_name_from_forms(forms_input: list) -> Optional[str]:
-    """
-    Extract databaseName from the GlueTableFormType in an asset's formsInput.
-
-    Scans the forms list for a GlueTableFormType entry and returns the
-    databaseName from its content. Used by both the import flow (for data
-    source matching) and the dry-run checker (for dependency validation).
-
-    Args:
-        forms_input: List of form dicts from an asset's formsInput
-
-    Returns:
-        Database name string or None if not found
-    """
-    for form in forms_input:
-        if not isinstance(form, dict):
-            continue
-        type_id = get_form_type_ref(form)
-        if GLUE_TABLE_FORM_TYPE not in type_id:
-            continue
-        content = parse_form_content(form.get("content"))
-        if content and content.get("databaseName"):
-            return content["databaseName"]
-    return None
 
 
 def _ensure_import_permissions(client, domain_id: str, project_id: str) -> List[str]:
@@ -722,7 +576,7 @@ def _resolve_target_data_source(
             ds
             for ds in resp.get("items", [])
             if ds.get("type") == source_ds_type
-            and ds.get("status") in DATA_SOURCE_VALID_STATUSES
+            and ds.get("status") in ("READY", "RUNNING")
         ]
 
         if not candidates:
@@ -740,10 +594,11 @@ def _resolve_target_data_source(
             return None
 
         def _build_result(ds_id: str) -> Dict[str, str]:
-            return {
-                "dataSourceId": ds_id,
-                "dataSourceRunId": _get_latest_run_id(ds_id),
-            }
+            run_id = _get_latest_run_id(ds_id)
+            result: Dict[str, str] = {"dataSourceId": ds_id}
+            if run_id is not None:
+                result["dataSourceRunId"] = run_id
+            return result
 
         # If no database_name, just return the first candidate
         if not database_name:
@@ -835,9 +690,21 @@ def _normalize_forms_input_for_api(
     # Cache for resolved target data sources keyed by (type, databaseName)
     _ds_cache: Dict[str, Optional[Dict[str, str]]] = {}
 
+    def _extract_database_name(all_forms: list) -> Optional[str]:
+        """Extract databaseName from the asset's GlueTableForm if present."""
+        for f in all_forms:
+            type_id = f.get("typeIdentifier") or f.get("typeName", "")
+            if "GlueTableFormType" in type_id:
+                try:
+                    content = json.loads(f.get("content", "{}"))
+                    return content.get("databaseName")
+                except (json.JSONDecodeError, KeyError):
+                    pass
+        return None
+
     if resource_type == "assets" and isinstance(forms_input, list):
         # Pre-extract database name for data source matching
-        db_name = extract_database_name_from_forms(forms_input)
+        db_name = _extract_database_name(forms_input)
 
         normalized = []
         for form in forms_input:
@@ -849,7 +716,7 @@ def _normalize_forms_input_for_api(
             # Remap DataSourceReferenceForm to target domain's data source
             form_type = form_copy.get("typeIdentifier", "")
             if (
-                form_type == DATA_SOURCE_REF_FORM_TYPE
+                form_type == "amazon.datazone.DataSourceReferenceFormType"
                 and client
                 and domain_id
                 and project_id
@@ -895,28 +762,28 @@ def _normalize_forms_input_for_api(
                     continue
 
             # Remap typeRevision to the target domain's current revision
-            form_id = form_copy.get("typeIdentifier", "")
+            form_id = str(form_copy.get("typeIdentifier", ""))
             if "typeRevision" in form_copy:
-                resolved = _resolve_revision(form_id, form_copy["typeRevision"])
+                resolved = _resolve_revision(form_id, str(form_copy["typeRevision"]))
                 if resolved:
                     form_copy["typeRevision"] = resolved
             normalized.append(form_copy)
         return normalized
 
     if resource_type == "assetTypes" and isinstance(forms_input, dict):
-        normalized = {}
+        normalized_dict: Dict[str, Dict[str, Any]] = {}
         for form_name, form_config in forms_input.items():
             config_copy = dict(form_config)
             if "typeName" in config_copy and "typeIdentifier" not in config_copy:
                 config_copy["typeIdentifier"] = config_copy.pop("typeName")
             # Remap typeRevision to the target domain's current revision
-            form_id = config_copy.get("typeIdentifier", form_name)
+            form_id = str(config_copy.get("typeIdentifier", form_name))
             if "typeRevision" in config_copy:
-                resolved = _resolve_revision(form_id, config_copy["typeRevision"])
+                resolved = _resolve_revision(form_id, str(config_copy["typeRevision"]))
                 if resolved:
                     config_copy["typeRevision"] = resolved
-            normalized[form_name] = config_copy
-        return normalized
+            normalized_dict[form_name] = config_copy
+        return normalized_dict
 
     return forms_input
 
@@ -1024,36 +891,7 @@ def _import_resource(
                 logger.info(f"Skipping managed FormType {name}")
                 return True, False
             if is_update:
-                # Form types have no update API, but if the existing one is
-                # DISABLED we must re-enable it by calling create_form_type
-                # with status=ENABLED (the API acts as an upsert for status).
-                try:
-                    ft_resp = client.get_form_type(
-                        domainIdentifier=domain_id,
-                        formTypeIdentifier=name,
-                    )
-                    ft_status = ft_resp.get("status")
-                except Exception:
-                    ft_status = None
-
-                if ft_status == "DISABLED":
-                    logger.info(f"FormType {name} is DISABLED, re-enabling")
-                    kwargs = {
-                        "domainIdentifier": domain_id,
-                        "owningProjectIdentifier": project_id,
-                        "name": resolved.get("name"),
-                        "status": "ENABLED",
-                    }
-                    if resolved.get("description"):
-                        kwargs["description"] = resolved["description"]
-                    if resolved.get("model"):
-                        kwargs["model"] = resolved["model"]
-                    client.create_form_type(**kwargs)
-                    logger.info(f"FormType {name} re-enabled")
-                else:
-                    logger.info(
-                        f"FormType {name} already exists and is ENABLED, skipping"
-                    )
+                logger.info(f"FormType {name} already exists, skipping (no update API)")
                 return True, True
             else:
                 kwargs = {
@@ -1231,7 +1069,7 @@ def _import_resource(
         return False, False
 
 
-def _identify_resources_to_delete(
+def _identify_extra_target_resources(
     client,
     domain_id: str,
     project_id: str,
@@ -1240,6 +1078,8 @@ def _identify_resources_to_delete(
     """
     Find resources in target project that are not present in the bundle.
 
+    These resources are reported for visibility but NOT deleted.
+
     Args:
         client: DataZone boto3 client
         domain_id: Target domain identifier
@@ -1247,9 +1087,9 @@ def _identify_resources_to_delete(
         catalog_data: Parsed catalog export JSON
 
     Returns:
-        Dict mapping resource types to lists of {id, name} dicts to delete
+        Dict mapping resource types to lists of {id, name} dicts found in target but not in bundle
     """
-    to_delete: Dict[str, List[Dict[str, str]]] = {rt: [] for rt in DELETION_ORDER}
+    extras: Dict[str, List[Dict[str, str]]] = {rt: [] for rt in RESOURCE_REPORT_ORDER}
 
     # Build sets of names from bundle for each resource type
     bundle_names = {}
@@ -1266,9 +1106,9 @@ def _identify_resources_to_delete(
         for item in target_glossaries:
             g = item.get("glossaryItem", {})
             if g.get("name") and g["name"] not in bundle_names["glossaries"]:
-                to_delete["glossaries"].append({"id": g.get("id"), "name": g["name"]})
+                extras["glossaries"].append({"id": g.get("id"), "name": g["name"]})
     except Exception as e:
-        logger.warning(f"Failed to search target glossaries for deletion: {e}")
+        logger.warning(f"Failed to search target glossaries: {e}")
 
     # Check glossary terms
     try:
@@ -1278,11 +1118,9 @@ def _identify_resources_to_delete(
         for item in target_terms:
             t = item.get("glossaryTermItem", {})
             if t.get("name") and t["name"] not in bundle_names["glossaryTerms"]:
-                to_delete["glossaryTerms"].append(
-                    {"id": t.get("id"), "name": t["name"]}
-                )
+                extras["glossaryTerms"].append({"id": t.get("id"), "name": t["name"]})
     except Exception as e:
-        logger.warning(f"Failed to search target glossary terms for deletion: {e}")
+        logger.warning(f"Failed to search target glossary terms: {e}")
 
     # Check form types
     try:
@@ -1292,11 +1130,11 @@ def _identify_resources_to_delete(
         for item in target_form_types:
             ft = item.get("formTypeItem", {})
             if ft.get("name") and ft["name"] not in bundle_names["formTypes"]:
-                to_delete["formTypes"].append(
+                extras["formTypes"].append(
                     {"id": ft.get("revision"), "name": ft["name"]}
                 )
     except Exception as e:
-        logger.warning(f"Failed to search target form types for deletion: {e}")
+        logger.warning(f"Failed to search target form types: {e}")
 
     # Check asset types
     try:
@@ -1306,11 +1144,11 @@ def _identify_resources_to_delete(
         for item in target_asset_types:
             at = item.get("assetTypeItem", {})
             if at.get("name") and at["name"] not in bundle_names["assetTypes"]:
-                to_delete["assetTypes"].append(
+                extras["assetTypes"].append(
                     {"id": at.get("revision"), "name": at["name"]}
                 )
     except Exception as e:
-        logger.warning(f"Failed to search target asset types for deletion: {e}")
+        logger.warning(f"Failed to search target asset types: {e}")
 
     # Check assets
     try:
@@ -1318,11 +1156,9 @@ def _identify_resources_to_delete(
         for item in target_assets:
             a = item.get("assetItem", {})
             if a.get("name") and a["name"] not in bundle_names["assets"]:
-                to_delete["assets"].append(
-                    {"id": a.get("identifier"), "name": a["name"]}
-                )
+                extras["assets"].append({"id": a.get("identifier"), "name": a["name"]})
     except Exception as e:
-        logger.warning(f"Failed to search target assets for deletion: {e}")
+        logger.warning(f"Failed to search target assets: {e}")
 
     # Check data products
     try:
@@ -1332,60 +1168,11 @@ def _identify_resources_to_delete(
         for item in target_dps:
             dp = item.get("dataProductItem", {})
             if dp.get("name") and dp["name"] not in bundle_names["dataProducts"]:
-                to_delete["dataProducts"].append(
-                    {"id": dp.get("id"), "name": dp["name"]}
-                )
+                extras["dataProducts"].append({"id": dp.get("id"), "name": dp["name"]})
     except Exception as e:
-        logger.warning(f"Failed to search target data products for deletion: {e}")
+        logger.warning(f"Failed to search target data products: {e}")
 
-    return to_delete
-
-
-def _delete_resource(
-    client,
-    domain_id: str,
-    project_id: str,
-    resource_id: str,
-    resource_type: str,
-) -> bool:
-    """
-    Delete a resource from the target project.
-
-    Args:
-        client: DataZone boto3 client
-        domain_id: Target domain identifier
-        project_id: Target project identifier
-        resource_id: Resource identifier to delete
-        resource_type: Type of resource
-
-    Returns:
-        True if deletion succeeded, False otherwise
-    """
-    try:
-        if resource_type == "glossaries":
-            client.delete_glossary(domainIdentifier=domain_id, identifier=resource_id)
-        elif resource_type == "glossaryTerms":
-            client.delete_glossary_term(
-                domainIdentifier=domain_id, identifier=resource_id
-            )
-        elif resource_type == "formTypes":
-            client.delete_form_type(
-                domainIdentifier=domain_id, formTypeIdentifier=resource_id
-            )
-        elif resource_type == "assetTypes":
-            client.delete_asset_type(
-                domainIdentifier=domain_id, assetTypeIdentifier=resource_id
-            )
-        elif resource_type == "assets":
-            client.delete_asset(domainIdentifier=domain_id, identifier=resource_id)
-        elif resource_type == "dataProducts":
-            client.delete_data_product(
-                domainIdentifier=domain_id, identifier=resource_id
-            )
-        return True
-    except Exception as e:
-        logger.error(f"Failed to delete {resource_type} {resource_id}: {e}")
-        return False
+    return extras
 
 
 def _publish_resource(
@@ -1486,8 +1273,11 @@ def import_catalog(
     """
     Import catalog resources into a target DataZone project.
 
-    Orchestrates: validate → map → create in dependency order → delete in reverse
-    order → optionally publish → return summary.
+    Orchestrates: validate → map → create in dependency order → log extra
+    resources in target (no deletion) → optionally publish → return summary.
+
+    Resources that exist in the target project but are NOT in the bundle are
+    logged for visibility but never deleted.
 
     Publishing behavior: By default, assets and data products are published only
     if they were published (listingStatus == "ACTIVE") in the source project.
@@ -1501,7 +1291,7 @@ def import_catalog(
         skip_publish: When True, skip all publishing regardless of source state
 
     Returns:
-        Dict with counts: {"created": N, "updated": N, "deleted": N, "failed": N, "published": N}
+        Dict with counts: {"created": N, "updated": N, "skipped": N, "failed": N, "published": N}
     """
     # Validate JSON structure
     _validate_catalog_json(catalog_data)
@@ -1528,7 +1318,7 @@ def import_catalog(
     # Initialize counters
     created = 0
     updated = 0
-    deleted = 0
+    skipped = 0
     failed = 0
     published = 0
 
@@ -1592,20 +1382,20 @@ def import_catalog(
                 "Failed to update termRelations for %s: %s", term.get("name"), e
             )
 
-    # Identify and delete resources not in bundle (reverse dependency order)
-    to_delete = _identify_resources_to_delete(
+    # Identify resources in target that are not in the bundle and log them.
+    # These resources are NOT deleted — they are only reported for visibility.
+    extra_resources = _identify_extra_target_resources(
         client, domain_id, project_id, catalog_data
     )
-    for resource_type in DELETION_ORDER:
-        for resource_info in to_delete.get(resource_type, []):
-            resource_id = resource_info.get("id")
-            if resource_id:
-                if _delete_resource(
-                    client, domain_id, project_id, resource_id, resource_type
-                ):
-                    deleted += 1
-                else:
-                    failed += 1
+    for resource_type in RESOURCE_REPORT_ORDER:
+        for resource_info in extra_resources.get(resource_type, []):
+            resource_name = resource_info.get("name", "unknown")
+            logger.info(
+                "Extra resource in target (not in bundle): %s '%s' — skipping deletion",
+                resource_type,
+                resource_name,
+            )
+            skipped += 1
 
     # Publish assets and data products unless skip_publish is set
     if not skip_publish:
@@ -1618,13 +1408,13 @@ def import_catalog(
 
     logger.info(
         f"Catalog import complete: {created} created, {updated} updated, "
-        f"{deleted} deleted, {failed} failed, {published} published"
+        f"{skipped} skipped (extra in target), {failed} failed, {published} published"
     )
 
     return {
         "created": created,
         "updated": updated,
-        "deleted": deleted,
+        "skipped": skipped,
         "failed": failed,
         "published": published,
     }

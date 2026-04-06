@@ -27,7 +27,7 @@ This directory contains translations of the SMUS CI/CD Pipeline CLI documentatio
 ### What Stays in English
 - **Technical terms**: pipeline, deploy, workflow, manifest, bundle, stage, CLI, CI/CD, DevOps, etc.
 - **Code blocks**: All bash, YAML, Python examples
-- **Commands**: `smus-cicd-cli deploy`, `git clone`, etc.
+- **Commands**: `aws-smus-cicd-cli deploy`, `git clone`, etc.
 - **URLs**: All links remain unchanged
 - **File paths**: `manifest.yaml`, `README.md`, etc.
 - **AWS service names**: SageMaker, Glue, Athena, etc.

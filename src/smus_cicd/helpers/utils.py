@@ -337,7 +337,7 @@ def get_datazone_project_info(
 
         if not domain_id:
             raise Exception(
-                "Domain not found - check domain name/tags in manifest or CloudFormation stack"
+                "Domain not found - check domain id/name/tags in manifest or CloudFormation stack"
             )
 
         project_id = _get_project_id(project_name, domain_id, region)
@@ -405,43 +405,35 @@ def _resolve_domain_id(config: Dict[str, Any], region: str) -> Optional[str]:
 
     logger = get_logger("utils")
 
-    # DEBUG: Log what we're working with
-    logger.debug(f"_resolve_domain_id called with region={region}")
-    logger.debug(f"config keys: {list(config.keys())}")
-    logger.debug(f"config.domain: {config.get('domain', {})}")
-
     # Try to get domain ID from CloudFormation exports first
     domain_id = get_domain_id(config)
-    logger.debug(f"domain_id from CloudFormation: {domain_id}")
+    if domain_id:
+        logger.debug(f"Resolved domain_id from CloudFormation: {domain_id}")
+        return domain_id
 
-    if not domain_id:
-        # Try to resolve domain by id, name, or tags
-        domain_config = config.get("domain", {})
-        domain_direct_id = domain_config.get("id")
-        domain_name = domain_config.get("name")
-        domain_tags = domain_config.get("tags")
+    domain_config = config.get("domain", {})
+    domain_direct_id = domain_config.get("id")
+    domain_name = domain_config.get("name")
+    domain_tags = domain_config.get("tags")
 
-        logger.debug(f"domain_direct_id: {domain_direct_id}")
-        logger.debug(f"domain_name: {domain_name}")
-        logger.debug(f"domain_tags: {domain_tags}")
+    # If a direct ID is provided, use it immediately
+    if domain_direct_id:
+        logger.debug(f"Using domain id directly: {domain_direct_id}")
+        return domain_direct_id
 
-        if domain_direct_id:
-            domain_id = domain_direct_id
-            logger.debug(f"Using domain id directly: {domain_id}")
-        elif domain_name or domain_tags:
-            try:
-                logger.debug(
-                    f"Calling datazone.resolve_domain_id with name={domain_name}, tags={domain_tags}, region={region}"
-                )
-                domain_id, _ = datazone.resolve_domain_id(
-                    domain_name=domain_name, domain_tags=domain_tags, region=region
-                )
-                logger.debug(f"Resolved domain_id: {domain_id}")
-            except Exception as e:
-                logger.error(f"Failed to resolve domain: {str(e)}")
-                raise Exception(f"Failed to resolve domain: {str(e)}")
-
-    return domain_id
+    # Otherwise resolve by name, tags, or auto-detect (single domain in region)
+    try:
+        logger.debug(
+            f"Calling datazone.resolve_domain_id with name={domain_name}, tags={domain_tags}, region={region}"
+        )
+        domain_id, _ = datazone.resolve_domain_id(
+            domain_name=domain_name, domain_tags=domain_tags, region=region
+        )
+        logger.debug(f"Resolved domain_id: {domain_id}")
+        return domain_id
+    except Exception as e:
+        logger.error(f"Failed to resolve domain: {str(e)}")
+        raise Exception(f"Failed to resolve domain: {str(e)}")
 
 
 def _get_project_id(project_name: str, domain_id: str, region: str) -> Optional[str]:

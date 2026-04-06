@@ -34,29 +34,27 @@ Deploy Airflow DAGs, Jupyter notebooks, and ML workflows from development to pro
 
 ## Quick Start
 
-**Install from source:**
+**Install:**
 ```bash
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 ```
 
 **Deploy your first application:**
 ```bash
 # Validate configuration
-smus-cicd-cli describe --manifest manifest.yaml --connect
+aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 
 # Create deployment bundle (optional)
-smus-cicd-cli bundle --manifest manifest.yaml
+aws-smus-cicd-cli bundle --manifest manifest.yaml
 
 # Preview deployment (dry run)
 smus-cicd-cli deploy --targets test --manifest manifest.yaml --dry-run
 
 # Deploy to test environment
-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run validation tests
-smus-cicd-cli test --manifest manifest.yaml --targets test
+aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 **See it in action:** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
@@ -85,7 +83,7 @@ smus-cicd-cli test --manifest manifest.yaml --targets test
 → **[Admin Guide](docs/getting-started/admin-quickstart.md)** - Configure infrastructure and pipelines in 15 minutes  
 → **[GitHub Workflow Templates](git-templates/)** - Generic, reusable workflow templates for automated deployment
 
-**The CLI is your abstraction layer:** You just call `smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic.
+**The CLI is your abstraction layer:** You just call `aws-smus-cicd-cli deploy` - the CLI handles all AWS service interactions (DataZone, Glue, Athena, SageMaker, MWAA, S3, IAM, etc.). Your workflows stay simple and generic.
 
 ---
 
@@ -157,7 +155,7 @@ S3 • Lambda • Step Functions • DynamoDB • RDS • SNS/SQS • Batch
 1. DevOps Team                 2. Data Team                    3. SMUS CI/CD CLI (The Abstraction)
    ↓                               ↓                              ↓
 Defines the PROCESS            Defines the CONTENT            Workflow calls:
-- Test on merge                - Glue jobs                    smus-cicd-cli deploy --manifest manifest.yaml
+- Test on merge                - Glue jobs                    aws-smus-cicd-cli deploy --manifest manifest.yaml
 - Approval for prod            - SageMaker training             ↓
 - Security scans               - Athena queries               CLI handles ALL AWS complexity:
 - Notification rules           - File structure               - DataZone APIs
@@ -196,7 +194,7 @@ service knowledge needed!
 - Business logic
 
 **Result:** 
-- **DevOps teams never call AWS APIs directly** - they just call `smus-cicd-cli deploy`
+- **DevOps teams never call AWS APIs directly** - they just call `aws-smus-cicd-cli deploy`
 - **CI/CD workflows are generic** - same workflow works for Glue apps, SageMaker apps, or Bedrock apps
 - Data teams never touch CI/CD configs
 - Both teams work independently using their expertise
@@ -265,17 +263,17 @@ GitHub Actions workflows (or other CI/CD systems) that automate deployment:
 - Enforces security and compliance policies
 - Example: `.github/workflows/deploy.yml`
 
-**Key insight:** DevOps teams create generic, reusable workflows that work for ANY application. They don't need to know if the app uses Glue, SageMaker, or Bedrock - the CLI handles all AWS service interactions. The workflow just calls `smus-cicd-cli deploy` and the CLI does the rest.
+**Key insight:** DevOps teams create generic, reusable workflows that work for ANY application. They don't need to know if the app uses Glue, SageMaker, or Bedrock - the CLI handles all AWS service interactions. The workflow just calls `aws-smus-cicd-cli deploy` and the CLI does the rest.
 
 ### Deployment Modes
 
 **Bundle-based (Artifact):** Create versioned archive → deploy archive to stages
 - Good for: audit trails, rollback capability, compliance
-- Command: `smus-cicd-cli bundle` then `smus-cicd-cli deploy --manifest app.tar.gz`
+- Command: `aws-smus-cicd-cli bundle` then `aws-smus-cicd-cli deploy --manifest app.tar.gz`
 
 **Direct (Git-based):** Deploy directly from sources without intermediate artifacts
 - Good for: simpler workflows, rapid iteration, git as source of truth
-- Command: `smus-cicd-cli deploy --manifest manifest.yaml --stage test`
+- Command: `aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test`
 
 Both modes work with any combination of storage and git content sources.
 
@@ -418,7 +416,7 @@ stages:
     domain:
       tags:
         purpose: smus-cicd-testing
-      region: ${TEST_DOMAIN_REGION:us-east-1}
+      region: ${TEST_DOMAIN_REGION}
     project:
       name: test-marketing
       owners:
@@ -427,7 +425,7 @@ stages:
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
     environment_variables:
       S3_PREFIX: test
-      AWS_REGION: ${TEST_DOMAIN_REGION:us-east-1}
+      AWS_REGION: ${TEST_DOMAIN_REGION}
       GRANT_TO: Admin,service-role/aws-quicksight-service-role-v0
     bootstrap:
       actions:
@@ -456,9 +454,9 @@ stages:
         assets:
         - name: TotalDeathByCountry
           owners:
-          - arn:aws:quicksight:${TEST_DOMAIN_REGION:us-east-1}:${AWS_ACCOUNT_ID}:user/default/Admin/*
+          - arn:aws:quicksight:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:user/default/Admin/*
           viewers:
-          - arn:aws:quicksight:${TEST_DOMAIN_REGION:us-east-1}:${AWS_ACCOUNT_ID}:user/default/Admin/*
+          - arn:aws:quicksight:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:user/default/Admin/*
         overrideParameters:
           ResourceIdOverrideConfiguration:
             PrefixForAllResources: deployed-{stage.name}-covid-
@@ -543,7 +541,7 @@ stages:
           name: mlflow-server
           connection_type: MLFLOW
           properties:
-            trackingServerArn: arn:aws:sagemaker:${STS_REGION}:${STS_ACCOUNT_ID}:mlflow-tracking-server/smus-integration-mlflow-use2
+            trackingServerArn: arn:aws:sagemaker:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:mlflow-tracking-server/smus-integration-mlflow-use2
             trackingServerName: smus-integration-mlflow-use2
         - type: workflow.create
           workflowName: parallel_notebooks_execution
@@ -695,7 +693,7 @@ stages:
           name: mlflow-server
           connection_type: MLFLOW
           properties:
-            trackingServerArn: arn:aws:sagemaker:${STS_REGION}:${STS_ACCOUNT_ID}:mlflow-tracking-server/smus-integration-mlflow-use2
+            trackingServerArn: arn:aws:sagemaker:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:mlflow-tracking-server/smus-integration-mlflow-use2
         - type: workflow.create
           workflowName: ml_training_workflow
         - type: workflow.run
@@ -1003,7 +1001,7 @@ genai_dev_workflow:
 ### Developer Experience
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Project templates | 🔄 | `smus-cicd-cli init` with templates |
+| Project templates | 🔄 | `aws-smus-cicd-cli init` with templates |
 | Manifest initialization | ✅ | [Create Command](docs/cli-commands.md#create) |
 | Interactive setup | 🔄 | Guided configuration prompts |
 | Local development | ✅ | [CLI Commands](docs/cli-commands.md) |
@@ -1038,7 +1036,7 @@ genai_dev_workflow:
 | Redshift queries | ✅ | [RedshiftDataOperator](docs/airflow-aws-operators.md#amazon-redshift) |
 
 ### Bootstrap Actions
-**Automated Workflow Execution & Event-Driven Workflows** - Trigger workflows automatically during deployment with `workflow.run` (use `trailLogs: true` to stream logs and wait for completion). Fetch workflow logs for validation and debugging with `workflow.logs`. Automatically refresh QuickSight dashboards after ETL deployment with `quicksight.refresh_dataset`. Emit custom events for downstream automation and CI/CD orchestration with `eventbridge.put_events`. Provision MLflow and other DataZone connections during deployment. Actions run in order during `smus-cicd-cli deploy` for reliable initialization and validation.
+**Automated Workflow Execution & Event-Driven Workflows** - Trigger workflows automatically during deployment with `workflow.run` (use `trailLogs: true` to stream logs and wait for completion). Fetch workflow logs for validation and debugging with `workflow.logs`. Automatically refresh QuickSight dashboards after ETL deployment with `quicksight.refresh_dataset`. Emit custom events for downstream automation and CI/CD orchestration with `eventbridge.put_events`. Provision MLflow and other DataZone connections during deployment. Actions run in order during `aws-smus-cicd-cli deploy` for reliable initialization and validation.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -1166,16 +1164,16 @@ genai_dev_workflow:
 
 ## Security Notice
 
-⚠️ **DO NOT** install from PyPI - always install from official AWS source code.
+Always install from the official AWS PyPI package or source code.
 
 ```bash
-# ✅ Correct - Install from official AWS repository
+# ✅ Correct - Install from official AWS PyPI package
+pip install aws-smus-cicd-cli
+
+# ✅ Also correct - Install from official AWS source code
 git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
 cd CICD-for-SageMakerUnifiedStudio
 pip install -e .
-
-# ❌ Wrong - Do not use PyPI
-pip install smus-cicd-cli  # May contain malicious code
 ```
 
 ---

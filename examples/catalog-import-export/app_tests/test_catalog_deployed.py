@@ -66,44 +66,129 @@ def test_assets_exist(datazone_client, domain_id, project_id):
     print(f"✅ Found {len(items)} asset(s) in target project")
 
 
+def _find_bundle_zip():
+    """Find the most recent bundle ZIP containing catalog_export.json."""
+    import glob
+    import os
+
+    search_dirs = [
+        ".",
+        "..",
+        os.path.join("..", ".."),
+        os.path.join("..", "..", "artifacts"),
+        "artifacts",
+    ]
+    candidates = []
+    for d in search_dirs:
+        candidates.extend(glob.glob(os.path.join(d, "*.zip")))
+    # Return the most recently modified ZIP that contains catalog data
+    for zip_path in sorted(candidates, key=os.path.getmtime, reverse=True):
+        try:
+            import zipfile
+
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                if "catalog/catalog_export.json" in zf.namelist():
+                    return zip_path
+        except Exception:
+            continue
+    return None
+
+
+def _load_catalog_export():
+    """Load the full catalog_export.json from the bundle ZIP."""
+    import json
+    import zipfile
+
+    zip_path = _find_bundle_zip()
+    if not zip_path:
+        return None
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        with zf.open("catalog/catalog_export.json") as f:
+            return json.load(f)
+
+
 def test_asset_names_match(datazone_client, domain_id, project_id):
-    """Verify that expected asset names are present in the target project."""
+    """Verify that asset names in the target project match those from the bundle."""
+    catalog_data = _load_catalog_export()
+    if catalog_data is None:
+        pytest.skip("No bundle ZIP with catalog_export.json found")
+
+    expected_names = {a["name"] for a in catalog_data.get("assets", []) if "name" in a}
+    if not expected_names:
+        pytest.skip("No assets in catalog export to verify")
+
     items = _search_resources(datazone_client, domain_id, project_id, "ASSET")
-    asset_names = set()
+    target_names = set()
     for item in items:
         asset_item = item.get("assetItem", item.get("assetListing", {}))
         name = asset_item.get("name", "")
         if name:
-            asset_names.add(name)
+            target_names.add(name)
 
-    assert len(asset_names) > 0, "No asset names found"
-    print(f"✅ Asset names in target: {', '.join(sorted(asset_names))}")
+    missing = expected_names - target_names
+    assert (
+        not missing
+    ), f"Assets from bundle missing in target project: {sorted(missing)}"
+    print(
+        f"✅ All {len(expected_names)} exported asset(s) found in target: "
+        f"{', '.join(sorted(expected_names))}"
+    )
 
 
 def test_publish_status_when_enabled(datazone_client, domain_id, project_id):
     """Verify that assets published in source are published in target.
 
-    This test checks that assets have a listing status indicating they
-    have been published. Assets are published based on their source
-    listingStatus (LISTED). If skipPublish is true, this test is skipped.
+    Loads the bundle's catalog_export.json to find which assets had
+    listingStatus ACTIVE in the source, then checks those assets have
+    a listingId in the target project.
     """
+    catalog_data = _load_catalog_export()
+    if catalog_data is None:
+        pytest.skip("No bundle ZIP with catalog_export.json found")
+
+    # Find asset names that were published (ACTIVE) in the source
+    source_published = {
+        a["name"]
+        for a in catalog_data.get("assets", [])
+        if a.get("listingStatus") == "ACTIVE" and "name" in a
+    }
+    if not source_published:
+        pytest.skip("No published assets in source bundle to verify")
+
     items = _search_resources(datazone_client, domain_id, project_id, "ASSET")
     if not items:
-        pytest.skip("No assets found to check publish status")
+        pytest.fail("No assets found in target project")
 
-    published_count = 0
+    # Build map of target asset name -> listingId
+    target_published = set()
     for item in items:
         asset_item = item.get("assetItem", item.get("assetListing", {}))
-        # Check for listing or published indicators
-        listing_id = asset_item.get("listingId")
-        if listing_id:
-            published_count += 1
+        name = asset_item.get("name", "")
+        if name and asset_item.get("listingId"):
+            target_published.add(name)
 
-    print(f"✅ {published_count}/{len(items)} assets have listing IDs (published)")
+    missing = source_published - target_published
+    assert (
+        not missing
+    ), f"Assets published in source but not published in target: {sorted(missing)}"
+    print(
+        f"✅ All {len(source_published)} source-published asset(s) "
+        f"are published in target"
+    )
 
 
 def test_form_types_exist(datazone_client, domain_id, project_id):
-    """Verify that custom form types were imported into the target project."""
+    """Verify that custom form types from the bundle exist in the target project."""
+    catalog_data = _load_catalog_export()
+    if catalog_data is None:
+        pytest.skip("No bundle ZIP with catalog_export.json found")
+
+    expected_names = {
+        ft["name"] for ft in catalog_data.get("formTypes", []) if "name" in ft
+    }
+    if not expected_names:
+        pytest.skip("No custom form types in catalog export to verify")
+
     try:
         resp = datazone_client.search_types(
             domainIdentifier=domain_id,
@@ -112,17 +197,18 @@ def test_form_types_exist(datazone_client, domain_id, project_id):
             maxResults=50,
         )
         items = resp.get("items", [])
-        # Filter to project-owned form types
-        project_forms = [
-            item
+        target_names = {
+            item.get("formTypeItem", {}).get("name")
             for item in items
             if item.get("formTypeItem", {}).get("owningProjectId") == project_id
-        ]
-        if project_forms:
-            print(
-                f"✅ Found {len(project_forms)} custom form type(s) in target project"
-            )
-        else:
-            print("ℹ️  No custom form types found (may not have been seeded)")
+        }
+        target_names.discard(None)
     except Exception as e:
         pytest.skip(f"Could not search form types: {e}")
+        return
+
+    missing = expected_names - target_names
+    assert (
+        not missing
+    ), f"Form types from bundle missing in target project: {sorted(missing)}"
+    print(f"✅ All {len(expected_names)} exported form type(s) found in target")

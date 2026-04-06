@@ -34,9 +34,7 @@ As an admin, you'll configure:
 ## Step 1: Install the CLI
 
 ```bash
-git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
+pip install aws-smus-cicd-cli
 ```
 
 ---
@@ -249,7 +247,7 @@ stages:
   properties: {}
 ```
 
-**See more:** [Bundle Manifest Reference - Connections](../bundle-manifest.md#connections)
+**See more:** [Manifest Reference - Connections](../manifest.md#connections)
 
 ### Create Connections Manually (Console)
 
@@ -285,49 +283,46 @@ The CLI is used differently depending on your deployment approach:
 ### Direct Git-Based Deployment
 ```bash
 # Deploy directly from git to test
-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml
 
 # Deploy to production
-smus-cicd-cli deploy --targets prod --manifest manifest.yaml
+aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
 ```
 
 ### Bundle-Based Deployment
 ```bash
 # Create bundle (typically from dev)
-smus-cicd-cli bundle --manifest manifest.yaml --targets dev
+aws-smus-cicd-cli bundle --manifest manifest.yaml --targets dev
 
 # Deploy bundle to test
-smus-cicd-cli deploy --targets test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 
 # Deploy same bundle to production
-smus-cicd-cli deploy --targets prod --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 ```
 
 ### Hybrid Deployment
 ```bash
 # Create bundle once (contains some content like data files, configs)
-smus-cicd-cli bundle --manifest manifest.yaml --targets dev
+aws-smus-cicd-cli bundle --manifest manifest.yaml --targets dev
 
 # Deploy to test: pulls workflows from release_test branch + data from bundle
-smus-cicd-cli deploy --targets test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 
 # Deploy to prod: pulls workflows from release_prod branch + data from bundle
-smus-cicd-cli deploy --targets prod --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 ```
 
 ### Validation Commands (All Approaches)
 ```bash
-# Preview deployment without making changes (dry run)
-smus-cicd-cli deploy --targets test --manifest manifest.yaml --dry-run
-
 # Validate deployment
-smus-cicd-cli test --targets test --manifest manifest.yaml
+aws-smus-cicd-cli test --stages test --manifest manifest.yaml
 
 # Check logs
-smus-cicd-cli logs --targets test --workflow my_workflow --live
+aws-smus-cicd-cli logs --stages test --workflow my_workflow --live
 
 # Monitor health
-smus-cicd-cli monitor --targets test --manifest manifest.yaml
+aws-smus-cicd-cli monitor --stages test --manifest manifest.yaml
 ```
 
 **Key insight:** 
@@ -407,10 +402,7 @@ jobs:
           python-version: '3.9'
       
       - name: Install SMUS CI/CD CLI
-        run: |
-          git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-          cd CICD-for-SageMakerUnifiedStudio
-          pip install -e .
+        run: pip install aws-smus-cicd-cli
       
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -420,14 +412,14 @@ jobs:
       
       - name: Deploy to Test
         if: github.ref == 'refs/heads/release_test'
-        run: smus-cicd-cli deploy --targets test --manifest manifest.yaml
+        run: aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml
       
       - name: Deploy to Production
         if: github.ref == 'refs/heads/release_prod'
-        run: smus-cicd-cli deploy --targets prod --manifest manifest.yaml
+        run: aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
       
       - name: Validate Deployment
-        run: smus-cicd-cli test --targets test --manifest manifest.yaml
+        run: aws-smus-cicd-cli test --stages test --manifest manifest.yaml
 ```
 
 ### GitHub Actions - Bundle-Based Deployment
@@ -446,10 +438,7 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Install SMUS CI/CD CLI
-        run: |
-          git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-          cd CICD-for-SageMakerUnifiedStudio
-          pip install -e .
+        run: pip install aws-smus-cicd-cli
       
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -458,7 +447,7 @@ jobs:
           aws-region: us-east-1
       
       - name: Create Bundle
-        run: smus-cicd-cli bundle --manifest manifest.yaml --targets dev
+        run: aws-smus-cicd-cli bundle --manifest manifest.yaml --targets dev
       
       - name: Upload Bundle
         uses: actions/upload-artifact@v3
@@ -467,10 +456,10 @@ jobs:
           path: "*.tar.gz"
       
       - name: Deploy to Test
-        run: smus-cicd-cli deploy --targets test --manifest manifest.yaml --manifest *.tar.gz
+        run: aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest *.tar.gz
       
       - name: Validate Deployment
-        run: smus-cicd-cli test --targets test --manifest manifest.yaml
+        run: aws-smus-cicd-cli test --stages test --manifest manifest.yaml
 
   deploy-prod:
     needs: deploy-test
@@ -486,10 +475,10 @@ jobs:
           name: application-bundle
       
       - name: Deploy to Production
-        run: smus-cicd-cli deploy --targets prod --manifest manifest.yaml --manifest *.tar.gz
+        run: aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml --manifest *.tar.gz
       
       - name: Monitor Production
-        run: smus-cicd-cli monitor --targets prod --manifest manifest.yaml
+        run: aws-smus-cicd-cli monitor --stages prod --manifest manifest.yaml
 ```
 
 **For complete CI/CD setup:**
@@ -512,7 +501,7 @@ After deployment, use these commands to verify everything works:
 ### Check Deployment Status
 ```bash
 # View overall bundle health
-smus-cicd-cli monitor --targets test --manifest manifest.yaml
+aws-smus-cicd-cli monitor --stages test --manifest manifest.yaml
 ```
 
 **Output:**
@@ -536,16 +525,16 @@ Connections:
 ### View Workflow Logs
 ```bash
 # Live logs for specific workflow
-smus-cicd-cli logs --targets test --workflow metrics_etl --live
+aws-smus-cicd-cli logs --stages test --workflow metrics_etl --live
 
 # Historical logs
-smus-cicd-cli logs --targets test --workflow metrics_etl --date 2025-01-13
+aws-smus-cicd-cli logs --stages test --workflow metrics_etl --date 2025-01-13
 ```
 
 ### Run Tests
 ```bash
 # Execute validation tests
-smus-cicd-cli test --targets test --manifest manifest.yaml
+aws-smus-cicd-cli test --stages test --manifest manifest.yaml
 ```
 
 **Output:**
@@ -649,14 +638,14 @@ Multiple data applications can deploy to the same project.
 
 ## Deployment Process
 1. Develop in your dev project
-2. Create bundle: `smus-cicd-cli bundle --manifest manifest.yaml --targets dev`
+2. Create bundle: `aws-smus-cicd-cli bundle --manifest manifest.yaml --targets dev`
 3. Push to GitHub → Automatic deployment to test
 4. After validation → Automatic deployment to prod
 
 ## Monitoring Your Deployment
-- Check status: `smus-cicd-cli monitor --targets test --manifest manifest.yaml`
-- View logs: `smus-cicd-cli logs --targets test --workflow YOUR_WORKFLOW --live`
-- Run tests: `smus-cicd-cli test --targets test --manifest manifest.yaml`
+- Check status: `aws-smus-cicd-cli monitor --stages test --manifest manifest.yaml`
+- View logs: `aws-smus-cicd-cli logs --stages test --workflow YOUR_WORKFLOW --live`
+- Run tests: `aws-smus-cicd-cli test --stages test --manifest manifest.yaml`
 
 ## Support
 - Slack: #data-platform-support
@@ -671,7 +660,7 @@ Multiple data applications can deploy to the same project.
 - **[Data Team Quick Start](quickstart.md)** - Guide for building and deploying applications
 
 ### Advanced Configuration
-- **[Bundle Manifest Reference](../bundle-manifest.md)** - Complete YAML specification
+- **[Manifest Reference](../manifest.md)** - Complete YAML specification
 - **[CLI Commands Reference](../cli-commands.md)** - All available commands
 - **[Monitoring and Metrics](../monitoring-and-metrics.md)** - Detailed monitoring setup
 

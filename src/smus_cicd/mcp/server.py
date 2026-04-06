@@ -290,8 +290,8 @@ class SMUSMCPServer:
         project_name = args.get("project_name")
 
         try:
-            # Try to use smus-cicd-cli describe to check project
-            cmd = ["smus-cicd-cli", "describe", "-p", "bundle.yaml", "--connect"]
+            # Try to use aws-smus-cicd-cli describe to check project
+            cmd = ["aws-smus-cicd-cli", "describe", "-p", "bundle.yaml", "--connect"]
             subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
             # For now, return a helpful message
@@ -304,7 +304,7 @@ aws datazone list-projects --domain-identifier <domain-id>
 
 Or use the SMUS CI/CD CLI:
 ```bash
-smus-cicd-cli describe -p bundle.yaml --connect
+aws-smus-cicd-cli describe -p bundle.yaml --connect
 ```
 
 ✅ Assuming project exists. Ready to create CI/CD configuration.
@@ -394,7 +394,7 @@ bundle:
 {github_actions}
 ```
 
-Save these files and run: `smus-cicd-cli deploy --bundle bundle.yaml -t dev`"""
+Save these files and run: `aws-smus-cicd-cli deploy --bundle bundle.yaml -t dev`"""
 
         return {"content": [{"type": "text", "text": response}]}
 
@@ -458,13 +458,13 @@ task = PythonOperator(
             if target == "dev":
                 deploy_steps += f"""      - name: Deploy to {target}
         if: github.ref == 'refs/heads/main'
-        run: smus-cicd-cli deploy --manifest bundle.yaml --targets {target}
+        run: aws-smus-cicd-cli deploy --manifest bundle.yaml --targets {target}
 
 """
             else:
                 deploy_steps += f"""      - name: Deploy to {target}
         if: github.event_name == 'workflow_dispatch'
-        run: smus-cicd-cli deploy --manifest bundle.yaml --targets {target}
+        run: aws-smus-cicd-cli deploy --manifest bundle.yaml --targets {target}
 
 """
 
@@ -479,7 +479,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: pip install smus-cicd-cli
+      - run: pip install aws-smus-cicd-cli
 {deploy_steps}"""
 
     def query_kb(self, args: Dict[str, Any]) -> Dict[str, Any]:

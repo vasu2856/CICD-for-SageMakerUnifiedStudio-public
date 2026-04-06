@@ -68,7 +68,7 @@ Each template source supports:
 ### Setup with Custom Config
 
 ```bash
-smus-cicd-cli integrate qcli --configure my-config.yaml
+aws-smus-cicd-cli integrate qcli --configure my-config.yaml
 ```
 
 ### Example Custom Configuration

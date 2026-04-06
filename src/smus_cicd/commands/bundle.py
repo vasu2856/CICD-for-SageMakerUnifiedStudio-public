@@ -80,7 +80,6 @@ def bundle_command(
     manifest_file: str,
     output_dir: str,
     output: str,
-    updated_after: Optional[str] = None,
 ):
     """Create bundle zip files by downloading from S3 connection locations."""
     try:
@@ -260,13 +259,11 @@ def bundle_command(
                             files_added += 1
                             typer.echo(f"    Copied file: {pattern}")
                         elif os.path.isdir(source_path):
-                            # Copy directory recursively
-                            dest_path = os.path.join(
-                                target_dir, os.path.basename(pattern)
-                            )
+                            # Copy directory contents directly into target_dir
                             shutil.copytree(
                                 source_path,
-                                dest_path,
+                                target_dir,
+                                dirs_exist_ok=True,
                                 ignore=shutil.ignore_patterns(
                                     "*.pyc",
                                     "__pycache__",
@@ -275,7 +272,7 @@ def bundle_command(
                                 ),
                             )
                             # Count files
-                            for root, dirs, files in os.walk(dest_path):
+                            for root, dirs, files in os.walk(target_dir):
                                 files_added += len(files)
                             typer.echo(f"    Copied directory: {pattern}")
                         else:
@@ -448,12 +445,10 @@ def bundle_command(
                         )
                     else:
                         # Export ALL project-owned catalog resources when enabled
-                        # The only optional filter is the --updated-after CLI flag
                         catalog_data = export_catalog(
                             domain_id=domain_id,
                             project_id=project_id,
                             region=region,
-                            updated_after=updated_after,
                         )
 
                         # Write catalog/catalog_export.json to temp_bundle_dir

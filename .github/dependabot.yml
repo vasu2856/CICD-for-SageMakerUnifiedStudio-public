@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/examples/analytic-workflow/ml/training/code"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "mlflow"
+
+  - package-ecosystem: "pip"
+    directory: "/examples/analytic-workflow/data-notebooks/notebooks"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "mlflow"
+      - dependency-name: "mlflow-skinny"
+      - dependency-name: "mlflow-tracing"
+      - dependency-name: "sagemaker-mlflow"

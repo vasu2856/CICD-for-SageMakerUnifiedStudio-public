@@ -1,6 +1,6 @@
 """Integration tests for catalog import/export edge cases.
 
-Covers the remaining integration tests from the testing guide:
+Covers integration tests from the testing guide:
   I7  — Bundle with content.catalog.enabled: false produces ZIP without catalog/
   I19 — Updated resources retain target identifiers after re-deploy
   I22 — Bundle with skipPublish: true skips publishing during deploy
@@ -13,18 +13,23 @@ Tests I18, I20, I21, I23, I24 are already covered by:
   - test_catalog_import.py::test_publish_failures_do_not_block (I24)
 """
 
+import importlib.util
 import json
 import os
 import time
 import zipfile
-from typing import Any, Dict, List, Optional
 
-import boto3
 import pytest
-import yaml
-from botocore.exceptions import ClientError
 
 from tests.integration.base import IntegrationTestBase
+
+# Load helpers from hyphenated directory via importlib
+_spec = importlib.util.spec_from_file_location(
+    "catalog_test_helpers",
+    os.path.join(os.path.dirname(__file__), "catalog_test_helpers.py"),
+)
+_h = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_h)
 
 
 class TestCatalogEdgeCases(IntegrationTestBase):
@@ -37,6 +42,7 @@ class TestCatalogEdgeCases(IntegrationTestBase):
     def setup_method(self, method):
         super().setup_method(method)
         self.setup_test_directory()
+        self._region = os.environ.get("DEV_DOMAIN_REGION", "us-east-1")
 
     def teardown_method(self, method):
         super().teardown_method(method)
@@ -44,106 +50,35 @@ class TestCatalogEdgeCases(IntegrationTestBase):
         self.cleanup_test_directory()
 
     # ------------------------------------------------------------------
-    # Helpers
+    # Workflow helpers (bundle + deploy)
     # ------------------------------------------------------------------
 
-    def _manifest_path(self, name: str) -> str:
-        return os.path.join(os.path.dirname(__file__), name)
+    def _setup_and_bundle(self, manifest_name, zip_prefix):
+        """Deploy dev, bundle, return (manifest_path, bundle_path)."""
+        pf = _h.get_manifest_path(manifest_name)
+        r = self.run_cli_command(["deploy", "--targets", "dev", "--manifest", pf])
+        assert r["success"], f"deploy dev failed: {r['output']}"
 
-    def _get_project_info(self, pipeline_file: str, stage: str = "dev"):
-        with open(pipeline_file, "r") as fh:
-            raw = yaml.safe_load(fh)
-        project_name = raw["stages"][stage]["project"]["name"]
-        region = os.environ.get("DEV_DOMAIN_REGION", "us-east-1")
+        r = self.run_cli_command(["bundle", "--targets", "dev", "--manifest", pf])
+        assert r["success"], f"bundle failed: {r['output']}"
 
-        from smus_cicd.application import ApplicationManifest
-        from smus_cicd.helpers.utils import (
-            build_domain_config,
-            get_datazone_project_info,
+        bundle = _h.find_bundle_zip(prefix=zip_prefix) or _h.find_bundle_zip()
+        assert bundle, "Bundle ZIP not found"
+        return pf, bundle
+
+    def _deploy_to_test(self, manifest_path, bundle_path):
+        """Deploy bundle to test stage, return CLI result."""
+        return self.run_cli_command(
+            [
+                "deploy",
+                "--targets",
+                "test",
+                "--bundle-archive-path",
+                bundle_path,
+                "--manifest",
+                manifest_path,
+            ]
         )
-
-        manifest = ApplicationManifest.from_file(pipeline_file)
-        config = build_domain_config(manifest.stages[stage])
-        info = get_datazone_project_info(project_name, config)
-        if "error" in info or "domain_id" not in info:
-            pytest.fail(f"Failed to get project info for stage {stage}: {info}")
-        return info["domain_id"], info["project_id"], region, project_name
-
-    def _dz_client(self, region: str):
-        return boto3.client("datazone", region_name=region)
-
-    def _find_bundle_zip(self, prefix: str = "Catalog") -> Optional[str]:
-        for d in [".", "artifacts"]:
-            if os.path.isdir(d):
-                for f in sorted(os.listdir(d), reverse=True):
-                    if f.startswith(prefix) and f.endswith(".zip"):
-                        return os.path.join(d, f)
-        return None
-
-    def _search_resources(
-        self,
-        domain_id: str,
-        project_id: str,
-        search_scope: str,
-        region: str,
-    ) -> List[Dict[str, Any]]:
-        dz = self._dz_client(region)
-        results: List[Dict[str, Any]] = []
-        next_token = None
-        while True:
-            kwargs: Dict[str, Any] = {
-                "domainIdentifier": domain_id,
-                "searchScope": search_scope,
-                "owningProjectIdentifier": project_id,
-                "maxResults": 50,
-            }
-            if next_token:
-                kwargs["nextToken"] = next_token
-            try:
-                resp = dz.search(**kwargs)
-            except Exception:
-                break
-            results.extend(resp.get("items", []))
-            next_token = resp.get("nextToken")
-            if not next_token:
-                break
-        return results
-
-    def _create_glossary(
-        self,
-        domain_id: str,
-        project_id: str,
-        name: str,
-        description: str,
-        region: str,
-    ) -> Optional[Dict[str, Any]]:
-        dz = self._dz_client(region)
-        try:
-            resp = dz.create_glossary(
-                domainIdentifier=domain_id,
-                owningProjectIdentifier=project_id,
-                name=name,
-                description=description,
-                status="ENABLED",
-            )
-            return {"id": resp["id"], "name": name}
-        except ClientError as exc:
-            code = exc.response["Error"]["Code"]
-            if code == "AccessDeniedException":
-                pytest.skip("User lacks CreateGlossary permission")
-            if code == "ConflictException":
-                return self._find_glossary(domain_id, project_id, name, region)
-            raise
-
-    def _find_glossary(
-        self, domain_id: str, project_id: str, name: str, region: str
-    ) -> Optional[Dict[str, Any]]:
-        items = self._search_resources(domain_id, project_id, "GLOSSARY", region)
-        for item in items:
-            g = item.get("glossaryItem", {})
-            if g.get("name") == name:
-                return {"id": g["id"], "name": name}
-        return None
 
     # ==================================================================
     # I7 — Bundle with content.catalog.enabled: false
@@ -152,51 +87,31 @@ class TestCatalogEdgeCases(IntegrationTestBase):
     def test_bundle_catalog_disabled_no_catalog_dir(self):
         """Bundle with content.catalog.enabled: false has no catalog/ directory.
 
-        Steps:
-        1. Deploy dev stage to initialize project
-        2. Bundle using manifest with catalog.enabled: false
-        3. Verify the ZIP does not contain catalog/ directory
-
         Validates: P1 (export disabled), I7
         """
         if not self.verify_aws_connectivity():
             pytest.skip("AWS connectivity not available")
 
-        pf = self._manifest_path("manifest-catalog-disabled.yaml")
+        pf = _h.get_manifest_path("manifest-catalog-disabled.yaml")
 
-        # Deploy dev to initialize project
         r = self.run_cli_command(["deploy", "--targets", "dev", "--manifest", pf])
         assert r["success"], f"deploy dev failed: {r['output']}"
 
-        # Bundle — catalog should be skipped.
-        # The manifest has storage content (code/) so the bundle should succeed
-        # but without a catalog/ directory inside.
         r = self.run_cli_command(["bundle", "--targets", "dev", "--manifest", pf])
+        assert r["success"], (
+            f"Bundle should succeed (manifest has storage content). "
+            f"Output: {r['output']}"
+        )
 
-        if r["success"]:
-            # ZIP was created — verify no catalog/ inside
-            bundle = self._find_bundle_zip(prefix="CatalogDisabledTest")
-            assert bundle, "Bundle ZIP not found after successful bundle command"
+        bundle = _h.find_bundle_zip(prefix="CatalogDisabledTest")
+        assert bundle, "Bundle ZIP not found after successful bundle command"
 
-            with zipfile.ZipFile(bundle, "r") as zf:
-                catalog_files = [
-                    n for n in zf.namelist() if n.startswith("catalog/")
-                ]
-                assert len(catalog_files) == 0, (
-                    f"Bundle should NOT contain catalog/ directory when "
-                    f"catalog.enabled is false. Found: {catalog_files}"
-                )
-        else:
-            # Bundle failed (no files to bundle) — also valid when catalog
-            # is the only content type and it's disabled.
-            # Verify no catalog/ directory exists in any output ZIP.
-            bundle = self._find_bundle_zip(prefix="CatalogDisabledTest")
-            if bundle:
-                with zipfile.ZipFile(bundle, "r") as zf:
-                    catalog_files = [
-                        n for n in zf.namelist() if n.startswith("catalog/")
-                    ]
-                    assert len(catalog_files) == 0
+        with zipfile.ZipFile(bundle, "r") as zf:
+            catalog_files = [n for n in zf.namelist() if n.startswith("catalog/")]
+            assert len(catalog_files) == 0, (
+                f"Bundle should NOT contain catalog/ when catalog.enabled "
+                f"is false. Found: {catalog_files}"
+            )
 
     # ==================================================================
     # I19 — Updated resources retain target identifiers after re-deploy
@@ -205,158 +120,130 @@ class TestCatalogEdgeCases(IntegrationTestBase):
     def test_redeploy_retains_target_identifiers(self):
         """Re-deploy updates resources in place — target IDs are unchanged.
 
-        Steps:
-        1. Setup source with glossary → bundle → deploy to test
-        2. Record target glossary ID
-        3. Re-deploy same bundle
-        4. Verify target glossary ID is unchanged
-
         Validates: I19, 5.2
         """
         if not self.verify_aws_connectivity():
             pytest.skip("AWS connectivity not available")
 
-        pf = self._manifest_path("manifest-import.yaml")
-        region = os.environ.get("DEV_DOMAIN_REGION", "us-east-1")
-
-        # Setup source
-        r = self.run_cli_command(["deploy", "--targets", "dev", "--manifest", pf])
-        assert r["success"]
-
-        domain_id, project_id, region, _ = self._get_project_info(pf, "dev")
+        pf, _ = self._setup_and_bundle("manifest-import.yaml", "CatalogImportTest")
+        domain_id, project_id, region, _ = _h.get_project_info(pf, "dev")
 
         ts = int(time.time())
         gname = f"RetainIdGlossary-{ts}"
-        glossary = self._create_glossary(
-            domain_id, project_id, gname, "retain-id test", region
+        glossary = _h.create_glossary(
+            domain_id, project_id, gname, region, description="retain-id test"
         )
         assert glossary, "Failed to create glossary"
 
-        # Bundle
+        # Re-bundle to include the new glossary
         r = self.run_cli_command(["bundle", "--targets", "dev", "--manifest", pf])
         assert r["success"]
-        bundle = self._find_bundle_zip(prefix="CatalogImportTest")
-        if not bundle:
-            bundle = self._find_bundle_zip()
+        bundle = _h.find_bundle_zip(prefix="CatalogImportTest") or _h.find_bundle_zip()
         assert bundle
 
         # First deploy
-        r = self.run_cli_command(
-            [
-                "deploy",
-                "--targets",
-                "test",
-                "--bundle-archive-path",
-                bundle,
-                "--manifest",
-                pf,
-            ]
-        )
+        r = self._deploy_to_test(pf, bundle)
         assert r["success"], f"First deploy failed: {r['output']}"
 
-        # Record target glossary ID
-        t_domain, t_project, _, _ = self._get_project_info(pf, "test")
-        items = self._search_resources(t_domain, t_project, "GLOSSARY", region)
-        target_glossary = None
+        t_domain, t_project, _, _ = _h.get_project_info(pf, "test")
+        items = _h.search_resources(t_domain, t_project, "GLOSSARY", region)
+        first_id = None
         for item in items:
             g = item.get("glossaryItem", {})
             if g.get("name") == gname:
-                target_glossary = g
+                first_id = g["id"]
                 break
-        assert target_glossary, f"Glossary {gname} not found in target after first deploy"
-        first_deploy_id = target_glossary["id"]
+        assert first_id, f"Glossary {gname} not found in target after first deploy"
 
         # Second deploy (same bundle)
-        r = self.run_cli_command(
-            [
-                "deploy",
-                "--targets",
-                "test",
-                "--bundle-archive-path",
-                bundle,
-                "--manifest",
-                pf,
-            ]
-        )
+        r = self._deploy_to_test(pf, bundle)
         assert r["success"], f"Second deploy failed: {r['output']}"
 
-        # Verify target glossary ID is unchanged
-        items = self._search_resources(t_domain, t_project, "GLOSSARY", region)
-        target_glossary_after = None
+        items = _h.search_resources(t_domain, t_project, "GLOSSARY", region)
+        second_id = None
         for item in items:
             g = item.get("glossaryItem", {})
             if g.get("name") == gname:
-                target_glossary_after = g
+                second_id = g["id"]
                 break
-        assert target_glossary_after, f"Glossary {gname} not found after re-deploy"
-        second_deploy_id = target_glossary_after["id"]
-
-        assert first_deploy_id == second_deploy_id, (
-            f"Target glossary ID changed after re-deploy: "
-            f"{first_deploy_id} → {second_deploy_id}"
-        )
+        assert second_id, f"Glossary {gname} not found after re-deploy"
+        assert (
+            first_id == second_id
+        ), f"Target glossary ID changed after re-deploy: {first_id} -> {second_id}"
 
     # ==================================================================
     # I22 — Deploy with skipPublish: true skips all publishing
     # ==================================================================
     @pytest.mark.integration
     def test_skip_publish_flag(self):
-        """Deploy with skipPublish: true skips all publishing.
-
-        Steps:
-        1. Setup source with catalog resources
-        2. Bundle using skip-publish manifest
-        3. Deploy to test
-        4. Verify Published: 0 in deploy output
+        """Deploy with skipPublish: true skips publishing even for ACTIVE assets.
 
         Validates: I22, P15b, 5.13
         """
         if not self.verify_aws_connectivity():
             pytest.skip("AWS connectivity not available")
 
-        pf = self._manifest_path("manifest-skip-publish.yaml")
-        region = os.environ.get("DEV_DOMAIN_REGION", "us-east-1")
-
-        # Setup source
+        pf = _h.get_manifest_path("manifest-skip-publish.yaml")
         r = self.run_cli_command(["deploy", "--targets", "dev", "--manifest", pf])
         assert r["success"]
 
-        domain_id, project_id, region, _ = self._get_project_info(pf, "dev")
+        domain_id, project_id, region, _ = _h.get_project_info(pf, "dev")
 
         ts = int(time.time())
-        glossary = self._create_glossary(
-            domain_id, project_id, f"SkipPublishGlossary-{ts}", "skip-publish test", region
+        asset_name = f"SkipPublishAsset-{ts}"
+        asset = _h.create_asset(
+            domain_id, project_id, asset_name, region, description="skip-publish test"
         )
-        assert glossary, "Failed to create glossary"
+        assert asset, "Failed to create asset"
 
-        # Bundle
-        r = self.run_cli_command(["bundle", "--targets", "dev", "--manifest", pf])
-        assert r["success"]
-        bundle = self._find_bundle_zip(prefix="CatalogSkipPublishTest")
-        if not bundle:
-            bundle = self._find_bundle_zip()
-        assert bundle
+        published = _h.publish_asset(domain_id, asset["id"], region)
+        if not published:
+            pytest.skip(
+                "Could not publish asset (physical resource may not exist). "
+                "Skipping skipPublish verification."
+            )
+
+        # Bundle — exported JSON should include the ACTIVE asset
+        pf, bundle = self._setup_and_bundle(
+            "manifest-skip-publish.yaml", "CatalogSkipPublishTest"
+        )
+
+        # Verify bundle contains the asset with ACTIVE status
+        with zipfile.ZipFile(bundle, "r") as zf:
+            assert "catalog/catalog_export.json" in zf.namelist()
+            with zf.open("catalog/catalog_export.json") as f:
+                catalog_data = json.load(f)
+            active = [
+                a
+                for a in catalog_data.get("assets", [])
+                if a.get("name") == asset_name and a.get("listingStatus") == "ACTIVE"
+            ]
+            assert (
+                active
+            ), f"Bundle should contain {asset_name} with ACTIVE listingStatus"
 
         # Deploy with skipPublish: true
-        r = self.run_cli_command(
-            [
-                "deploy",
-                "--targets",
-                "test",
-                "--bundle-archive-path",
-                bundle,
-                "--manifest",
-                pf,
-            ]
-        )
+        r = self._deploy_to_test(pf, bundle)
         assert r["success"], f"Deploy failed: {r['output']}"
 
-        # Verify Published: 0
+        # Assert Published: 0 in output
         out = r["output"]
         assert "Published: 0" in out or "published: 0" in out.lower(), (
             f"Deploy with skipPublish: true should report Published: 0. "
             f"Output: {out}"
         )
 
-        # Verify catalog import completed
-        assert "catalog" in out.lower(), "Deploy output should mention catalog"
+        # Assert asset exists in target but is NOT published
+        t_domain, t_project, _, _ = _h.get_project_info(pf, "test")
+        items = _h.search_resources(t_domain, t_project, "ASSET", region)
+        target_asset = None
+        for item in items:
+            a = item.get("assetItem", {})
+            if a.get("name") == asset_name:
+                target_asset = a
+                break
+        assert target_asset, f"Asset {asset_name} not found in target after deploy"
+        assert not target_asset.get("listingId"), (
+            f"Asset {asset_name} should NOT be published when skipPublish "
+            f"is true, but has listingId: {target_asset.get('listingId')}"
+        )

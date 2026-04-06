@@ -531,16 +531,16 @@ Edit `manifest.yaml`:
 
 ### 4. Validate
 ```bash
-smus-cicd-cli describe --manifest manifest.yaml --connect
+aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 ```
 
 ### 5. Deploy
 ```bash
 # Deploy to test
-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run tests
-smus-cicd-cli test --manifest manifest.yaml --targets test
+aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 ---
@@ -589,7 +589,7 @@ All examples include integration tests in `app_tests/` directory:
 
 ```bash
 # Run tests after deployment
-smus-cicd-cli test --manifest manifest.yaml --targets test
+aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 **What tests validate:**

@@ -49,13 +49,13 @@ def show_help_suggestion():
     """Show helpful suggestions for common mistakes."""
     console.print("\n[yellow]💡 Common usage patterns:[/yellow]")
     console.print(
-        "   [cyan]smus-cicd-cli describe --manifest my-pipeline.yaml --targets dev[/cyan]"
+        "   [cyan]aws-smus-cicd-cli describe --manifest my-pipeline.yaml --targets dev[/cyan]"
     )
     console.print(
-        "   [cyan]smus-cicd-cli monitor --manifest my-pipeline.yaml --output JSON[/cyan]"
+        "   [cyan]aws-smus-cicd-cli monitor --manifest my-pipeline.yaml --output JSON[/cyan]"
     )
     console.print(
-        "   [cyan]smus-cicd-cli deploy --manifest my-pipeline.yaml --targets prod[/cyan]"
+        "   [cyan]aws-smus-cicd-cli deploy --manifest my-pipeline.yaml --targets prod[/cyan]"
     )
 
     console.print("\n[yellow]🔧 Universal switches (work on all commands):[/yellow]")
@@ -67,20 +67,26 @@ def show_help_suggestion():
     )
 
     console.print("\n[yellow]📖 For detailed help:[/yellow]")
-    console.print("   [cyan]smus-cicd-cli --help[/cyan]")
-    console.print("   [cyan]smus-cicd-cli <command> --help[/cyan]")
+    console.print("   [cyan]aws-smus-cicd-cli --help[/cyan]")
+    console.print("   [cyan]aws-smus-cicd-cli <command> --help[/cyan]")
 
 
 app = typer.Typer(
     help="SMUS CI/CD CLI - Manage SageMaker Unified Studio CI/CD pipelines",
     no_args_is_help=True,
     add_completion=False,
-    epilog="💡 Use 'smus-cicd-cli <command> --help' for command-specific help",
+    epilog="💡 Use 'aws-smus-cicd-cli <command> --help' for command-specific help",
 )
 
 
 # Global log level option
 LOG_LEVEL = None
+
+
+def _version_callback(value: bool):
+    if value:
+        console.print(f"aws-smus-cicd-cli {__version__}")
+        raise typer.Exit()
 
 
 @app.callback()
@@ -92,16 +98,32 @@ def main(
         help="Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
         case_sensitive=False,
     ),
+    show_version: bool = typer.Option(
+        None,
+        "--version",
+        "-v",
+        help="Show the CLI version and exit.",
+        is_eager=True,
+        callback=_version_callback,
+    ),
 ):
     """SMUS CI/CD CLI - Manage SageMaker Unified Studio CI/CD pipelines."""
     global LOG_LEVEL
     LOG_LEVEL = log_level
 
 
+@app.command(
+    "version", help="Show the CLI version.", rich_help_panel="Pipeline Commands"
+)
+def version():
+    """Show the installed version of aws-smus-cicd-cli."""
+    console.print(f"aws-smus-cicd-cli {__version__}")
+
+
 # Register commands with proper ordering
 @app.command(
     "describe",
-    help="1. Describe and validate pipeline manifest file. Example: smus-cicd-cli describe --manifest pipeline.yaml --targets dev",
+    help="1. Describe and validate pipeline manifest file. Example: aws-smus-cicd-cli describe --manifest pipeline.yaml --targets dev",
     rich_help_panel="Pipeline Commands",
 )
 def describe(
@@ -138,7 +160,7 @@ def describe(
 
 @app.command(
     "bundle",
-    help="2. Create bundle zip files. Bundles from dev target by default. Example: smus-cicd-cli bundle --targets test",
+    help="2. Create bundle zip files. Bundles from dev target by default. Example: aws-smus-cicd-cli bundle --targets test",
     rich_help_panel="Pipeline Commands",
 )
 def bundle(
@@ -162,11 +184,6 @@ def bundle(
         "--local",
         help="Bundle from local filesystem instead of dev target",
     ),
-    updated_after: str = typer.Option(
-        None,
-        "--updated-after",
-        help="ISO 8601 timestamp to filter ALL catalog resources uniformly by updatedAt (e.g., 2024-01-01T00:00:00Z). This is a CLI-only option, not a manifest field.",
-    ),
     target_positional: str = typer.Argument(
         None, help="Target name (positional argument for backward compatibility)"
     ),
@@ -178,26 +195,6 @@ def bundle(
     """Create bundle zip files. By default bundles FROM dev target for deployment to specified target."""
     configure_logging(output, LOG_LEVEL)
 
-    # Validate --updated-after timestamp format if provided
-    if updated_after is not None:
-        from datetime import datetime
-
-        try:
-            # Try parsing ISO 8601 formats
-            ts = updated_after.rstrip("Z")
-            if "+" in ts or (ts.count("-") > 2):
-                # Has timezone offset
-                datetime.fromisoformat(updated_after.replace("Z", "+00:00"))
-            else:
-                datetime.fromisoformat(ts)
-        except (ValueError, TypeError):
-            console.print(
-                f"Error: Invalid --updated-after timestamp format: '{updated_after}'. "
-                "Expected ISO 8601 format (e.g., 2024-01-01T00:00:00Z).",
-                style="red",
-            )
-            raise typer.Exit(1)
-
     # Determine bundle source
     if local:
         bundle_source = final_targets or "default"
@@ -207,14 +204,12 @@ def bundle(
         console.print(f"🔍 Bundle source: {bundle_source} target")
         console.print(f"📦 Bundle destination: {final_targets or 'default'}")
 
-    bundle_command(
-        bundle_source, manifest_file, output_dir, output, updated_after=updated_after
-    )
+    bundle_command(bundle_source, manifest_file, output_dir, output)
 
 
 @app.command(
     "deploy",
-    help="3. Deploy bundle files to target (auto-initializes if needed). Example: smus-cicd-cli deploy --manifest pipeline.yaml --targets prod",
+    help="3. Deploy bundle files to target (auto-initializes if needed). Example: aws-smus-cicd-cli deploy --manifest pipeline.yaml --targets prod",
     rich_help_panel="Pipeline Commands",
 )
 def deploy(
@@ -294,7 +289,7 @@ def deploy(
 
 @app.command(
     "monitor",
-    help="4. Monitor workflow status. Example: smus-cicd-cli monitor --manifest pipeline.yaml --targets dev",
+    help="4. Monitor workflow status. Example: aws-smus-cicd-cli monitor --manifest pipeline.yaml --targets dev",
     rich_help_panel="Pipeline Commands",
 )
 def monitor(
@@ -324,7 +319,7 @@ def monitor(
 
 @app.command(
     "create",
-    help="0. Create new pipeline manifest. Example: smus-cicd-cli create --output pipeline.yaml --name 'MyPipeline'",
+    help="0. Create new pipeline manifest. Example: aws-smus-cicd-cli create --output pipeline.yaml --name 'MyPipeline'",
     rich_help_panel="Pipeline Commands",
 )
 def create(
@@ -371,7 +366,7 @@ def create(
 
 @app.command(
     "logs",
-    help="5. Fetch workflow logs from CloudWatch. Example: smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/my-workflow",
+    help="5. Fetch workflow logs from CloudWatch. Example: aws-smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/my-workflow",
     rich_help_panel="Pipeline Commands",
 )
 def logs(
@@ -395,7 +390,7 @@ def logs(
 
 @app.command(
     "run",
-    help="6. Run Airflow CLI commands in target environment. Example: smus-cicd-cli run --workflow my_dag --manifest pipeline.yaml",
+    help="6. Run Airflow CLI commands in target environment. Example: aws-smus-cicd-cli run --workflow my_dag --manifest pipeline.yaml",
     rich_help_panel="Pipeline Commands",
 )
 def run(
@@ -425,7 +420,7 @@ def run(
 
 @app.command(
     "test",
-    help="6. Run tests for pipeline targets. Example: smus-cicd-cli test --targets marketing-test-stage",
+    help="6. Run tests for pipeline targets. Example: aws-smus-cicd-cli test --targets marketing-test-stage",
     rich_help_panel="Pipeline Commands",
 )
 def test(
@@ -457,7 +452,7 @@ def test(
 
 @app.command(
     "delete",
-    help="7. Delete projects and environments. Example: smus-cicd-cli delete --targets marketing-test-stage --force",
+    help="7. Delete projects and environments. Example: aws-smus-cicd-cli delete --targets marketing-test-stage --force",
     rich_help_panel="Pipeline Commands",
 )
 def delete(
@@ -485,7 +480,7 @@ def delete(
 
 @app.command(
     "integrate",
-    help="Integrate SMUS CI/CD CLI with other tools (Q CLI). Example: smus-cicd-cli integrate qcli",
+    help="Integrate SMUS CI/CD CLI with other tools (Q CLI). Example: aws-smus-cicd-cli integrate qcli",
     rich_help_panel="Pipeline Commands",
 )
 def integrate(
@@ -503,10 +498,10 @@ def integrate(
     - qcli: Amazon Q CLI integration via MCP (Model Context Protocol)
 
     Examples:
-      smus-cicd-cli integrate qcli                           # Setup with default config
-      smus-cicd-cli integrate qcli --configure custom.yaml   # Setup with custom config
-      smus-cicd-cli integrate qcli --status                  # Check integration status
-      smus-cicd-cli integrate qcli --uninstall               # Remove integration
+      aws-smus-cicd-cli integrate qcli                           # Setup with default config
+      aws-smus-cicd-cli integrate qcli --configure custom.yaml   # Setup with custom config
+      aws-smus-cicd-cli integrate qcli --status                  # Check integration status
+      aws-smus-cicd-cli integrate qcli --uninstall               # Remove integration
     """
     configure_logging("TEXT", LOG_LEVEL)
     if tool.lower() == "qcli":
@@ -521,7 +516,7 @@ def integrate(
 
 @app.command(
     "chat",
-    help="8. Start interactive AI chat agent. Example: smus-cicd-cli chat",
+    help="8. Start interactive AI chat agent. Example: aws-smus-cicd-cli chat",
     rich_help_panel="Pipeline Commands",
 )
 def chat(

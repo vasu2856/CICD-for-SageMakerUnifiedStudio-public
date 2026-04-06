@@ -4,7 +4,7 @@ Feature: datazone-catalog-import-export
 
 Tests the simplified CatalogExporter that exports ALL project-owned catalog
 resources when enabled, with support for externalIdentifier, formsOutput→formsInput,
-termRelations, and optional --updated-after CLI flag.
+and termRelations.
 
 Uses hypothesis library with @settings(max_examples=100).
 """
@@ -18,6 +18,8 @@ from hypothesis import strategies as st
 
 from smus_cicd.helpers.catalog_export import (
     ALL_RESOURCE_TYPES,
+    _search_resources,
+    _search_type_resources,
     _serialize_resource,
     export_catalog,
 )
@@ -147,18 +149,6 @@ def asset_type_item_strategy(draw, project_id="project-456"):
             "owningProjectId": project_id,
         }
     }
-
-
-@st.composite
-def iso_timestamp_strategy(draw):
-    """Generate a valid ISO 8601 timestamp string."""
-    year = draw(st.integers(min_value=2020, max_value=2030))
-    month = draw(st.integers(min_value=1, max_value=12))
-    day = draw(st.integers(min_value=1, max_value=28))
-    hour = draw(st.integers(min_value=0, max_value=23))
-    minute = draw(st.integers(min_value=0, max_value=59))
-    second = draw(st.integers(min_value=0, max_value=59))
-    return f"{year:04d}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:02d}Z"
 
 
 def _build_mock_client(
@@ -304,68 +294,6 @@ class TestProperty2ExportAllProjectOwnedResources(unittest.TestCase):
         # Verify all 6 resource types were queried
         self.assertEqual(mock_client.search.call_count, 4)
         self.assertEqual(mock_client.search_types.call_count, 2)
-
-
-class TestProperty3UpdatedAfterFilterCorrectness(unittest.TestCase):
-    """Property 3: Updated-After CLI Filter Correctness.
-
-    **Validates: Requirement 2.12**
-
-    When --updated-after is provided, the filter is applied uniformly to ALL
-    resource types. When not provided, no filter is applied.
-    """
-
-    @settings(max_examples=100)
-    @given(
-        updated_after=st.one_of(st.none(), iso_timestamp_strategy()),
-    )
-    @patch("smus_cicd.helpers.catalog_export._get_datazone_client")
-    def test_updated_after_filter_applied_uniformly(
-        self, mock_get_client, updated_after
-    ):
-        """
-        Property 3: Updated-After CLI Filter Correctness
-
-        **Validates: Requirement 2.12**
-
-        When updated_after is provided, ALL queries include the filter.
-        When not provided, NO queries include the filter.
-        """
-        mock_client = _build_mock_client()
-        mock_get_client.return_value = mock_client
-
-        export_catalog(
-            "domain-1",
-            "proj-1",
-            "us-east-1",
-            updated_after=updated_after,
-        )
-
-        # Check all Search API calls
-        for c in mock_client.search.call_args_list:
-            if updated_after:
-                self.assertIn("filters", c[1])
-                self.assertEqual(
-                    c[1]["filters"]["filter"]["value"],
-                    updated_after,
-                )
-                self.assertEqual(
-                    c[1]["filters"]["filter"]["attribute"],
-                    "updatedAt",
-                )
-            else:
-                self.assertNotIn("filters", c[1])
-
-        # Check all SearchTypes API calls
-        for c in mock_client.search_types.call_args_list:
-            if updated_after:
-                self.assertIn("filters", c[1])
-                self.assertEqual(
-                    c[1]["filters"]["filter"]["value"],
-                    updated_after,
-                )
-            else:
-                self.assertNotIn("filters", c[1])
 
 
 class TestProperty6ExportJsonStructureInvariant(unittest.TestCase):
@@ -647,6 +575,66 @@ class TestProperty16ExportErrorPropagation(unittest.TestCase):
             or "Failed to export" in str(ctx.exception)
             or isinstance(ctx.exception, Exception),
         )
+
+
+# Feature: remove-updated-after-flag, Property 1: Search API calls never include filters
+class TestPropertySearchApiCallsNeverIncludeFilters(unittest.TestCase):
+    """Property 1: Search API calls never include filters.
+
+    **Validates: Requirements 3.5, 3.6**
+
+    For any valid domain_id, project_id, and search_scope, _search_resources()
+    and _search_type_resources() SHALL NOT include a "filters" key in API call
+    parameters.
+    """
+
+    @settings(max_examples=100)
+    @given(
+        domain_id=_safe_text(5, 30),
+        project_id=_safe_text(5, 30),
+        search_scope=st.sampled_from(["GLOSSARY", "GLOSSARY_TERM", "ASSET", "DATA_PRODUCT"]),
+    )
+    def test_search_resources_never_includes_filters(self, domain_id, project_id, search_scope):
+        """
+        Property 1: Search API calls never include filters (_search_resources)
+
+        **Validates: Requirement 3.5**
+        """
+        mock_client = MagicMock()
+        mock_client.search.return_value = {"items": []}
+
+        _search_resources(mock_client, domain_id, project_id, search_scope)
+
+        for call in mock_client.search.call_args_list:
+            self.assertNotIn(
+                "filters",
+                call[1],
+                "Search API call should never include a 'filters' key",
+            )
+
+    @settings(max_examples=100)
+    @given(
+        domain_id=_safe_text(5, 30),
+        project_id=_safe_text(5, 30),
+        search_scope=st.sampled_from(["FORM_TYPE", "ASSET_TYPE"]),
+    )
+    def test_search_type_resources_never_includes_filters(self, domain_id, project_id, search_scope):
+        """
+        Property 1: Search API calls never include filters (_search_type_resources)
+
+        **Validates: Requirement 3.6**
+        """
+        mock_client = MagicMock()
+        mock_client.search_types.return_value = {"items": []}
+
+        _search_type_resources(mock_client, domain_id, project_id, search_scope)
+
+        for call in mock_client.search_types.call_args_list:
+            self.assertNotIn(
+                "filters",
+                call[1],
+                "SearchTypes API call should never include a 'filters' key",
+            )
 
 
 if __name__ == "__main__":

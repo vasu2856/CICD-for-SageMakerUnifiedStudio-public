@@ -123,7 +123,7 @@ The SMUS CI/CD CLI intelligently manages infrastructure creation and updates:
 #### **Domain Management**
 ```bash
 # CLI automatically creates DataZone domain if missing
-smus-cicd-cli deploy --manifest manifest.yaml --targets test
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test
 # Creates domain "my-studio-domain" if it doesn't exist
 # Uses existing domain if already present
 ```
@@ -131,7 +131,7 @@ smus-cicd-cli deploy --manifest manifest.yaml --targets test
 #### **Project Creation**
 ```bash
 # CLI creates SageMaker projects as needed
-smus-cicd-cli deploy --manifest manifest.yaml --targets test,prod
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test,prod
 # Creates "my-project-test" and "my-project-prod" projects
 # Skips creation if projects already exist
 ```
@@ -240,7 +240,7 @@ graph TD
 #### **Bundle Creation Process**
 ```bash
 # CLI packages all deployment artifacts
-smus-cicd-cli bundle --manifest manifest.yaml --targets test
+aws-smus-cicd-cli bundle --manifest manifest.yaml --targets test
 ```
 
 **What gets bundled:**
@@ -264,7 +264,7 @@ The CLI handles infrastructure creation during deployment:
 
 ```bash
 # Single command creates all required infrastructure
-smus-cicd-cli deploy --manifest manifest.yaml --targets test
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test
 
 # CLI automatically:
 # 1. Creates DataZone domain if missing
@@ -327,7 +327,7 @@ deploy-production:
   steps:
     - name: Deploy to Production
       run: |
-        smus-cicd-cli deploy --manifest manifest.yaml --targets prod
+        aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
 ```
 
 **GitLab CI Example:**
@@ -339,7 +339,7 @@ deploy-production:
     action: start
   when: manual  # Requires manual trigger
   script:
-    - smus-cicd-cli deploy --manifest manifest.yaml --targets prod
+    - aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
 ```
 
 #### **Approval Workflow Process**
@@ -358,13 +358,13 @@ deploy-production:
 #### **1. Configuration Validation**
 ```bash
 # Validates bundle configuration and connectivity
-smus-cicd-cli describe --manifest manifest.yaml --connect
+aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 ```
 
 #### **2. Bundle Creation**
 ```bash
 # Creates deployment bundle from source environment
-smus-cicd-cli bundle --manifest manifest.yaml --targets test
+aws-smus-cicd-cli bundle --manifest manifest.yaml --targets test
 ```
 
 #### **3. Pre-Deployment Validation (Dry Run)**
@@ -380,25 +380,25 @@ smus-cicd-cli deploy --manifest manifest.yaml --targets test --dry-run --output 
 ```bash
 # Deploys with automatic infrastructure creation
 # (automatic pre-deployment validation runs first; skip with --skip-validation)
-smus-cicd-cli deploy --manifest manifest.yaml --targets test
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test
 ```
 
 #### **5. Test Execution**
 ```bash
 # Runs validation tests on deployed environment
-smus-cicd-cli test --manifest manifest.yaml --targets test
+aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
 #### **6. Production Deployment**
 ```bash
 # Deploys to production with approval gates
-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
 ```
 
 #### **7. Monitoring and Status**
 ```bash
 # Monitors deployment status and health
-smus-cicd-cli monitor --manifest manifest.yaml --targets prod
+aws-smus-cicd-cli monitor --manifest manifest.yaml --targets prod
 ```
 
 ## Manual Reviewers and Approval Process
@@ -441,7 +441,7 @@ deploy-production:
       when: manual
       allow_failure: false
   script:
-    - smus-cicd-cli deploy --manifest manifest.yaml --targets prod
+    - aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
 ```
 
 ### Approval Workflow Mechanics
@@ -541,7 +541,7 @@ create-bundle:
 ```
 
 **Purpose**: Packages deployment artifacts including DAGs, notebooks, and catalog assets
-**CLI Command**: `smus-cicd-cli bundle --manifest manifest.yaml --targets test`
+**CLI Command**: `aws-smus-cicd-cli bundle --manifest manifest.yaml --targets test`
 **Infrastructure Impact**: Creates S3 storage for bundles if not present
 
 #### **Job 3: Test Environment Deployment**
@@ -554,7 +554,7 @@ deploy-test:
 ```
 
 **Purpose**: Deploys to test environment with automatic infrastructure provisioning
-**CLI Command**: `smus-cicd-cli deploy --manifest manifest.yaml --targets test`
+**CLI Command**: `aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test`
 **Infrastructure Created**:
 - SageMaker project (if missing)
 - Lakehouse environment (if missing)
@@ -571,7 +571,7 @@ run-tests:
 ```
 
 **Purpose**: Validates deployment through automated testing
-**CLI Command**: `smus-cicd-cli test --manifest manifest.yaml --targets test`
+**CLI Command**: `aws-smus-cicd-cli test --manifest manifest.yaml --targets test`
 
 #### **Job 5: Production Deployment (Manual Approval)**
 ```yaml
@@ -583,7 +583,7 @@ deploy-prod:
 ```
 
 **Manual Approval Gate**: Uses GitHub environment `aws-env-amirbo-6778` with protection rules
-**CLI Command**: `smus-cicd-cli deploy --manifest manifest.yaml --targets prod`
+**CLI Command**: `aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod`
 **Infrastructure Management**: Creates production infrastructure idempotently
 
 ### Repository-Specific Features
@@ -651,7 +651,7 @@ The workflow demonstrates automatic catalog asset management:
 # CLI automatically handles catalog asset subscriptions
 - name: Deploy with Catalog Assets
   run: |
-    smus-cicd-cli deploy --manifest manifest.yaml --targets prod
+    aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
     # CLI automatically:
     # 1. Identifies catalog assets in bundle
     # 2. Requests subscriptions for production project
@@ -710,5 +710,5 @@ This implementation showcases how the SMUS CI/CD CLI's infrastructure management
 
 For more detailed information about CLI commands and bundle configuration, see:
 - [CLI Commands Documentation](cli-commands.md)
-- [Bundle Manifest Guide](bundle-manifest.md)
+- [Manifest Guide](manifest.md)
 - [Development Guide](development.md)

@@ -59,13 +59,13 @@ You're responsible for configuring CI/CD pipelines (GitHub Actions), managing Sa
 → [Admin Quick Start](admin-quickstart.md)
 
 **Understand how it works first**  
-→ [Bundle Manifest Reference](../bundle-manifest.md)
+→ [Manifest Reference](../manifest.md)
 
 **See examples**  
 → [Examples](../../examples/)
 
 **Read complete documentation**  
-→ [CLI Commands](../cli-commands.md) | [Bundle Manifest](../bundle-manifest.md)
+→ [CLI Commands](../cli-commands.md) | [Manifest](../manifest.md)
 
 ---
 
@@ -87,8 +87,8 @@ All guides assume you have:
 After completing a quick start guide:
 
 1. **Explore Examples** - See [examples/](../../examples/) for real-world scenarios
-2. **Read Concepts** - Understand [bundle manifests](../bundle-manifest.md)
-3. **Reference Docs** - Check [CLI commands](../cli-commands.md) and [manifest syntax](../bundle-manifest.md)
+2. **Read Concepts** - Understand [manifests](../manifest.md)
+3. **Reference Docs** - Check [CLI commands](../cli-commands.md) and [manifest syntax](../manifest.md)
 4. **Set Up CI/CD** - Configure [GitHub Actions](../github-actions-integration.md)
 
 ---

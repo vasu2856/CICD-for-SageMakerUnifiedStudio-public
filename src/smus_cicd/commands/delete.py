@@ -36,7 +36,7 @@ def delete_command(
     """
     Delete projects and environments that were deployed during initialize.
 
-    Example: smus-cicd-cli delete --targets test --force
+    Example: aws-smus-cicd-cli delete --targets test --force
     """
     try:
         # Parse manifest

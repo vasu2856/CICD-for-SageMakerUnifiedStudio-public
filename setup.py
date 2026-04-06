@@ -43,8 +43,7 @@ dev_requires = [
 ]
 
 setup(
-    name="smus-cicd-cli",
-    version="1.0.0",
+    name="aws-smus-cicd-cli",
     author="AWS SageMaker Unified Studio Team",
     author_email="sagemaker-unified-studio@amazon.com",
     description="A CLI tool for managing CI/CD pipelines in SageMaker Unified Studio (SMUS)",
@@ -76,7 +75,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "smus-cicd-cli=smus_cicd.cli:app",
+            "aws-smus-cicd-cli=smus_cicd.cli:app",
         ],
     },
     data_files=data_files,

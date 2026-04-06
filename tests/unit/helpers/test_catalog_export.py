@@ -2,7 +2,7 @@
 
 Tests the simplified CatalogExporter that exports ALL project-owned catalog
 resources when enabled, with support for externalIdentifier, formsOutput→formsInput,
-termRelations, and optional --updated-after CLI flag.
+and termRelations.
 """
 
 import json
@@ -68,36 +68,6 @@ class TestSearchResources(unittest.TestCase):
         # Second call should include nextToken
         second_call_args = mock_client.search.call_args_list[1][1]
         self.assertEqual(second_call_args["nextToken"], "token-1")
-
-    def test_with_updated_after_filter(self):
-        """Test searching resources with --updated-after CLI flag filter."""
-        mock_client = MagicMock()
-        mock_client.search.return_value = {"items": []}
-
-        _search_resources(
-            mock_client,
-            "domain-123",
-            "project-456",
-            "ASSET",
-            updated_after="2025-01-01T00:00:00Z",
-        )
-
-        call_args = mock_client.search.call_args[1]
-        self.assertIn("filters", call_args)
-        self.assertEqual(call_args["filters"]["filter"]["attribute"], "updatedAt")
-        self.assertEqual(
-            call_args["filters"]["filter"]["value"], "2025-01-01T00:00:00Z"
-        )
-
-    def test_without_updated_after_filter(self):
-        """Test that no filter is applied when --updated-after is not provided."""
-        mock_client = MagicMock()
-        mock_client.search.return_value = {"items": []}
-
-        _search_resources(mock_client, "domain-123", "project-456", "ASSET")
-
-        call_args = mock_client.search.call_args[1]
-        self.assertNotIn("filters", call_args)
 
     def test_owning_project_filter_applied_for_all_scopes(self):
         """Test owningProjectIdentifier is applied for all search scopes."""
@@ -237,25 +207,6 @@ class TestSearchTypeResources(unittest.TestCase):
             _search_type_resources(mock_client, "domain-123", "project-456", scope)
             call_args = mock_client.search_types.call_args[1]
             self.assertFalse(call_args["managed"])
-
-    def test_with_updated_after_filter(self):
-        """Test --updated-after CLI flag filter for SearchTypes."""
-        mock_client = MagicMock()
-        mock_client.search_types.return_value = {"items": []}
-
-        _search_type_resources(
-            mock_client,
-            "domain-123",
-            "project-456",
-            "FORM_TYPE",
-            updated_after="2025-01-01T00:00:00Z",
-        )
-
-        call_args = mock_client.search_types.call_args[1]
-        self.assertIn("filters", call_args)
-        self.assertEqual(
-            call_args["filters"]["filter"]["value"], "2025-01-01T00:00:00Z"
-        )
 
     def test_pagination(self):
         """Test pagination for SearchTypes API."""
@@ -761,52 +712,6 @@ class TestExportCatalog(unittest.TestCase):
                 call[1],
                 f"owningProjectIdentifier should not be in search_types call: {call}",
             )
-
-    @patch("smus_cicd.helpers.catalog_export._get_datazone_client")
-    def test_updated_after_filter_applied_to_all_types(self, mock_get_client):
-        """Test --updated-after CLI flag filter is applied uniformly to ALL resource types."""
-        mock_client = MagicMock()
-        mock_get_client.return_value = mock_client
-        mock_client.search.return_value = {"items": []}
-        mock_client.search_types.return_value = {"items": []}
-
-        export_catalog(
-            "domain-1",
-            "proj-1",
-            "us-east-1",
-            updated_after="2025-06-01T00:00:00Z",
-        )
-
-        # All Search API calls should have the filter
-        for call in mock_client.search.call_args_list:
-            self.assertIn("filters", call[1])
-            self.assertEqual(
-                call[1]["filters"]["filter"]["value"],
-                "2025-06-01T00:00:00Z",
-            )
-
-        # All SearchTypes API calls should have the filter
-        for call in mock_client.search_types.call_args_list:
-            self.assertIn("filters", call[1])
-            self.assertEqual(
-                call[1]["filters"]["filter"]["value"],
-                "2025-06-01T00:00:00Z",
-            )
-
-    @patch("smus_cicd.helpers.catalog_export._get_datazone_client")
-    def test_no_filter_when_updated_after_not_provided(self, mock_get_client):
-        """Test no filter is applied when --updated-after is not provided."""
-        mock_client = MagicMock()
-        mock_get_client.return_value = mock_client
-        mock_client.search.return_value = {"items": []}
-        mock_client.search_types.return_value = {"items": []}
-
-        export_catalog("domain-1", "proj-1", "us-east-1")
-
-        for call in mock_client.search.call_args_list:
-            self.assertNotIn("filters", call[1])
-        for call in mock_client.search_types.call_args_list:
-            self.assertNotIn("filters", call[1])
 
     @patch("smus_cicd.helpers.catalog_export._get_datazone_client")
     def test_external_identifier_exported_for_assets(self, mock_get_client):

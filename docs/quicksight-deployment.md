@@ -91,10 +91,10 @@ stages:
 
 ### 1. Bundle Phase
 
-When running `smus-cicd-cli bundle`, dashboards with `assetBundle: export` are exported:
+When running `aws-smus-cicd-cli bundle`, dashboards with `assetBundle: export` are exported:
 
 ```bash
-smus-cicd-cli bundle --targets dev
+aws-smus-cicd-cli bundle --targets dev
 ```
 
 **What happens:**
@@ -105,10 +105,10 @@ smus-cicd-cli bundle --targets dev
 
 ### 2. Deploy Phase
 
-When running `smus-cicd-cli deploy`, dashboards are imported:
+When running `aws-smus-cicd-cli deploy`, dashboards are imported:
 
 ```bash
-smus-cicd-cli deploy --targets prod
+aws-smus-cicd-cli deploy --targets prod
 ```
 
 **What happens:**
@@ -150,8 +150,8 @@ stages:
 **Steps:**
 1. Create dashboard in dev environment
 2. Add to manifest with `assetBundle: export`
-3. Run `smus-cicd-cli bundle --targets dev`
-4. Run `smus-cicd-cli deploy --targets prod`
+3. Run `aws-smus-cicd-cli bundle --targets dev`
+4. Run `aws-smus-cicd-cli deploy --targets prod`
 
 ### Use Case 2: Environment-Specific Permissions
 

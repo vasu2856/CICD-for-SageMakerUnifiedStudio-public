@@ -36,9 +36,8 @@ The catalog import/export feature supports the following DataZone resource types
 When you run the `bundle` command with catalog export enabled, the CLI:
 
 1. Queries the DataZone Search and SearchTypes APIs to retrieve ALL catalog resources owned by your source project
-2. Optionally filters resources by the `--updated-after` CLI flag (if provided)
-3. Serializes the resources into a `catalog/catalog_export.json` file within the bundle ZIP archive
-4. Preserves resource names, metadata, cross-references, `inputForms`, and `termRelations` for later import
+2. Serializes the resources into a `catalog/catalog_export.json` file within the bundle ZIP archive
+3. Preserves resource names, metadata, cross-references, `formsInput`, and `termRelations` for later import
 
 ### Import During Deploy
 
@@ -46,10 +45,13 @@ When you run the `deploy` command, the CLI:
 
 1. Extracts the `catalog/catalog_export.json` file from the bundle
 2. Builds an identifier mapping between source and target projects using `externalIdentifier` (with normalization) or name as fallback
-3. Creates, updates, or deletes resources in the target project in dependency order
-4. Resolves cross-references (e.g., GlossaryTerm → Glossary, Asset → AssetType)
-5. Publishes assets and data products that were published in the source project (unless `skipPublish: true` is configured), verifying each listing becomes ACTIVE before counting it as published
-6. Reports a summary of created, updated, deleted, published, and failed resources
+3. Creates or updates resources in the target project in dependency order
+4. Logs any resources that exist in the target but are not in the bundle (these are left untouched)
+5. Resolves cross-references (e.g., GlossaryTerm → Glossary, Asset → AssetType)
+6. Publishes assets and data products that were published in the source project (unless `skipPublish: true` is configured), verifying each listing becomes ACTIVE before counting it as published
+7. Reports a summary of created, updated, skipped (extra in target), published, and failed resources
+
+> ⚠️ **No resources are ever deleted during import.** The import process only creates new resources or updates existing ones. Resources that exist in the target project but are not present in the bundle — including resources left over from previous deployments — are preserved and logged as "skipped (extra in target)". If you need to remove stale resources from a target project, you must delete them manually through the DataZone console or API.
 
 ## Configuration
 
@@ -61,7 +63,7 @@ The manifest `content.catalog` section is intentionally simple — it only suppo
 - `skipPublish` — boolean to skip all publishing regardless of source state (default: false)
 - `assets.access` — array for subscription requests (existing functionality)
 
-No filter options (`include`, `names`, `assetTypes`, `updatedAfter`, etc.) exist in the manifest. When enabled, ALL project-owned catalog resources are exported. To filter by date, use the `--updated-after` CLI flag on the bundle command.
+No filter options (`include`, `names`, `assetTypes`, etc.) exist in the manifest. When enabled, ALL project-owned catalog resources are exported.
 
 Publishing behavior: By default, assets and data products are published during import only if they were published (`listingStatus == "ACTIVE"`) in the source project. This preserves the source publish state across environments. After calling the asynchronous publish API (`create_listing_change_set`), the importer polls the resource to verify the listing becomes ACTIVE before counting it as published. If the listing fails (e.g., the underlying physical resource doesn't exist in the target), it is counted as a publish failure. Set `skipPublish: true` to skip all publishing.
 
@@ -103,16 +105,25 @@ content:
 To control catalog import behavior per stage, use the `deployment_configuration.catalog` section:
 
 ```yaml
-targets:
-  dev:
+stages:
+  test:
+    stage: TEST
+    domain:
+      region: us-east-1
+    project:
+      name: test-catalog-project
     deployment_configuration:
-      catalog:
-        disable: false  # Enable catalog import (default)
+      catalog: {}          # Enable catalog import (default)
   
   prod:
+    stage: PROD
+    domain:
+      region: us-east-1
+    project:
+      name: prod-catalog-project
     deployment_configuration:
       catalog:
-        disable: true   # Skip catalog import for this stage
+        disable: true      # Skip catalog import for this stage
 ```
 
 ## Usage
@@ -127,29 +138,14 @@ targets:
 
 ```bash
 # Step 1: Bundle from dev environment (exports ALL catalog resources)
-smus-cli bundle --manifest manifest.yaml
+aws-smus-cicd-cli bundle --manifest manifest.yaml
 
 # Step 2: Deploy to test environment
-smus-cli deploy --bundle bundle.zip --targets test
+aws-smus-cicd-cli deploy --bundle bundle.zip --targets test
 
 # Step 3: Deploy to prod environment
-smus-cli deploy --bundle bundle.zip --targets prod
+aws-smus-cicd-cli deploy --bundle bundle.zip --targets prod
 ```
-
-### Example: Incremental Export with --updated-after
-
-To export only recently modified resources, use the `--updated-after` CLI flag on the bundle command. This filters ALL resource types uniformly by modification timestamp.
-
-```bash
-# Export only resources modified since February 1, 2025
-smus-cli bundle --manifest manifest.yaml --updated-after "2025-02-01T00:00:00Z"
-```
-
-The `--updated-after` flag:
-- Accepts an ISO 8601 timestamp (e.g., `2025-02-01T00:00:00Z`)
-- Filters ALL resource types uniformly (glossaries, assets, form types, etc.)
-- Is optional — when omitted, all project-owned resources are exported
-- Is a CLI-only option, not a manifest field
 
 ### Example: Deploy with Publishing Skipped
 
@@ -162,8 +158,8 @@ content:
 ```
 
 ```bash
-smus-cli bundle --manifest manifest.yaml
-smus-cli deploy --bundle bundle.zip --targets test
+aws-smus-cicd-cli bundle --manifest manifest.yaml
+aws-smus-cicd-cli deploy --bundle bundle.zip --targets test
 ```
 
 ## Resource Mapping and Dependencies
@@ -190,7 +186,7 @@ Resources are created in the following dependency order to ensure references are
 5. **Assets** (reference AssetTypes, may reference GlossaryTerms)
 6. **Data Products** (may reference Assets)
 
-Resources are deleted in reverse dependency order when they exist in the target but not in the bundle.
+Resources that exist in the target but are not in the bundle are logged for visibility but never deleted.
 
 ### Cross-Reference Resolution
 
@@ -202,16 +198,9 @@ The import process automatically resolves cross-references between resources:
 - **FormTypes/Assets** → **GlossaryTerms**: Glossary term references are remapped
 - **Data Products** → **Assets**: Item references within data products are preserved
 
-### Resource Deletion
+### Extra Resources in Target
 
-During import, resources that exist in the target project but are NOT present in the bundle are deleted. Deletion follows reverse dependency order to avoid breaking references:
-
-1. Data Products
-2. Assets
-3. AssetTypes
-4. FormTypes
-5. GlossaryTerms
-6. Glossaries
+During import, resources that exist in the target project but are NOT present in the bundle are **never deleted**. This includes resources created by previous deployments that are no longer in the source project. They are logged for visibility and counted as "skipped" in the import summary. This means the target project may accumulate resources over time as the source project evolves. If you need to clean up stale resources, delete them manually through the DataZone console or API.
 
 ## Export JSON Structure
 
@@ -253,8 +242,8 @@ The exported `catalog/catalog_export.json` file has the following structure:
       "description": "Customer data asset",
       "typeIdentifier": "at_001",
       "formsInput": [],
-      "inputForms": [],
-      "externalIdentifier": "arn:aws:..."
+      "externalIdentifier": "arn:aws:...",
+      "listingStatus": "ACTIVE"
     }
   ],
   "dataProducts": [
@@ -262,7 +251,8 @@ The exported `catalog/catalog_export.json` file has the following structure:
       "sourceId": "dp_001",
       "name": "Sales Analytics Product",
       "description": "Comprehensive sales data product",
-      "items": [...]
+      "items": [...],
+      "listingStatus": "ACTIVE"
     }
   ]
 }
@@ -278,7 +268,7 @@ The exported `catalog/catalog_export.json` file has the following structure:
 | DataZone API error | Export fails with descriptive error message |
 | No matching resources | Produces valid JSON with empty arrays, logs informational message |
 | Missing permissions | Export fails with permission error |
-| Invalid `--updated-after` format | Validation error with helpful message |
+
 
 ### Import Errors
 
@@ -292,7 +282,6 @@ The exported `catalog/catalog_export.json` file has the following structure:
 | Publish API failure | Logs error, continues with remaining resources |
 | Publish listing verification FAILED | Listing failed asynchronously (e.g., missing physical resource); logged as publish failure |
 | Publish listing verification timeout | Listing did not become ACTIVE within timeout; logged as publish failure |
-| Deletion failure | Logs error, continues with remaining resources |
 
 ### Partial Failures
 
@@ -300,14 +289,14 @@ The import process is resilient to partial failures. If some resources fail to i
 
 1. The error is logged with resource name, type, and error message
 2. Processing continues with remaining resources
-3. A summary reports counts of created, updated, deleted, and failed resources
+3. A summary reports counts of created, updated, skipped, and failed resources
 
 **Example output:**
 ```
 Catalog import summary:
   Created: 15
   Updated: 8
-  Deleted: 2
+  Skipped (extra in target): 2
   Failed: 1
   Published: 12
 ```
@@ -320,48 +309,41 @@ Commit your `manifest.yaml` with catalog export configuration to version control
 
 ### 2. Test in Lower Environments First
 
-Always test catalog changes in dev/test environments before promoting to production:
+Always test catalog changes in test environments before promoting to production. Since the bundle is created from dev, deploy to test first to validate:
 
 ```bash
-# Deploy to dev first
-smus-cli deploy --bundle bundle.zip --targets dev
+# Deploy to test first (bundle was created from dev)
+aws-smus-cicd-cli deploy --bundle bundle.zip --targets test
 
-# Verify catalog resources in dev
-# Then promote to test
-smus-cli deploy --bundle bundle.zip --targets test
-
-# Finally promote to prod
-smus-cli deploy --bundle bundle.zip --targets prod
+# Verify catalog resources in test
+# Then promote to prod
+aws-smus-cicd-cli deploy --bundle bundle.zip --targets prod
 ```
 
-### 3. Use --updated-after for Large Catalogs
-
-For projects with many catalog resources, use the `--updated-after` CLI flag to export only recent changes:
-
-```bash
-# Export only resources modified since the last deployment
-smus-cli bundle --manifest manifest.yaml --updated-after "2025-02-20T00:00:00Z"
-```
-
-### 4. Disable Catalog Import When Not Needed
+### 3. Disable Catalog Import When Not Needed
 
 If a stage doesn't need catalog updates, disable import to speed up deployments:
 
 ```yaml
-targets:
+stages:
   prod:
+    stage: PROD
+    domain:
+      region: us-east-1
+    project:
+      name: prod-project
     deployment_configuration:
       catalog:
         disable: true
 ```
 
-### 5. Maintain Consistent Physical Resource Names Across Environments
+### 4. Maintain Consistent Physical Resource Names Across Environments
 
 > ⚠️ **IMPORTANT**: The underlying physical resources (Glue Tables, Glue Databases, S3 buckets, etc.) referenced by catalog assets **must have the same name** in all environments. The import process relies on normalized `externalIdentifier` or resource name matching. If physical resource names differ between stages, assets will not be matched correctly.
 
 Ensure resource names are unique within each type to avoid mapping conflicts.
 
-### 6. Review Import Summaries
+### 5. Review Import Summaries
 
 Always review the import summary after deployment to ensure all resources were created or updated successfully:
 
@@ -369,7 +351,7 @@ Always review the import summary after deployment to ensure all resources were c
 Catalog import summary:
   Created: 10
   Updated: 5
-  Deleted: 0
+  Skipped (extra in target): 0
   Failed: 0
   Published: 8
 ```
@@ -388,17 +370,16 @@ Catalog import summary:
 **For Resource Renaming**: To rename a resource across environments:
 1. Create the resource with the new name in the source
 2. Export and deploy to target
-3. The old resource in the target will be deleted automatically (since it's no longer in the bundle)
+3. The old resource in the target will remain (it is not deleted automatically) — remove it manually if needed
 
 ## Troubleshooting
 
 ### Problem: Export produces empty arrays
 
-**Cause**: No resources are owned by the source project, or the `--updated-after` CLI timestamp is too recent
+**Cause**: No resources are owned by the source project
 
 **Solution**: 
 - Verify resources exist in the source project and are owned by it
-- If using `--updated-after`, try an earlier timestamp or omit the flag to export all resources
 
 ### Problem: Import fails with "Malformed JSON" error
 
@@ -451,7 +432,6 @@ Failed to import dataProducts MyProduct: An error occurred (ValidationException)
 **Cause**: The DataZone Search or SearchTypes API could not find resources of that type in the source project. Common reasons:
 - The resources are not owned by the project (they may be shared from another project)
 - The resources were deleted after the last successful export
-- The `--updated-after` timestamp is more recent than the resource's last update
 
 **Error messages** (visible in logs):
 ```
@@ -462,7 +442,6 @@ Failed to search target assets: An error occurred (ResourceNotFoundException) ..
 
 **Solution**:
 - Verify resources exist in the DataZone console and are owned by the source project
-- Remove the `--updated-after` flag to export all resources regardless of update time
 - Check IAM permissions for `datazone:Search` and `datazone:SearchTypes`
 
 ### Problem: Partial import success (some resources created, others failed)
@@ -472,7 +451,7 @@ Failed to search target assets: An error occurred (ResourceNotFoundException) ..
 ✅ Catalog import completed:
    Created: 8
    Updated: 2
-   Deleted: 0
+   Skipped (extra in target): 0
    Failed: 3
    Published: 7
 ```
@@ -488,7 +467,7 @@ A `Failed` count greater than zero indicates some resources could not be importe
 **How to debug**:
 1. Re-run the deploy with verbose logging enabled:
    ```bash
-   SMUS_LOG_LEVEL=DEBUG smus-cicd deploy --target <target-name>
+   SMUS_LOG_LEVEL=DEBUG aws-smus-cicd-cli deploy --targets <target-name>
    ```
 2. Look for `Failed to import <resourceType> <name>:` lines in the output — these show the exact API error for each failed resource
 3. Check if failures cascade from a parent type:
@@ -506,6 +485,17 @@ A `Failed` count greater than zero indicates some resources could not be importe
 
 **Cause**: Insufficient DataZone permissions
 
+**Solution**:
+- Verify your IAM role has DataZone permissions:
+  - `datazone:Search`
+  - `datazone:SearchTypes`
+  - `datazone:CreateGlossary`, `datazone:UpdateGlossary`
+  - `datazone:CreateGlossaryTerm`, `datazone:UpdateGlossaryTerm`
+  - `datazone:CreateFormType`, `datazone:UpdateFormType`
+  - `datazone:CreateAssetType`, `datazone:UpdateAssetType`
+  - `datazone:CreateAsset`, `datazone:UpdateAsset`
+  - `datazone:CreateDataProduct`, `datazone:UpdateDataProduct`
+
 ### Problem: Published count is 0 even though source assets were published
 
 **Cause**: The `create_listing_change_set` API is asynchronous. The import process polls the resource after publishing to verify the listing becomes ACTIVE. If the underlying physical resource (e.g., Glue Table) doesn't exist in the target environment, the listing will fail asynchronously and be counted as a publish failure rather than a success.
@@ -514,17 +504,6 @@ A `Failed` count greater than zero indicates some resources could not be importe
 - Verify the physical resources (Glue Tables, S3 buckets, etc.) exist in the target environment with the same names as in the source
 - Check the deploy logs for "Listing FAILED" or "Listing verification timed out" messages
 - If the physical resources can't be created in the target, use `skipPublish: true` in the manifest to skip publishing
-
-**Solution**:
-- Verify your IAM role has DataZone permissions:
-  - `datazone:Search`
-  - `datazone:SearchTypes`
-  - `datazone:CreateGlossary`, `datazone:UpdateGlossary`, `datazone:DeleteGlossary`
-  - `datazone:CreateGlossaryTerm`, `datazone:UpdateGlossaryTerm`, `datazone:DeleteGlossaryTerm`
-  - `datazone:CreateFormType`, `datazone:UpdateFormType`, `datazone:DeleteFormType`
-  - `datazone:CreateAssetType`, `datazone:UpdateAssetType`, `datazone:DeleteAssetType`
-  - `datazone:CreateAsset`, `datazone:UpdateAsset`, `datazone:DeleteAsset`
-  - `datazone:CreateDataProduct`, `datazone:UpdateDataProduct`, `datazone:DeleteDataProduct`
 
 ## Additional Resources
 

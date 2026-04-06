@@ -11,7 +11,6 @@ from hypothesis import strategies as st
 
 from smus_cicd.helpers.catalog_import import (
     CREATION_ORDER,
-    DELETION_ORDER,
     REQUIRED_TOP_LEVEL_KEYS,
     _build_identifier_map,
     _normalize_external_identifier,
@@ -406,14 +405,15 @@ class TestProperty11DependencyOrderedCreation(unittest.TestCase):
                     )
 
 
-class TestProperty12DependencyOrderedDeletion(unittest.TestCase):
+class TestProperty12ExtraResourcesNotDeleted(unittest.TestCase):
     """
-    Property 12: Dependency-Ordered Deletion
+    Property 12: Extra Resources Are Logged, Not Deleted
 
-    **Validates: Requirements 5.4, 5.5**
+    **Validates: Updated Requirement 5.4**
 
-    The CatalogImporter SHALL delete resources in reverse dependency order:
-    DataProducts → Assets → AssetTypes → FormTypes → GlossaryTerms → Glossaries
+    The CatalogImporter SHALL NOT delete resources that exist in the target
+    project but are not present in the bundle. Instead, they are logged and
+    counted as skipped.
     """
 
     @settings(max_examples=100)
@@ -423,13 +423,13 @@ class TestProperty12DependencyOrderedDeletion(unittest.TestCase):
         has_asset=st.booleans(),
     )
     @patch("smus_cicd.helpers.catalog_import._get_datazone_client")
-    def test_deletion_order_respected(
+    def test_extra_resources_skipped_not_deleted(
         self, mock_get_client, has_glossary, has_term, has_asset
     ):
         client = MagicMock()
         mock_get_client.return_value = client
 
-        # Empty bundle means everything in target gets deleted
+        # Empty bundle means everything in target is extra
         catalog_data = {
             "metadata": {
                 "sourceProjectId": "sp",
@@ -458,28 +458,19 @@ class TestProperty12DependencyOrderedDeletion(unittest.TestCase):
         client.search.side_effect = search_side_effect
         client.search_types.return_value = {"items": []}
 
-        delete_order = []
-        client.delete_glossary.side_effect = lambda **kw: delete_order.append(
-            "glossaries"
-        )
-        client.delete_glossary_term.side_effect = lambda **kw: delete_order.append(
-            "glossaryTerms"
-        )
-        client.delete_asset.side_effect = lambda **kw: delete_order.append("assets")
+        result = import_catalog("d1", "p1", catalog_data, "us-east-1")
 
-        import_catalog("d1", "p1", catalog_data, "us-east-1")
+        # No delete APIs should ever be called
+        client.delete_glossary.assert_not_called()
+        client.delete_glossary_term.assert_not_called()
+        client.delete_asset.assert_not_called()
+        client.delete_asset_type.assert_not_called()
+        client.delete_form_type.assert_not_called()
+        client.delete_data_product.assert_not_called()
 
-        # Verify reverse dependency order for deletions
-        for i, rt_early in enumerate(DELETION_ORDER):
-            for rt_late in DELETION_ORDER[i + 1 :]:
-                early_indices = [j for j, t in enumerate(delete_order) if t == rt_early]
-                late_indices = [j for j, t in enumerate(delete_order) if t == rt_late]
-                if early_indices and late_indices:
-                    self.assertLess(
-                        max(early_indices),
-                        min(late_indices),
-                        f"All {rt_early} must be deleted before any {rt_late}",
-                    )
+        # Extra resources should be counted as skipped
+        expected_skipped = sum([has_glossary, has_term, has_asset])
+        self.assertEqual(result["skipped"], expected_skipped)
 
 
 class TestProperty13ImportErrorResilience(unittest.TestCase):
@@ -583,30 +574,16 @@ class TestProperty14ImportSummaryCounts(unittest.TestCase):
 
         result = import_catalog("d1", "p1", catalog_data, "us-east-1")
 
-        # created + updated + failed >= total_in_bundle (deleted adds to total too)
+        # created + updated + failed = total resources in bundle
         self.assertEqual(
-            result["created"]
-            + result["updated"]
-            + result["deleted"]
-            + result["failed"],
-            total_in_bundle
-            + result["deleted"],  # deleted resources come from target, not bundle
+            result["created"] + result["updated"] + result["failed"],
+            total_in_bundle,
         )
-        # More specifically: created + updated + failed (from bundle) = total_in_bundle
-        # and deleted count is separate
-        _bundle_processed = (  # noqa: F841
-            result["created"]
-            + result["updated"]
-            + (
-                result["failed"] - result["deleted"]
-                if result["deleted"] == 0
-                else result["failed"]
-            )
-        )
-        # Simpler check: all counts are non-negative
+        # skipped is separate (extra resources in target, not in bundle)
+        self.assertGreaterEqual(result["skipped"], 0)
+        # All counts are non-negative
         self.assertGreaterEqual(result["created"], 0)
         self.assertGreaterEqual(result["updated"], 0)
-        self.assertGreaterEqual(result["deleted"], 0)
         self.assertGreaterEqual(result["failed"], 0)
         self.assertGreaterEqual(result["published"], 0)
 

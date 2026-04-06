@@ -8,9 +8,8 @@ from botocore.exceptions import ClientError
 from smus_cicd.helpers.catalog_import import (
     _build_identifier_map,
     _ensure_import_permissions,
-    _delete_resource,
     _get_form_type_revision,
-    _identify_resources_to_delete,
+    _identify_extra_target_resources,
     _import_resource,
     _is_managed_resource,
     _normalize_external_identifier,
@@ -352,43 +351,16 @@ class TestImportResource(unittest.TestCase):
         self.assertFalse(success)
 
 
-class TestDeleteResource(unittest.TestCase):
-    """Test _delete_resource function."""
-
-    def test_delete_glossary(self):
-        client = MagicMock()
-        result = _delete_resource(client, "d1", "p1", "g1", "glossaries")
-        self.assertTrue(result)
-        client.delete_glossary.assert_called_once_with(
-            domainIdentifier="d1", identifier="g1"
-        )
-
-    def test_delete_asset(self):
-        client = MagicMock()
-        result = _delete_resource(client, "d1", "p1", "a1", "assets")
-        self.assertTrue(result)
-        client.delete_asset.assert_called_once_with(
-            domainIdentifier="d1", identifier="a1"
-        )
-
-    def test_delete_failure(self):
-        client = MagicMock()
-        client.delete_glossary.side_effect = Exception("Delete failed")
-        result = _delete_resource(client, "d1", "p1", "g1", "glossaries")
-        self.assertFalse(result)
-
-
-
 class TestPublishResource(unittest.TestCase):
     """Test _publish_resource function with listing verification."""
 
     @patch("smus_cicd.helpers.catalog_import.time.sleep", return_value=None)
     def test_publish_asset_active(self, mock_sleep):
         client = MagicMock()
-        client.get_asset.return_value = {
-            "listing": {"listingStatus": "ACTIVE"}
-        }
-        result = _publish_resource(client, "d1", "a1", "assets", max_wait_seconds=5, poll_interval=1)
+        client.get_asset.return_value = {"listing": {"listingStatus": "ACTIVE"}}
+        result = _publish_resource(
+            client, "d1", "a1", "assets", max_wait_seconds=5, poll_interval=1
+        )
         self.assertTrue(result)
         client.create_listing_change_set.assert_called_once_with(
             domainIdentifier="d1",
@@ -401,10 +373,10 @@ class TestPublishResource(unittest.TestCase):
     @patch("smus_cicd.helpers.catalog_import.time.sleep", return_value=None)
     def test_publish_data_product_active(self, mock_sleep):
         client = MagicMock()
-        client.get_data_product.return_value = {
-            "listing": {"listingStatus": "ACTIVE"}
-        }
-        result = _publish_resource(client, "d1", "dp1", "dataProducts", max_wait_seconds=5, poll_interval=1)
+        client.get_data_product.return_value = {"listing": {"listingStatus": "ACTIVE"}}
+        result = _publish_resource(
+            client, "d1", "dp1", "dataProducts", max_wait_seconds=5, poll_interval=1
+        )
         self.assertTrue(result)
         client.create_listing_change_set.assert_called_once_with(
             domainIdentifier="d1",
@@ -417,20 +389,20 @@ class TestPublishResource(unittest.TestCase):
     @patch("smus_cicd.helpers.catalog_import.time.sleep", return_value=None)
     def test_publish_asset_failed(self, mock_sleep):
         client = MagicMock()
-        client.get_asset.return_value = {
-            "listing": {"listingStatus": "FAILED"}
-        }
-        result = _publish_resource(client, "d1", "a1", "assets", max_wait_seconds=5, poll_interval=1)
+        client.get_asset.return_value = {"listing": {"listingStatus": "FAILED"}}
+        result = _publish_resource(
+            client, "d1", "a1", "assets", max_wait_seconds=5, poll_interval=1
+        )
         self.assertFalse(result)
 
     @patch("smus_cicd.helpers.catalog_import.time.sleep", return_value=None)
     def test_publish_asset_timeout(self, mock_sleep):
         """Listing stays CREATING and never resolves within timeout."""
         client = MagicMock()
-        client.get_asset.return_value = {
-            "listing": {"listingStatus": "CREATING"}
-        }
-        result = _publish_resource(client, "d1", "a1", "assets", max_wait_seconds=3, poll_interval=1)
+        client.get_asset.return_value = {"listing": {"listingStatus": "CREATING"}}
+        result = _publish_resource(
+            client, "d1", "a1", "assets", max_wait_seconds=3, poll_interval=1
+        )
         self.assertFalse(result)
 
     @patch("smus_cicd.helpers.catalog_import.time.sleep", return_value=None)
@@ -441,7 +413,9 @@ class TestPublishResource(unittest.TestCase):
             {"listing": {"listingStatus": "CREATING"}},
             {"listing": {"listingStatus": "ACTIVE"}},
         ]
-        result = _publish_resource(client, "d1", "a1", "assets", max_wait_seconds=10, poll_interval=1)
+        result = _publish_resource(
+            client, "d1", "a1", "assets", max_wait_seconds=10, poll_interval=1
+        )
         self.assertTrue(result)
         self.assertEqual(client.get_asset.call_count, 2)
 
@@ -465,13 +439,14 @@ class TestPublishResource(unittest.TestCase):
             Exception("Transient error"),
             {"listing": {"listingStatus": "ACTIVE"}},
         ]
-        result = _publish_resource(client, "d1", "a1", "assets", max_wait_seconds=10, poll_interval=1)
+        result = _publish_resource(
+            client, "d1", "a1", "assets", max_wait_seconds=10, poll_interval=1
+        )
         self.assertTrue(result)
 
 
-
-class TestIdentifyResourcesToDelete(unittest.TestCase):
-    """Test _identify_resources_to_delete function."""
+class TestIdentifyExtraTargetResources(unittest.TestCase):
+    """Test _identify_extra_target_resources function."""
 
     def test_identifies_extra_resources(self):
         client = MagicMock()
@@ -486,11 +461,11 @@ class TestIdentifyResourcesToDelete(unittest.TestCase):
         catalog_data = _make_valid_catalog(
             glossaries=[{"sourceId": "g1", "name": "Kept"}]
         )
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog_data)
-        self.assertEqual(len(to_delete["glossaries"]), 1)
-        self.assertEqual(to_delete["glossaries"][0]["name"], "Extra")
+        extras = _identify_extra_target_resources(client, "d1", "p1", catalog_data)
+        self.assertEqual(len(extras["glossaries"]), 1)
+        self.assertEqual(extras["glossaries"][0]["name"], "Extra")
 
-    def test_no_deletions_when_all_match(self):
+    def test_no_extras_when_all_match(self):
         client = MagicMock()
         client.search.side_effect = lambda **kwargs: (
             {"items": [{"glossaryItem": {"id": "g1", "name": "Kept"}}]}
@@ -502,8 +477,8 @@ class TestIdentifyResourcesToDelete(unittest.TestCase):
         catalog_data = _make_valid_catalog(
             glossaries=[{"sourceId": "g1", "name": "Kept"}]
         )
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog_data)
-        self.assertEqual(len(to_delete["glossaries"]), 0)
+        extras = _identify_extra_target_resources(client, "d1", "p1", catalog_data)
+        self.assertEqual(len(extras["glossaries"]), 0)
 
 
 class TestImportCatalog(unittest.TestCase):
@@ -582,15 +557,15 @@ class TestImportCatalog(unittest.TestCase):
         )
 
     @patch("smus_cicd.helpers.catalog_import._get_datazone_client")
-    def test_deletion_reverse_order(self, mock_get_client):
-        """Test resources are deleted in reverse dependency order."""
+    def test_extra_resources_logged_not_deleted(self, mock_get_client):
+        """Test extra resources in target are logged but NOT deleted."""
         client = MagicMock()
         mock_get_client.return_value = client
 
         # No resources in bundle
         catalog_data = _make_valid_catalog()
 
-        # Target has resources to delete
+        # Target has extra resources
         def search_side_effect(**kwargs):
             scope = kwargs.get("searchScope")
             if scope == "GLOSSARY":
@@ -604,18 +579,13 @@ class TestImportCatalog(unittest.TestCase):
         client.search.side_effect = search_side_effect
         client.search_types.return_value = {"items": []}
 
-        delete_order = []
-        client.delete_glossary.side_effect = lambda **kw: delete_order.append(
-            "glossary"
-        )
-        client.delete_asset.side_effect = lambda **kw: delete_order.append("asset")
+        result = import_catalog("d1", "p1", catalog_data, "us-east-1")
 
-        import_catalog("d1", "p1", catalog_data, "us-east-1")
-
-        # Assets should be deleted before glossaries (reverse order)
-        self.assertIn("asset", delete_order)
-        self.assertIn("glossary", delete_order)
-        self.assertLess(delete_order.index("asset"), delete_order.index("glossary"))
+        # No delete APIs should be called
+        client.delete_glossary.assert_not_called()
+        client.delete_asset.assert_not_called()
+        # Extra resources should be counted as skipped
+        self.assertEqual(result["skipped"], 2)
 
     @patch("smus_cicd.helpers.catalog_import.time.sleep", return_value=None)
     @patch("smus_cicd.helpers.catalog_import._get_datazone_client")
@@ -763,7 +733,7 @@ class TestImportCatalog(unittest.TestCase):
         result = import_catalog("d1", "p1", catalog_data, "us-east-1")
         self.assertIn("created", result)
         self.assertIn("updated", result)
-        self.assertIn("deleted", result)
+        self.assertIn("skipped", result)
         self.assertIn("failed", result)
         self.assertIn("published", result)
 
@@ -916,6 +886,7 @@ class TestGetDatazoneClient(unittest.TestCase):
     @patch("smus_cicd.helpers.catalog_import.boto3.client")
     def test_custom_endpoint(self, mock_boto_client):
         from smus_cicd.helpers.catalog_import import _get_datazone_client
+
         _get_datazone_client("us-east-1")
         mock_boto_client.assert_called_once_with(
             "datazone", region_name="us-east-1", endpoint_url="https://custom.endpoint"
@@ -925,6 +896,7 @@ class TestGetDatazoneClient(unittest.TestCase):
     @patch("smus_cicd.helpers.catalog_import.boto3.client")
     def test_default_endpoint(self, mock_boto_client):
         from smus_cicd.helpers.catalog_import import _get_datazone_client
+
         _get_datazone_client("us-west-2")
         mock_boto_client.assert_called_once_with("datazone", region_name="us-west-2")
 
@@ -1040,7 +1012,9 @@ class TestNormalizeFormsInputForApi(unittest.TestCase):
         self.assertEqual(result[0]["typeRevision"], "target-rev")
 
     def test_asset_type_forms_rename(self):
-        forms = {"MyForm": {"typeName": "MyForm", "typeRevision": "1", "required": True}}
+        forms = {
+            "MyForm": {"typeName": "MyForm", "typeRevision": "1", "required": True}
+        }
         result = _normalize_forms_input_for_api(forms, "assetTypes")
         self.assertEqual(result["MyForm"]["typeIdentifier"], "MyForm")
         self.assertNotIn("typeName", result["MyForm"])
@@ -1130,10 +1104,17 @@ class TestImportResourceGlossaryTerms(unittest.TestCase):
     """Test _import_resource for glossary terms (create and update)."""
 
     def _empty_id_map(self):
-        return {rt: {} for rt in [
-            "glossaries", "glossaryTerms", "formTypes",
-            "assetTypes", "assets", "dataProducts",
-        ]}
+        return {
+            rt: {}
+            for rt in [
+                "glossaries",
+                "glossaryTerms",
+                "formTypes",
+                "assetTypes",
+                "assets",
+                "dataProducts",
+            ]
+        }
 
     def test_create_glossary_term(self):
         client = MagicMock()
@@ -1183,10 +1164,17 @@ class TestImportResourceFormTypes(unittest.TestCase):
     """Test _import_resource for form types (create, update, managed skip)."""
 
     def _empty_id_map(self):
-        return {rt: {} for rt in [
-            "glossaries", "glossaryTerms", "formTypes",
-            "assetTypes", "assets", "dataProducts",
-        ]}
+        return {
+            rt: {}
+            for rt in [
+                "glossaries",
+                "glossaryTerms",
+                "formTypes",
+                "assetTypes",
+                "assets",
+                "dataProducts",
+            ]
+        }
 
     def test_create_form_type(self):
         client = MagicMock()
@@ -1239,10 +1227,17 @@ class TestImportResourceAssetTypes(unittest.TestCase):
     """Test _import_resource for asset types (create, update, managed skip, form filtering)."""
 
     def _empty_id_map(self):
-        return {rt: {} for rt in [
-            "glossaries", "glossaryTerms", "formTypes",
-            "assetTypes", "assets", "dataProducts",
-        ]}
+        return {
+            rt: {}
+            for rt in [
+                "glossaries",
+                "glossaryTerms",
+                "formTypes",
+                "assetTypes",
+                "assets",
+                "dataProducts",
+            ]
+        }
 
     def test_create_asset_type(self):
         client = MagicMock()
@@ -1318,10 +1313,17 @@ class TestImportResourceAssetUpdate(unittest.TestCase):
     """Test _import_resource for asset update (revision merge)."""
 
     def _empty_id_map(self):
-        return {rt: {} for rt in [
-            "glossaries", "glossaryTerms", "formTypes",
-            "assetTypes", "assets", "dataProducts",
-        ]}
+        return {
+            rt: {}
+            for rt in [
+                "glossaries",
+                "glossaryTerms",
+                "formTypes",
+                "assetTypes",
+                "assets",
+                "dataProducts",
+            ]
+        }
 
     def test_update_asset_merges_forms(self):
         client = MagicMock()
@@ -1378,10 +1380,17 @@ class TestImportResourceDataProducts(unittest.TestCase):
     """Test _import_resource for data products (create and update)."""
 
     def _empty_id_map(self):
-        return {rt: {} for rt in [
-            "glossaries", "glossaryTerms", "formTypes",
-            "assetTypes", "assets", "dataProducts",
-        ]}
+        return {
+            rt: {}
+            for rt in [
+                "glossaries",
+                "glossaryTerms",
+                "formTypes",
+                "assetTypes",
+                "assets",
+                "dataProducts",
+            ]
+        }
 
     def test_create_data_product(self):
         client = MagicMock()
@@ -1422,42 +1431,8 @@ class TestImportResourceDataProducts(unittest.TestCase):
         self.assertEqual(call_kwargs["items"], [{"identifier": "a1"}])
 
 
-class TestDeleteResourceAllTypes(unittest.TestCase):
-    """Test _delete_resource for all resource types."""
-
-    def test_delete_glossary_term(self):
-        client = MagicMock()
-        result = _delete_resource(client, "d1", "p1", "t1", "glossaryTerms")
-        self.assertTrue(result)
-        client.delete_glossary_term.assert_called_once()
-
-    def test_delete_form_type(self):
-        client = MagicMock()
-        result = _delete_resource(client, "d1", "p1", "ft1", "formTypes")
-        self.assertTrue(result)
-        client.delete_form_type.assert_called_once_with(
-            domainIdentifier="d1", formTypeIdentifier="ft1"
-        )
-
-    def test_delete_asset_type(self):
-        client = MagicMock()
-        result = _delete_resource(client, "d1", "p1", "at1", "assetTypes")
-        self.assertTrue(result)
-        client.delete_asset_type.assert_called_once_with(
-            domainIdentifier="d1", assetTypeIdentifier="at1"
-        )
-
-    def test_delete_data_product(self):
-        client = MagicMock()
-        result = _delete_resource(client, "d1", "p1", "dp1", "dataProducts")
-        self.assertTrue(result)
-        client.delete_data_product.assert_called_once_with(
-            domainIdentifier="d1", identifier="dp1"
-        )
-
-
-class TestIdentifyResourcesToDeleteAllTypes(unittest.TestCase):
-    """Test _identify_resources_to_delete for all resource types."""
+class TestIdentifyExtraTargetResourcesAllTypes(unittest.TestCase):
+    """Test _identify_extra_target_resources for all resource types."""
 
     def _make_client(self, search_items=None, search_type_items=None):
         client = MagicMock()
@@ -1477,48 +1452,72 @@ class TestIdentifyResourcesToDeleteAllTypes(unittest.TestCase):
         return client
 
     def test_identifies_extra_glossary_terms(self):
-        client = self._make_client(search_items={
-            "GLOSSARY_TERM": [{"glossaryTermItem": {"id": "t1", "name": "ExtraTerm"}}],
-        })
+        client = self._make_client(
+            search_items={
+                "GLOSSARY_TERM": [
+                    {"glossaryTermItem": {"id": "t1", "name": "ExtraTerm"}}
+                ],
+            }
+        )
         catalog_data = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog_data)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog_data)
         self.assertEqual(len(to_delete["glossaryTerms"]), 1)
         self.assertEqual(to_delete["glossaryTerms"][0]["name"], "ExtraTerm")
 
     def test_identifies_extra_form_types(self):
-        client = self._make_client(search_type_items={
-            "FORM_TYPE": [{"formTypeItem": {
-                "revision": "ft1", "name": "ExtraForm", "owningProjectId": "p1"
-            }}],
-        })
+        client = self._make_client(
+            search_type_items={
+                "FORM_TYPE": [
+                    {
+                        "formTypeItem": {
+                            "revision": "ft1",
+                            "name": "ExtraForm",
+                            "owningProjectId": "p1",
+                        }
+                    }
+                ],
+            }
+        )
         catalog_data = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog_data)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog_data)
         self.assertEqual(len(to_delete["formTypes"]), 1)
 
     def test_identifies_extra_asset_types(self):
-        client = self._make_client(search_type_items={
-            "ASSET_TYPE": [{"assetTypeItem": {
-                "revision": "at1", "name": "ExtraAT", "owningProjectId": "p1"
-            }}],
-        })
+        client = self._make_client(
+            search_type_items={
+                "ASSET_TYPE": [
+                    {
+                        "assetTypeItem": {
+                            "revision": "at1",
+                            "name": "ExtraAT",
+                            "owningProjectId": "p1",
+                        }
+                    }
+                ],
+            }
+        )
         catalog_data = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog_data)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog_data)
         self.assertEqual(len(to_delete["assetTypes"]), 1)
 
     def test_identifies_extra_assets(self):
-        client = self._make_client(search_items={
-            "ASSET": [{"assetItem": {"identifier": "a1", "name": "ExtraAsset"}}],
-        })
+        client = self._make_client(
+            search_items={
+                "ASSET": [{"assetItem": {"identifier": "a1", "name": "ExtraAsset"}}],
+            }
+        )
         catalog_data = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog_data)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog_data)
         self.assertEqual(len(to_delete["assets"]), 1)
 
     def test_identifies_extra_data_products(self):
-        client = self._make_client(search_items={
-            "DATA_PRODUCT": [{"dataProductItem": {"id": "dp1", "name": "ExtraDP"}}],
-        })
+        client = self._make_client(
+            search_items={
+                "DATA_PRODUCT": [{"dataProductItem": {"id": "dp1", "name": "ExtraDP"}}],
+            }
+        )
         catalog_data = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog_data)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog_data)
         self.assertEqual(len(to_delete["dataProducts"]), 1)
 
     def test_search_failure_graceful(self):
@@ -1526,7 +1525,7 @@ class TestIdentifyResourcesToDeleteAllTypes(unittest.TestCase):
         client.search.side_effect = Exception("Network error")
         client.search_types.side_effect = Exception("Network error")
         catalog_data = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog_data)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog_data)
         # Should not crash, all lists empty
         for rt in to_delete:
             self.assertEqual(len(to_delete[rt]), 0)
@@ -1582,7 +1581,17 @@ class TestBuildIdentifierMapAllTypes(unittest.TestCase):
         client = MagicMock()
         client.search.return_value = {"items": []}
         client.search_types.side_effect = lambda **kw: (
-            {"items": [{"assetTypeItem": {"revision": "tgt-at1", "name": "AT1", "owningProjectId": "p1"}}]}
+            {
+                "items": [
+                    {
+                        "assetTypeItem": {
+                            "revision": "tgt-at1",
+                            "name": "AT1",
+                            "owningProjectId": "p1",
+                        }
+                    }
+                ]
+            }
             if kw.get("searchScope") == "ASSET_TYPE"
             else {"items": []}
         )
@@ -1609,11 +1618,13 @@ class TestBuildIdentifierMapAllTypes(unittest.TestCase):
     def test_glossary_term_search_failure(self):
         client = MagicMock()
         call_count = [0]
+
         def search_side(**kw):
             scope = kw.get("searchScope")
             if scope == "GLOSSARY_TERM":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search.side_effect = search_side
         client.search_types.return_value = {"items": []}
         catalog = _make_valid_catalog(
@@ -1625,10 +1636,12 @@ class TestBuildIdentifierMapAllTypes(unittest.TestCase):
     def test_form_type_search_failure(self):
         client = MagicMock()
         client.search.return_value = {"items": []}
+
         def search_types_side(**kw):
             if kw.get("searchScope") == "FORM_TYPE":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search_types.side_effect = search_types_side
         catalog = _make_valid_catalog(
             formTypes=[{"sourceId": "src-ft1", "name": "FT1"}]
@@ -1639,10 +1652,12 @@ class TestBuildIdentifierMapAllTypes(unittest.TestCase):
     def test_asset_type_search_failure(self):
         client = MagicMock()
         client.search.return_value = {"items": []}
+
         def search_types_side(**kw):
             if kw.get("searchScope") == "ASSET_TYPE":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search_types.side_effect = search_types_side
         catalog = _make_valid_catalog(
             assetTypes=[{"sourceId": "src-at1", "name": "AT1"}]
@@ -1652,10 +1667,12 @@ class TestBuildIdentifierMapAllTypes(unittest.TestCase):
 
     def test_data_product_search_failure(self):
         client = MagicMock()
+
         def search_side(**kw):
             if kw.get("searchScope") == "DATA_PRODUCT":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search.side_effect = search_side
         client.search_types.return_value = {"items": []}
         catalog = _make_valid_catalog(
@@ -1666,10 +1683,12 @@ class TestBuildIdentifierMapAllTypes(unittest.TestCase):
 
     def test_asset_search_failure(self):
         client = MagicMock()
+
         def search_side(**kw):
             if kw.get("searchScope") == "ASSET":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search.side_effect = search_side
         client.search_types.return_value = {"items": []}
         catalog = _make_valid_catalog(
@@ -1680,15 +1699,15 @@ class TestBuildIdentifierMapAllTypes(unittest.TestCase):
 
     def test_glossary_search_failure(self):
         client = MagicMock()
+
         def search_side(**kw):
             if kw.get("searchScope") == "GLOSSARY":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search.side_effect = search_side
         client.search_types.return_value = {"items": []}
-        catalog = _make_valid_catalog(
-            glossaries=[{"sourceId": "src-g1", "name": "G1"}]
-        )
+        catalog = _make_valid_catalog(glossaries=[{"sourceId": "src-g1", "name": "G1"}])
         id_map = _build_identifier_map(client, "d1", "p1", catalog)
         self.assertNotIn("src-g1", id_map["glossaries"])
 
@@ -1751,10 +1770,17 @@ class TestImportResourceBranches(unittest.TestCase):
     """Cover remaining branch misses in _import_resource."""
 
     def _empty_id_map(self):
-        return {rt: {} for rt in [
-            "glossaries", "glossaryTerms", "formTypes",
-            "assetTypes", "assets", "dataProducts",
-        ]}
+        return {
+            rt: {}
+            for rt in [
+                "glossaries",
+                "glossaryTerms",
+                "formTypes",
+                "assetTypes",
+                "assets",
+                "dataProducts",
+            ]
+        }
 
     def test_create_asset_minimal_no_optional_fields(self):
         """Asset creation without description, typeIdentifier, formsInput, externalIdentifier."""
@@ -2013,7 +2039,7 @@ class TestImportCatalogSecondPass(unittest.TestCase):
 
     @patch("smus_cicd.helpers.catalog_import._get_datazone_client")
     def test_deletion_failure_increments_failed(self, mock_get_client):
-        """Deletion failure should increment failed counter."""
+        """Extra resources in target should be skipped, not deleted."""
         client = MagicMock()
         mock_get_client.return_value = client
         catalog_data = _make_valid_catalog()
@@ -2022,13 +2048,15 @@ class TestImportCatalogSecondPass(unittest.TestCase):
             if kw.get("searchScope") == "GLOSSARY":
                 return {"items": [{"glossaryItem": {"id": "g1", "name": "Extra"}}]}
             return {"items": []}
+
         client.search.side_effect = search_side
         client.search_types.return_value = {"items": []}
-        client.delete_glossary.side_effect = Exception("Delete failed")
 
         result = import_catalog("d1", "p1", catalog_data, "us-east-1")
-        self.assertEqual(result["deleted"], 0)
-        self.assertEqual(result["failed"], 1)
+        # No delete APIs should be called
+        client.delete_glossary.assert_not_called()
+        self.assertEqual(result["skipped"], 1)
+        self.assertEqual(result["failed"], 0)
 
     @patch("smus_cicd.helpers.catalog_import._get_datazone_client")
     def test_second_pass_non_list_term_relations(self, mock_get_client):
@@ -2069,28 +2097,45 @@ class TestImportCatalogPublishableUpdate(unittest.TestCase):
 
     @patch("smus_cicd.helpers.catalog_import.time.sleep", return_value=None)
     @patch("smus_cicd.helpers.catalog_import._get_datazone_client")
-    def test_update_asset_with_active_listing_publishes(self, mock_get_client, mock_sleep):
+    def test_update_asset_with_active_listing_publishes(
+        self, mock_get_client, mock_sleep
+    ):
         """Updated asset with ACTIVE listingStatus should be published."""
         client = MagicMock()
         mock_get_client.return_value = client
         # Asset already exists in target
         client.search.side_effect = lambda **kw: (
-            {"items": [{"assetItem": {"identifier": "tgt-a1", "name": "A1", "externalIdentifier": "ext1"}}]}
+            {
+                "items": [
+                    {
+                        "assetItem": {
+                            "identifier": "tgt-a1",
+                            "name": "A1",
+                            "externalIdentifier": "ext1",
+                        }
+                    }
+                ]
+            }
             if kw.get("searchScope") == "ASSET"
             else {"items": []}
         )
         client.search_types.return_value = {"items": []}
-        client.get_asset.return_value = {"formsOutput": [], "listing": {"listingStatus": "ACTIVE"}}
+        client.get_asset.return_value = {
+            "formsOutput": [],
+            "listing": {"listingStatus": "ACTIVE"},
+        }
 
         catalog_data = _make_valid_catalog(
-            assets=[{
-                "sourceId": "src-a1",
-                "name": "A1",
-                "typeIdentifier": "t1",
-                "formsInput": [],
-                "externalIdentifier": "ext1",
-                "listingStatus": "ACTIVE",
-            }]
+            assets=[
+                {
+                    "sourceId": "src-a1",
+                    "name": "A1",
+                    "typeIdentifier": "t1",
+                    "formsInput": [],
+                    "externalIdentifier": "ext1",
+                    "listingStatus": "ACTIVE",
+                }
+            ]
         )
 
         result = import_catalog("d1", "p1", catalog_data, "us-east-1")
@@ -2111,13 +2156,15 @@ class TestImportCatalogPublishableUpdate(unittest.TestCase):
 
         catalog_data = _make_valid_catalog(
             glossaries=[{"sourceId": "g1", "name": "G1", "status": "ENABLED"}],
-            glossaryTerms=[{
-                "sourceId": "src-t1",
-                "name": "T1",
-                "glossaryId": "g1",
-                "status": "ENABLED",
-                "termRelations": {"isA": ["src-t2"]},
-            }],
+            glossaryTerms=[
+                {
+                    "sourceId": "src-t1",
+                    "name": "T1",
+                    "glossaryId": "g1",
+                    "status": "ENABLED",
+                    "termRelations": {"isA": ["src-t2"]},
+                }
+            ],
         )
 
         result = import_catalog("d1", "p1", catalog_data, "us-east-1")
@@ -2125,79 +2172,91 @@ class TestImportCatalogPublishableUpdate(unittest.TestCase):
         self.assertEqual(result["failed"], 1)
 
 
-class TestIdentifyResourcesToDeleteBranches(unittest.TestCase):
-    """Cover branch misses in _identify_resources_to_delete."""
+class TestIdentifyExtraTargetResourcesBranches(unittest.TestCase):
+    """Cover branch misses in _identify_extra_target_resources."""
 
     def test_glossary_term_deletion_search_failure(self):
         client = MagicMock()
+
         def search_side(**kw):
             if kw.get("searchScope") == "GLOSSARY_TERM":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search.side_effect = search_side
         client.search_types.return_value = {"items": []}
         catalog = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog)
         self.assertEqual(len(to_delete["glossaryTerms"]), 0)
 
     def test_form_type_deletion_search_failure(self):
         client = MagicMock()
         client.search.return_value = {"items": []}
+
         def search_types_side(**kw):
             if kw.get("searchScope") == "FORM_TYPE":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search_types.side_effect = search_types_side
         catalog = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog)
         self.assertEqual(len(to_delete["formTypes"]), 0)
 
     def test_asset_type_deletion_search_failure(self):
         client = MagicMock()
         client.search.return_value = {"items": []}
+
         def search_types_side(**kw):
             if kw.get("searchScope") == "ASSET_TYPE":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search_types.side_effect = search_types_side
         catalog = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog)
         self.assertEqual(len(to_delete["assetTypes"]), 0)
 
     def test_asset_deletion_search_failure(self):
         client = MagicMock()
+
         def search_side(**kw):
             if kw.get("searchScope") == "ASSET":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search.side_effect = search_side
         client.search_types.return_value = {"items": []}
         catalog = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog)
         self.assertEqual(len(to_delete["assets"]), 0)
 
     def test_data_product_deletion_search_failure(self):
         client = MagicMock()
+
         def search_side(**kw):
             if kw.get("searchScope") == "DATA_PRODUCT":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search.side_effect = search_side
         client.search_types.return_value = {"items": []}
         catalog = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog)
         self.assertEqual(len(to_delete["dataProducts"]), 0)
 
     def test_glossary_deletion_search_failure(self):
         client = MagicMock()
+
         def search_side(**kw):
             if kw.get("searchScope") == "GLOSSARY":
                 raise Exception("Search failed")
             return {"items": []}
+
         client.search.side_effect = search_side
         client.search_types.return_value = {"items": []}
         catalog = _make_valid_catalog()
-        to_delete = _identify_resources_to_delete(client, "d1", "p1", catalog)
+        to_delete = _identify_extra_target_resources(client, "d1", "p1", catalog)
         self.assertEqual(len(to_delete["glossaries"]), 0)
 
 

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This feature adds support for importing and exporting DataZone catalog assets (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products) as part of the SMUS CI/CD `bundle` and `deploy` commands. During bundling, the CLI exports all catalog resources from a source project using the DataZone Search and SearchTypes APIs and serializes them to JSON, including each asset's and data product's `listingStatus` to preserve the source publish state. For assets, an additional GetAsset API call per item enriches the search results with full details including `formsOutput` (form data), since the Search API only returns summary data. The Search API supports `owningProjectIdentifier` for server-side ownership filtering, while the SearchTypes API requires client-side filtering by `owningProjectId` on response items. An optional `--updated-after` CLI flag on the bundle command allows filtering resources by modification timestamp. The manifest configuration is intentionally simple: a boolean `enabled` flag to turn catalog export on/off, and an optional `skipPublish` flag to override the default source-state-based publishing behavior. No filter options (include lists, name filters, asset type filters, or date filters) exist in the manifest. During deployment, the CLI reads the exported JSON, maps source identifiers to target project identifiers using externalIdentifier (when present) or name as fallback, creates or updates the resources in the target project via DataZone create/update APIs, and publishes assets and data products that were published in the source project unless `skipPublish` is set to true.
+This feature adds support for importing and exporting DataZone catalog assets (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products) as part of the SMUS CI/CD `bundle` and `deploy` commands. During bundling, the CLI exports all catalog resources from a source project using the DataZone Search and SearchTypes APIs and serializes them to JSON, including each asset's and data product's `listingStatus` to preserve the source publish state. For assets, an additional GetAsset API call per item enriches the search results with full details including `formsOutput` (form data), since the Search API only returns summary data. The Search API supports `owningProjectIdentifier` for server-side ownership filtering, while the SearchTypes API requires client-side filtering by `owningProjectId` on response items. The manifest configuration is intentionally simple: a boolean `enabled` flag to turn catalog export on/off, and an optional `skipPublish` flag to override the default source-state-based publishing behavior. No filter options (include lists, name filters, asset type filters, or date filters) exist in the manifest. During deployment, the CLI reads the exported JSON, maps source identifiers to target project identifiers using externalIdentifier (when present) or name as fallback, creates or updates the resources in the target project via DataZone create/update APIs, and publishes assets and data products that were published in the source project unless `skipPublish` is set to true. Resources that exist in the target project but are not in the bundle are logged for visibility but never deleted.
 
 ## Glossary
 
@@ -42,7 +42,7 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 2. WHEN `content.catalog.enabled` is set to true, THE Bundle_Command SHALL export ALL catalog resource types owned by the source project (Glossaries, GlossaryTerms, FormTypes, AssetTypes, Assets, and Data Products)
 3. WHEN `content.catalog.enabled` is set to false or omitted, THE Bundle_Command SHALL NOT export any catalog resources
 4. THE Manifest SHALL support an optional `content.catalog.skipPublish` boolean field to override the default source-state-based publishing behavior (default: false). When false, assets and data products are published only if they were published (listingStatus == "ACTIVE") in the source project. When true, all publishing is skipped regardless of source state.
-5. THE Manifest SHALL NOT contain any filter options for catalog resources (no `include`, `names`, `assetTypes`, `updatedAfter`, or any other filter fields within the `content.catalog` section or its subsections)
+5. THE Manifest SHALL NOT contain any filter options for catalog resources (no `include`, `names`, `assetTypes`, or any other filter fields within the `content.catalog` section or its subsections)
 6. THE Manifest `content.catalog` section SHALL only support the following fields: `enabled` (boolean), `skipPublish` (boolean), and `assets.access` (array for subscription requests)
 7. THE Catalog_Exporter SHALL export the `formsOutput` data for assets (retrieved via the GetAsset API enrichment step, serialized as `formsInput`)
 8. THE Catalog_Exporter SHALL export the `termRelations` field as part of glossary term serialization
@@ -64,9 +64,8 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 9. THE Catalog_Exporter SHALL serialize all retrieved resources into a single `catalog_export.json` file within the bundle archive under a `catalog/` directory
 10. WHEN serializing assets, THE Catalog_Exporter SHALL include the `formsOutput` data (retrieved via the GetAsset API enrichment step) serialized as `formsInput` in the exported JSON, since the Search API does not return form data in its summary results
 11. WHEN serializing glossary terms, THE Catalog_Exporter SHALL include the `termRelations` field in the exported JSON
-12. WHEN the bundle command is invoked with an optional `--updated-after` CLI flag, THE Catalog_Exporter SHALL filter exported resources to only include those with `updatedAt` timestamp greater than or equal to the specified ISO 8601 timestamp
-13. WHEN exporting assets, THE Catalog_Exporter SHALL call the GetAsset API for each asset returned by the Search API to retrieve full asset details including `formsOutput`, `description`, and `listingStatus`, since the Search API only returns summary data
-14. WHEN resolving the source identifier for assets, THE Catalog_Exporter SHALL use the `identifier` field (from Search API results) or the `id` field (from GetAsset API results) as a fallback, since these APIs use different field names for the asset identifier
+12. WHEN exporting assets, THE Catalog_Exporter SHALL call the GetAsset API for each asset returned by the Search API to retrieve full asset details including `formsOutput`, `description`, and `listingStatus`, since the Search API only returns summary data
+13. WHEN resolving the source identifier for assets, THE Catalog_Exporter SHALL use the `identifier` field (from Search API results) or the `id` field (from GetAsset API results) as a fallback, since these APIs use different field names for the asset identifier
 
 ### Requirement 3: Catalog Export JSON Serialization
 
@@ -95,24 +94,24 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 5. IF a resource with the same normalized externalIdentifier or name does not exist in the target project, THEN THE Identifier_Mapper SHALL mark the resource for creation
 6. THE Identifier_Mapper SHALL resolve cross-resource references (e.g., GlossaryTerm referencing a Glossary, Asset referencing an AssetType, Asset or FormType referencing GlossaryTerms) using the built mapping
 
-### Requirement 5: Create, Update, and Delete Catalog Resources in Target Project
+### Requirement 5: Create and Update Catalog Resources in Target Project
 
-**User Story:** As a developer, I want the deploy command to synchronize catalog resources in the target project with the bundle, so that my catalog definitions are promoted across stages and obsolete resources are removed.
+**User Story:** As a developer, I want the deploy command to create or update catalog resources in the target project with the bundle, so that my catalog definitions are promoted across stages. Resources in the target that are not in the bundle are left untouched and logged for visibility.
 
 #### Acceptance Criteria
 
 1. WHEN a resource is marked for creation, THE Catalog_Importer SHALL call the corresponding DataZone create API (CreateGlossary, CreateGlossaryTerm, CreateFormType, CreateAssetType, CreateAsset)
 2. WHEN creating metadata form types, THE Catalog_Importer SHALL preserve the complete model structure including all field definitions and validation rules
 3. WHEN a resource already exists in the target project (matched by normalized externalIdentifier or name), THE Catalog_Importer SHALL call the corresponding DataZone update API to synchronize the resource
-4. WHEN a resource exists in the target project but is NOT present in the Catalog_Export_JSON, THE Catalog_Importer SHALL call the corresponding DataZone delete API to remove the resource
-5. THE Catalog_Importer SHALL delete resources in reverse dependency order: Assets before AssetTypes, AssetTypes before FormTypes, GlossaryTerms before Glossaries (to avoid breaking references)
+4. WHEN a resource exists in the target project but is NOT present in the Catalog_Export_JSON, THE Catalog_Importer SHALL NOT delete it. Instead, THE Catalog_Importer SHALL log the resource name and type for visibility and count it as skipped.
+5. _(Removed — no deletion ordering needed since resources are never deleted)_
 6. THE Catalog_Importer SHALL create resources in dependency order: Glossaries before GlossaryTerms, FormTypes before AssetTypes, AssetTypes before Assets (noting that Assets and FormTypes can reference GlossaryTerms)
 7. THE Catalog_Importer SHALL create metadata form types before any assets or asset types that reference them
 8. WHEN importing assets, THE Catalog_Importer SHALL preserve the `inputForms` field containing the asset's metadata form instances
 9. WHEN importing glossary terms, THE Catalog_Importer SHALL preserve the `termRelations` field containing relationships to other terms
 10. IF a DataZone API call fails during import, THEN THE Catalog_Importer SHALL log the error, continue processing remaining resources, and report a summary of failures at the end
 11. THE Catalog_Importer SHALL produce a Catalog_Import_JSON file with the remapped identifiers before making API calls, for auditability
-12. THE Catalog_Importer SHALL report counts of created, updated, deleted, and failed resources in the import summary
+12. THE Catalog_Importer SHALL report counts of created, updated, skipped (extra in target), and failed resources in the import summary
 13. WHEN `content.catalog.skipPublish` is false (default) in the manifest, THE Catalog_Importer SHALL automatically publish imported assets and data products only if they were published (listingStatus == "ACTIVE") in the source project. WHEN `content.catalog.skipPublish` is true, THE Catalog_Importer SHALL skip all publishing regardless of source state. After calling the asynchronous publish API (`create_listing_change_set`), THE Catalog_Importer SHALL poll the resource's listing status to verify it becomes ACTIVE before counting it as published. If the listing status is FAILED or the verification times out, the resource SHALL be counted as a publish failure.
 14. WHEN publishing assets or data products, IF the publish API call fails or the listing verification determines the listing status is FAILED, THEN THE Catalog_Importer SHALL log the error and continue processing remaining resources
 15. WHEN importing assets that contain a `DataSourceReferenceForm` in their `formsInput`, THE Catalog_Importer SHALL remap the form's `dataSourceIdentifier.id`, `filterableDataSourceId`, and `dataSourceRunId` to a matching data source in the target project. The target data source SHALL be matched by type and database name: (1) exact `databaseName` match in the data source's `relationalFilterConfigurations`, (2) wildcard `"*"` database filter, (3) first candidate of the same type. The `databaseName` SHALL be extracted from the asset's `GlueTableForm` content. If no matching data source exists in the target project, the `DataSourceReferenceForm` SHALL be stripped from the asset's forms.
@@ -135,6 +134,6 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 #### Acceptance Criteria
 
 1. IF the DataZone Search_API or SearchTypes_API returns an error during export, THEN THE Catalog_Exporter SHALL raise an exception with a descriptive error message
-2. IF the source project has no catalog resources (or no resources matching the `--updated-after` CLI timestamp when provided), THEN THE Catalog_Exporter SHALL produce an empty Catalog_Export_JSON with zero resources and log an informational message
+2. IF the source project has no catalog resources, THEN THE Catalog_Exporter SHALL produce an empty Catalog_Export_JSON with zero resources and log an informational message
 3. IF a create or update API call fails for a specific resource during import, THEN THE Catalog_Importer SHALL log the resource name, type, and error, then continue with the next resource
 4. IF the Catalog_Export_JSON is malformed or missing required fields, THEN THE Catalog_Importer SHALL raise a validation error before attempting any API calls

@@ -11,16 +11,6 @@ on:
       - '.github/workflows/catalog-import-export.yml'
   workflow_dispatch:
 
-# To filter exported catalog resources by modification date, use the --updated-after
-# CLI flag on the bundle command. This is the ONLY way to filter resources — no filter
-# options exist in the manifest. Example:
-#
-#   smus-cli bundle --manifest examples/catalog-import-export/manifest.yaml \
-#       --updated-after 2024-06-01T00:00:00Z
-#
-# The --updated-after flag accepts an ISO 8601 timestamp and filters ALL resource
-# types uniformly by their updatedAt timestamp.
-
 concurrency:
   group: catalog-import-export-${{ github.ref }}
   cancel-in-progress: true

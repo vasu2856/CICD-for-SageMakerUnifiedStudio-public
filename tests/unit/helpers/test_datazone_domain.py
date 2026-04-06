@@ -102,3 +102,64 @@ class TestGetDomainNameById:
         with patch("smus_cicd.helpers.datazone._get_datazone_client", return_value=mock_client):
             with pytest.raises(Exception, match="ResourceNotFoundException"):
                 get_domain_name_by_id("dzd-bad", "us-east-1")
+
+
+class TestResolveDomainIdAutoDetect:
+    """Test _resolve_domain_id auto-detect path in utils (no id/name/tags provided)."""
+
+    def test_auto_detects_single_domain(self):
+        """When no domain id/name/tags are set, resolve_domain_id is called and auto-detects."""
+        from smus_cicd.helpers.utils import _resolve_domain_id
+
+        config = {"domain": {"region": "us-east-1"}}
+
+        with patch("smus_cicd.helpers.utils.get_domain_id", return_value=None):
+            with patch("smus_cicd.helpers.datazone.resolve_domain_id") as mock_resolve:
+                mock_resolve.return_value = ("dzd-autodetected", "auto-domain")
+                result = _resolve_domain_id(config, "us-east-1")
+
+        assert result == "dzd-autodetected"
+        mock_resolve.assert_called_once_with(
+            domain_name=None, domain_tags=None, region="us-east-1"
+        )
+
+    def test_raises_when_multiple_domains_and_no_identifier(self):
+        """When multiple domains exist and no identifier given, raises an exception."""
+        from smus_cicd.helpers.utils import _resolve_domain_id
+
+        config = {"domain": {"region": "us-east-1"}}
+
+        with patch("smus_cicd.helpers.utils.get_domain_id", return_value=None):
+            with patch("smus_cicd.helpers.datazone.resolve_domain_id") as mock_resolve:
+                mock_resolve.side_effect = Exception(
+                    "Multiple domains found in region us-east-1. Please specify domain name or tags."
+                )
+                with pytest.raises(Exception, match="Multiple domains found"):
+                    _resolve_domain_id(config, "us-east-1")
+
+    def test_cfn_result_takes_priority(self):
+        """When CloudFormation returns a domain ID, it is used without calling resolve_domain_id."""
+        from smus_cicd.helpers.utils import _resolve_domain_id
+
+        config = {"domain": {"region": "us-east-1"}}
+
+        with patch("smus_cicd.helpers.utils.get_domain_id", return_value="dzd-from-cfn"):
+            with patch("smus_cicd.helpers.datazone.resolve_domain_id") as mock_resolve:
+                result = _resolve_domain_id(config, "us-east-1")
+
+        assert result == "dzd-from-cfn"
+        mock_resolve.assert_not_called()
+
+    def test_direct_id_skips_resolve(self):
+        """When domain.id is set, resolve_domain_id is not called."""
+        from smus_cicd.helpers.utils import _resolve_domain_id
+
+        config = {"domain": {"id": "dzd-direct", "region": "us-east-1"}}
+
+        with patch("smus_cicd.helpers.utils.get_domain_id", return_value=None):
+            with patch("smus_cicd.helpers.datazone.resolve_domain_id") as mock_resolve:
+                result = _resolve_domain_id(config, "us-east-1")
+
+        assert result == "dzd-direct"
+        mock_resolve.assert_not_called()
+

@@ -6,7 +6,7 @@ Tests the manifest content.catalog section which ONLY supports:
 - connectionName (string): Connection name for catalog access
 - assets.access (array): Subscription/access requests
 
-NO filter fields (include, names, assetTypes, updatedAfter, etc.) are supported.
+NO filter fields (include, names, assetTypes, etc.) are supported.
 """
 
 import unittest
@@ -195,51 +195,6 @@ class TestSimplifiedCatalogConfig(unittest.TestCase):
         """Test parsing without assets section."""
         manifest = ApplicationManifest.from_dict(_make_manifest_data({"enabled": True}))
         self.assertIsNone(manifest.content.catalog.assets)
-
-    # --- backward compatibility ---
-
-    def test_backward_compatibility_access_assets_property(self):
-        """Test backward compatibility property for accessAssets."""
-        manifest = ApplicationManifest.from_dict(
-            _make_manifest_data(
-                {
-                    "assets": {
-                        "access": [
-                            {
-                                "selector": {"assetId": "asset-123"},
-                                "permission": "READ",
-                            }
-                        ]
-                    }
-                }
-            )
-        )
-        catalog = manifest.content.catalog
-        self.assertEqual(len(catalog.accessAssets), 1)
-        self.assertEqual(catalog.accessAssets[0].selector.assetId, "asset-123")
-
-    def test_backward_compatibility_access_assets_empty(self):
-        """Test accessAssets returns empty list when no assets configured."""
-        manifest = ApplicationManifest.from_dict(_make_manifest_data({"enabled": True}))
-        self.assertEqual(manifest.content.catalog.accessAssets, [])
-
-    def test_backward_compatibility_old_access_assets_field(self):
-        """Test backward compatibility with old accessAssets field location."""
-        manifest = ApplicationManifest.from_dict(
-            _make_manifest_data(
-                {
-                    "accessAssets": [
-                        {
-                            "selector": {"assetId": "legacy-asset"},
-                            "permission": "READ",
-                        }
-                    ]
-                }
-            )
-        )
-        catalog = manifest.content.catalog
-        self.assertEqual(len(catalog.accessAssets), 1)
-        self.assertEqual(catalog.accessAssets[0].selector.assetId, "legacy-asset")
 
     # --- no filter fields accepted ---
 

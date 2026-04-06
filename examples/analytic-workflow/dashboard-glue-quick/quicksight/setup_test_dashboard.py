@@ -26,13 +26,9 @@ def setup_test_dashboard():
     """Import test dashboard to dev environment."""
     
     # Get from environment or use defaults
-    account_id = os.environ.get("AWS_ACCOUNT_ID")
     dev_region = os.environ.get("DEV_DOMAIN_REGION", "us-east-2")
-    
-    if not account_id:
-        # Try to get from STS
-        sts = boto3.client("sts")
-        account_id = sts.get_caller_identity()["Account"]
+    sts = boto3.client("sts")
+    account_id = sts.get_caller_identity()["Account"]
     
     # Configuration
     dashboard_bundle = os.path.join(os.path.dirname(__file__), "TotalDeathByCountry.qs")
@@ -84,9 +80,9 @@ def setup_test_dashboard():
     
     print(f"\n✅ Test dashboard setup complete!")
     print(f"\nNext steps:")
-    print(f"  1. Run: smus-cicd-cli bundle --targets dev")
+    print(f"  1. Run: aws-smus-cicd-cli bundle --targets dev")
     print(f"     → Will export '{dashboard_name}' by name lookup")
-    print(f"  2. Run: smus-cicd-cli deploy --targets test")
+    print(f"  2. Run: aws-smus-cicd-cli deploy --targets test")
     print(f"     → Will import as 'deployed-test-{dashboard_name}' in us-east-1")
 
 

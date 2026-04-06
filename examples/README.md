@@ -454,8 +454,8 @@ Minimal pipeline for testing basic functionality:
 - S3 storage bundle
 
 ```bash
-smus-cicd-cli describe --manifest examples/TestPipeline.yaml
-smus-cicd-cli deploy dev --manifest examples/TestPipeline.yaml
+aws-smus-cicd-cli describe --manifest examples/TestPipeline.yaml
+aws-smus-cicd-cli deploy dev --manifest examples/TestPipeline.yaml
 ```
 
 ---
@@ -471,8 +471,8 @@ Comprehensive demo showing all features:
 - Environment-specific parameters
 
 ```bash
-smus-cicd-cli describe --manifest examples/demo-manifest.yaml --connect
-smus-cicd-cli deploy test --manifest examples/demo-manifest.yaml
+aws-smus-cicd-cli describe --manifest examples/demo-manifest.yaml --connect
+aws-smus-cicd-cli deploy test --manifest examples/demo-manifest.yaml
 ```
 
 ---
@@ -490,9 +490,9 @@ Complete ETL workflow with:
 
 ```bash
 cd examples/analytic-workflow/etl
-smus-cicd-cli deploy test --manifest manifest.yaml
-smus-cicd-cli run --workflow covid_etl_pipeline --targets test --manifest manifest.yaml
-smus-cicd-cli test --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy test --manifest manifest.yaml
+aws-smus-cicd-cli run --workflow covid_etl_pipeline --targets test --manifest manifest.yaml
+aws-smus-cicd-cli test --targets test --manifest manifest.yaml
 ```
 
 #### ML Pipeline
@@ -505,7 +505,7 @@ Machine learning workflow with:
 
 ```bash
 cd examples/analytic-workflow/ml
-smus-cicd-cli deploy test --manifest manifest.yaml
+aws-smus-cicd-cli deploy test --manifest manifest.yaml
 ```
 
 ---

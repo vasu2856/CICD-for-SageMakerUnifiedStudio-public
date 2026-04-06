@@ -21,9 +21,13 @@
 ## Step 1: Install the CLI
 
 ```bash
+pip install aws-smus-cicd-cli
+```
+
+To use the bundled examples, also clone the repository:
+
+```bash
 git clone https://github.com/aws/CICD-for-SageMakerUnifiedStudio.git
-cd CICD-for-SageMakerUnifiedStudio
-pip install -e .
 ```
 
 ---
@@ -33,7 +37,7 @@ pip install -e .
 Copy the data notebooks example:
 
 ```bash
-cp -r examples/analytic-workflow/data-notebooks my-notebook-app
+cp -r CICD-for-SageMakerUnifiedStudio/examples/analytic-workflow/data-notebooks my-notebook-app
 cd my-notebook-app
 ```
 
@@ -44,12 +48,22 @@ This example includes:
 
 ---
 
-## Step 3: Customize the Manifest
+## Step 3: Set Up Your SageMaker Unified Studio Domain and Project
+
+Before deploying, you need a SageMaker Unified Studio IAM domain and project. You can create these manually in the AWS console:
+
+1. Open the [SageMaker Unified Studio console](https://console.aws.amazon.com/datazone)
+2. Click **Get started** and follow the setup wizard
+3. Once the domain is active, you can use it and the admin project created by default or create a new project.
+
+---
+
+## Step 4: Customize the Manifest
 
 Edit `manifest.yaml` to match your environment:
 
 ```yaml
-applicationName: MyNotebookApp  # Change this
+applicationName: MyNotebookApp
 
 content:
   storage:
@@ -61,43 +75,39 @@ content:
       connectionName: default.workflow_serverless
 
 stages:
-  dev:
+  test:
+    stage: TEST
     domain:
-      region: us-east-1  # Your AWS region
+      tags:                                     # Change domain identifier
+        purpose: smus-cicd-testing
+      region: ${TEST_DOMAIN_REGION}   # Change domain region
     project:
-      name: my-dev-project  # Your project name
+      name: test-marketing                      # Change project name
 ```
 
 **What to change:**
 - `applicationName`: A logical name for this CI/CD manifest environment — not a SMUS resource. This name can be anything.
-- `domain.region`: Your AWS region
-- Domain identifier — use one of:
+- `domain.region`: Your AWS region, change in the manifest or export that region variable.
+- Domain identifier — use one of (omit entirely if you only have 1 domain in your account):
   - `domain.id`: Your domain ID (visible in the SMUS portal)
   - `domain.name`: Your domain name
   - `domain.tags`: Tag key-value pairs to look up the domain
 - `project.name`: Your SageMaker Unified Studio project name
 
+Note: in order to change domain name or tags, you will need to use `aws datazone` CLI because they are not exposed in SMUS portal. Check [this](../../examples/analytic-workflow/dashboard-glue-quick/README.md#4-deploy-to-test-environment) for help with tagging.
 ---
 
-## Step 4: Deploy
+## Step 5: Deploy
 
-The data-notebooks example has two stages with different purposes:
-
-- `dev` — uploads notebooks and workflow files to S3 only (no workflow setup)
-- `test` — deploys files to the project, creates the Airflow workflow, and runs it
+Make sure you are authenticated in your target deployment account with the role that allows creation of SageMaker notebook and Workflow. For simple testing - use Admin role.
 
 To actually create and run the workflow, deploy to the **test** stage:
 
 ```bash
-# Preview what will happen (optional but recommended)
-smus-cicd-cli deploy --targets test --manifest manifest.yaml --dry-run
-
-# Deploy to test
-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 ```
 
 > No bundling needed — the CLI uploads files directly from your local directory.
-> The `--dry-run` flag validates your manifest, permissions, and resources without making any changes. The deploy command also runs automatic pre-deployment validation by default.
 
 **What happens:**
 1. ✅ Uploads notebooks and workflows to S3 from local files
@@ -147,7 +157,7 @@ For DevOps teams: **[Admin Guide](admin-quickstart.md)** - Configure automated p
 - Check connection names in SageMaker Unified Studio console
 
 **Deployment fails?**
-- Run `smus-cicd-cli describe --manifest manifest.yaml --connect` to validate configuration
+- Run `aws-smus-cicd-cli describe --manifest manifest.yaml --connect` to validate configuration
 - Check AWS credentials: `aws sts get-caller-identity`
 
 **Need help?**
@@ -282,7 +292,7 @@ data_processing:
 ## Step 5: Validate Configuration
 
 ```bash
-smus-cicd-cli describe --manifest manifest.yaml --connect
+aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 ```
 
 **Expected output:**
@@ -317,7 +327,7 @@ If using bundle-based deployment, create a versioned artifact:
 
 ```bash
 # Create bundle from dev environment
-smus-cicd-cli bundle --manifest manifest.yaml --targets dev
+aws-smus-cicd-cli bundle --manifest manifest.yaml --targets dev
 ```
 
 This creates a versioned archive containing your application content. Skip this step if using direct git-based deployment.
@@ -332,10 +342,10 @@ Deploy your application to the test environment:
 
 ```bash
 # Option 1: Direct deployment (git-based)
-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml
 
 # Option 2: Bundle-based deployment (if you created a bundle in Step 6)
-smus-cicd-cli deploy --targets test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 ```
 
 **See more:** [CLI Commands - deploy](../cli-commands.md#deploy)
@@ -346,10 +356,10 @@ smus-cicd-cli deploy --targets test --manifest manifest.yaml --manifest path/to/
 
 ```bash
 # Run validation tests
-smus-cicd-cli test --targets test --manifest manifest.yaml
+aws-smus-cicd-cli test --stages test --manifest manifest.yaml
 
 # Trigger workflow manually
-smus-cicd-cli run --targets test --workflow data_processing_dag
+aws-smus-cicd-cli run --stages test --workflow data_processing_dag
 ```
 
 **See more:** [CLI Commands - test & run](../cli-commands.md#test)
@@ -362,7 +372,7 @@ After validating in test, deploy to production:
 
 ```bash
 # Deploy to production
-smus-cicd-cli deploy --targets prod --manifest manifest.yaml
+aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
 ```
 
 **See more:** [CLI Commands - deploy](../cli-commands.md#deploy)
@@ -388,12 +398,12 @@ content:
 
 **Deploy with catalog integration:**
 ```bash
-smus-cicd-cli deploy --targets test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml
 ```
 
 The CLI will automatically request subscriptions to catalog assets for your project.
 
-**See more:** [Bundle Manifest Reference - Catalog Assets](../bundle-manifest.md#catalog-assets)
+**See more:** [Manifest Reference - Catalog Assets](../manifest.md#catalog-assets)
 
 ---
 
@@ -401,13 +411,13 @@ The CLI will automatically request subscriptions to catalog assets for your proj
 
 ```bash
 # Monitor workflow status
-smus-cicd-cli monitor --targets test --manifest manifest.yaml
+aws-smus-cicd-cli monitor --stages test --manifest manifest.yaml
 
 # View workflow logs
-smus-cicd-cli logs --workflow data_processing_dag --targets test --live
+aws-smus-cicd-cli logs --workflow data_processing_dag --stages test --live
 
 # Check deployment history
-smus-cicd-cli describe --targets test --manifest manifest.yaml
+aws-smus-cicd-cli describe --stages test --manifest manifest.yaml
 ```
 
 **See more:** [CLI Commands - monitor & logs](../cli-commands.md#monitor)
@@ -511,7 +521,7 @@ Each data application is self-contained with its own bundle manifest and can be 
 ## Next Steps
 
 ### Learn More
-- **[Bundle Manifest Reference](../bundle-manifest.md)** - Complete YAML guide
+- **[Manifest Reference](../manifest.md)** - Complete YAML guide
 - **[Variable Substitution](../substitutions-and-variables.md)** - Dynamic configuration
 - **[CLI Commands](../cli-commands.md)** - All available commands
 - **[GitHub Actions Integration](../github-actions-integration.md)** - CI/CD automation
