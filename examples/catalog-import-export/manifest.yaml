@@ -35,7 +35,7 @@ stages:
     domain:
       region: ${PROD_DOMAIN_REGION}
       tags:
-        purpose: smus-cicd-testing
+        purpose: smus-cicd-production
     project:
       name: prod-catalog-project
       profileName: All capabilities
