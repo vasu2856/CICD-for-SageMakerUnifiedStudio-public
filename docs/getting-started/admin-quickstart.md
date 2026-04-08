@@ -54,7 +54,7 @@ The CLI supports three deployment approaches:
 2. **Bundle-Based** - Create versioned bundles, then deploy them to stages (all content from bundle)
 3. **Hybrid** - Create bundle for static content (data, configs), pull workflows from git branches per stage
 
-**See more:** [Deployment Approaches Guide](../deployment-approaches.md)
+**See more:** [Deployment Approaches Guide](../deployment.md)
 
 ### Stage Configuration
 

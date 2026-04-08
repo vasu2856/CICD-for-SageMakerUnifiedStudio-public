@@ -3,7 +3,7 @@ notebooks_workflow:
   tasks:
     nb_churn:
       operator: airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator
-      retries: 0
+      retries: 1
       input_config:
         input_path: notebooks/bundle/notebooks/customer_churn_prediction.ipynb
         input_params:
@@ -19,7 +19,7 @@ notebooks_workflow:
       wait_for_completion: true
     nb_sales:
       operator: airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator
-      retries: 0
+      retries: 1
       input_config:
         input_path: notebooks/bundle/notebooks/retail_sales_forecasting.ipynb
         input_params:
@@ -35,7 +35,7 @@ notebooks_workflow:
       wait_for_completion: true
     nb_segment:
       operator: airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator
-      retries: 0
+      retries: 1
       input_config:
         input_path: notebooks/bundle/notebooks/customer_segmentation_analysis.ipynb
         input_params:
