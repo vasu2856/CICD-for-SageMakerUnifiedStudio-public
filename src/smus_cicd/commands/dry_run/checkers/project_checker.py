@@ -27,20 +27,8 @@ class ProjectChecker:
     def check(self, context: DryRunContext) -> List[Finding]:
         findings: List[Finding] = []
 
-        if context.target_config is None or context.config is None:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=(
-                        "Skipping project initialization check: "
-                        "manifest/target not loaded"
-                    ),
-                )
-            )
-            return findings
-
         config = context.config
-        region = config.get("region", "us-east-1")
+        region = config.get("region")
 
         # Resolve domain_id — may come from config directly, or via
         # domain name/tags lookup when the manifest uses tags.

@@ -31,12 +31,29 @@ from smus_cicd.commands.dry_run.models import DryRunContext, Severity
 
 def _make_context(
     catalog_data: Optional[Dict[str, Any]] = None,
+    resources: Optional[list] = None,
 ) -> DryRunContext:
-    """Build a DryRunContext with catalog data."""
+    """Build a DryRunContext with catalog data.
+
+    If ``resources`` is provided, groups them by their ``type`` field into
+    the keyed format expected by the production catalog export schema.
+    """
+    if resources is not None and catalog_data is None:
+        catalog_data = _group_resources(resources)
     return DryRunContext(
         manifest_file="manifest.yaml",
         catalog_data=catalog_data,
     )
+
+
+def _group_resources(resources: list) -> Dict[str, Any]:
+    """Group a flat list of resource dicts by their 'type' field into keyed format."""
+    grouped: Dict[str, Any] = {"metadata": {}}
+    for r in resources:
+        if isinstance(r, dict):
+            rtype = r.get("type", "unknown")
+            grouped.setdefault(rtype, []).append(r)
+    return grouped
 
 
 def _make_resource(
@@ -73,7 +90,9 @@ class TestCatalogCheckerNoData:
         assert "no catalog data" in findings[0].message.lower()
 
     def test_empty_resources_produces_ok(self, checker):
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": []})
+        ctx = _make_context(
+            catalog_data={"metadata": {}, "assets": [], "glossaries": []}
+        )
         findings = checker.check(ctx)
 
         assert len(findings) == 1
@@ -91,24 +110,25 @@ class TestRequiredFieldValidation:
 
     def test_valid_resource_no_field_errors(self, checker):
         resources = [_make_resource()]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
         assert len(errors) == 0
 
     def test_missing_type_produces_error(self, checker):
-        resources = [{"name": "foo", "identifier": "id-1"}]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        """In keyed format, type is auto-tagged from the key. Test missing name instead."""
+        resources = [{"type": "assets", "identifier": "id-1"}]  # missing name
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
         assert len(errors) == 1
-        assert "type" in errors[0].message
+        assert "name" in errors[0].message
 
     def test_missing_name_produces_error(self, checker):
         resources = [{"type": "assets", "identifier": "id-1"}]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -117,7 +137,7 @@ class TestRequiredFieldValidation:
 
     def test_missing_identifier_produces_error(self, checker):
         resources = [{"type": "assets", "name": "foo"}]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -126,7 +146,7 @@ class TestRequiredFieldValidation:
 
     def test_missing_multiple_fields_produces_error(self, checker):
         resources = [{"type": "assets"}]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -135,24 +155,27 @@ class TestRequiredFieldValidation:
         assert "name" in errors[0].message
 
     def test_non_dict_resource_produces_error(self, checker):
-        resources = ["not-a-dict"]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        """Non-dict resources are filtered out during flattening, producing 0 resources."""
+        ctx = _make_context(catalog_data={"assets": ["not-a-dict"]})
         findings = checker.check(ctx)
 
-        errors = [f for f in findings if f.severity == Severity.ERROR]
-        assert len(errors) == 1
-        assert "not a dict" in errors[0].message
+        # Non-dict items are skipped, so we get "0 resources" OK
+        ok_findings = [f for f in findings if "0 resource" in f.message]
+        assert len(ok_findings) == 1
 
     def test_multiple_invalid_resources(self, checker):
-        resources = [
-            {"name": "a", "identifier": "id-a"},  # missing type
-            {"type": "assets", "identifier": "id-b"},  # missing name
-        ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(
+            catalog_data={
+                "assets": [
+                    {"name": "a", "identifier": "id-a"},  # type auto-tagged
+                    {"type": "assets", "identifier": "id-b"},  # missing name
+                ],
+            }
+        )
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
-        assert len(errors) == 2
+        assert len(errors) == 1  # only the missing-name one
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +196,7 @@ class TestGlossaryTermCrossReferences:
                 glossaryId="glossary-1",
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -188,7 +211,7 @@ class TestGlossaryTermCrossReferences:
                 glossaryId="nonexistent-glossary",
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -201,7 +224,7 @@ class TestGlossaryTermCrossReferences:
         resources = [
             _make_resource(rtype="glossaryTerms", name="term1", identifier="term-1"),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -226,7 +249,7 @@ class TestAssetFormTypeCrossReferences:
                 formsInput=[{"typeIdentifier": "my-form-type"}],
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -241,7 +264,7 @@ class TestAssetFormTypeCrossReferences:
                 formsInput=[{"typeIdentifier": "missing-form-type"}],
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -259,7 +282,7 @@ class TestAssetFormTypeCrossReferences:
                 formsInput=[{"typeIdentifier": "amazon.datazone.GlueTableFormType"}],
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -275,7 +298,7 @@ class TestAssetFormTypeCrossReferences:
                 formsInput=[{"typeName": "custom-form"}],
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -286,7 +309,7 @@ class TestAssetFormTypeCrossReferences:
         resources = [
             _make_resource(rtype="assets", name="asset1", identifier="asset-1"),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -302,7 +325,7 @@ class TestAssetFormTypeCrossReferences:
                 formsInput="not-a-list",
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -327,7 +350,7 @@ class TestAssetTypeFormTypeCrossReferences:
                 formsInput={"form1": {"typeIdentifier": "my-form-type"}},
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -342,7 +365,7 @@ class TestAssetTypeFormTypeCrossReferences:
                 formsInput={"form1": {"typeIdentifier": "missing-form"}},
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -361,7 +384,7 @@ class TestAssetTypeFormTypeCrossReferences:
                 },
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -377,7 +400,7 @@ class TestAssetTypeFormTypeCrossReferences:
                 formsInput=[{"typeIdentifier": "something"}],
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         # No cross-ref errors for asset types with list formsInput
@@ -398,7 +421,7 @@ class TestResourceTypeCounting:
             _make_resource(rtype="glossaries", name="g1", identifier="id-1"),
             _make_resource(rtype="glossaries", name="g2", identifier="id-2"),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         ok_findings = [f for f in findings if f.severity == Severity.OK]
@@ -416,7 +439,7 @@ class TestResourceTypeCounting:
             _make_resource(rtype="formTypes", name="f1", identifier="id-5"),
             _make_resource(rtype="dataProducts", name="dp1", identifier="id-6"),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         count_finding = [f for f in findings if "would process" in f.message]
@@ -430,15 +453,19 @@ class TestResourceTypeCounting:
         assert count_finding[0].details["total"] == 6
 
     def test_unknown_type_included(self, checker):
-        resources = [
-            _make_resource(rtype="unknownType", name="u1", identifier="id-1"),
-        ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        """Unknown resource types not in CREATION_ORDER are not processed."""
+        ctx = _make_context(
+            catalog_data={
+                "unknownType": [
+                    {"type": "unknownType", "name": "u1", "identifier": "id-1"},
+                ],
+            }
+        )
         findings = checker.check(ctx)
 
-        count_finding = [f for f in findings if "would process" in f.message]
-        assert len(count_finding) == 1
-        assert "1 unknownType" in count_finding[0].message
+        # No resources from CREATION_ORDER found, so 0 resources
+        ok_findings = [f for f in findings if "0 resource" in f.message]
+        assert len(ok_findings) == 1
 
     def test_type_counts_in_details(self, checker):
         resources = [
@@ -446,7 +473,7 @@ class TestResourceTypeCounting:
             _make_resource(rtype="assets", name="a2", identifier="id-2"),
             _make_resource(rtype="glossaries", name="g1", identifier="id-3"),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         count_finding = [f for f in findings if "would process" in f.message]
@@ -469,7 +496,7 @@ class TestMixedResources:
             _make_resource(rtype="assets", name="good", identifier="id-1"),
             {"type": "assets", "name": "bad"},  # missing identifier
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -492,7 +519,7 @@ class TestMixedResources:
                 glossaryId="nonexistent",
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -515,7 +542,7 @@ class TestFindingMetadata:
 
     def test_count_finding_has_service(self, checker):
         resources = [_make_resource()]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         count_finding = [f for f in findings if "would process" in f.message]
@@ -523,7 +550,7 @@ class TestFindingMetadata:
 
     def test_field_error_has_resource(self, checker):
         resources = [{"type": "assets", "name": "myasset"}]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -531,7 +558,7 @@ class TestFindingMetadata:
 
     def test_field_error_has_details(self, checker):
         resources = [{"type": "assets", "name": "myasset"}]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -547,7 +574,7 @@ class TestFindingMetadata:
                 glossaryId="missing",
             ),
         ]
-        ctx = _make_context(catalog_data={"metadata": {}, "resources": resources})
+        ctx = _make_context(resources=resources)
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]

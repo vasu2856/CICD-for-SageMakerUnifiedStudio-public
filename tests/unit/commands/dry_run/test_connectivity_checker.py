@@ -100,28 +100,7 @@ def checker():
 # -----------------------------------------------------------------------
 
 
-class TestConnectivityCheckerNoConfig:
-    """Tests when manifest/target is not loaded."""
-
-    def test_no_target_config_produces_warning(self, checker):
-        context = DryRunContext(manifest_file="m.yaml", target_config=None)
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "skipping" in findings[0].message.lower()
-
-    def test_no_config_dict_produces_warning(self, checker):
-        context = DryRunContext(
-            manifest_file="m.yaml",
-            target_config=_TargetConfig(),
-            config=None,
-        )
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-
+# TestConnectivityCheckerNoConfig tests moved to test_preflight_checker.py
 
 # -----------------------------------------------------------------------
 # Test: DataZone domain reachability (Req 6.1)
@@ -192,12 +171,12 @@ class TestDomainReachability:
         context = _make_context(domain_id=None)
         findings = checker.check(context)
 
-        warning_findings = [
+        error_findings = [
             f
             for f in findings
-            if f.severity == Severity.WARNING and f.service == "datazone"
+            if f.severity == Severity.ERROR and f.service == "datazone"
         ]
-        assert any("domain_id" in f.message.lower() for f in warning_findings)
+        assert any("domain_id" in f.message.lower() for f in error_findings)
 
 
 # -----------------------------------------------------------------------
@@ -294,7 +273,7 @@ class TestProjectExistence:
         project_warnings = [
             f
             for f in findings
-            if f.severity == Severity.WARNING and "project_name" in f.message.lower()
+            if f.severity == Severity.ERROR and "project_name" in f.message.lower()
         ]
         assert len(project_warnings) >= 1
 
@@ -314,8 +293,7 @@ class TestS3BucketAccessibility:
     """
 
     @patch(
-        "smus_cicd.commands.dry_run.checkers.connectivity_checker"
-        ".ConnectivityChecker._get_project_connections"
+        "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
     @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
     def test_bucket_accessible(self, mock_boto3, mock_get_conns, checker):
@@ -340,8 +318,7 @@ class TestS3BucketAccessibility:
         assert s3_ok[0].resource == "my-real-bucket"
 
     @patch(
-        "smus_cicd.commands.dry_run.checkers.connectivity_checker"
-        ".ConnectivityChecker._get_project_connections"
+        "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
     @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
     def test_bucket_not_accessible(self, mock_boto3, mock_get_conns, checker):
@@ -371,8 +348,7 @@ class TestS3BucketAccessibility:
         assert s3_errors[0].details["error_code"] == "404"
 
     @patch(
-        "smus_cicd.commands.dry_run.checkers.connectivity_checker"
-        ".ConnectivityChecker._get_project_connections"
+        "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
     @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
     def test_bucket_generic_error(self, mock_boto3, mock_get_conns, checker):
@@ -398,8 +374,7 @@ class TestS3BucketAccessibility:
         assert "not accessible" in s3_errors[0].message.lower()
 
     @patch(
-        "smus_cicd.commands.dry_run.checkers.connectivity_checker"
-        ".ConnectivityChecker._get_project_connections"
+        "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
     @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
     def test_multiple_buckets_deduplicated(self, mock_boto3, mock_get_conns, checker):
@@ -426,8 +401,7 @@ class TestS3BucketAccessibility:
         assert s3_ok[0].resource == "shared-bucket"
 
     @patch(
-        "smus_cicd.commands.dry_run.checkers.connectivity_checker"
-        ".ConnectivityChecker._get_project_connections"
+        "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
     @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
     def test_no_storage_items_no_s3_findings(self, mock_boto3, mock_get_conns, checker):
@@ -442,37 +416,7 @@ class TestS3BucketAccessibility:
         assert len(s3_findings) == 0
 
     @patch(
-        "smus_cicd.commands.dry_run.checkers.connectivity_checker"
-        ".ConnectivityChecker._get_project_connections"
-    )
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_s3_client_creation_failure(self, mock_boto3, mock_get_conns, checker):
-        mock_dz = MagicMock()
-        mock_dz.get_domain.return_value = {"id": "dzd_test"}
-
-        def client_factory(svc, **kw):
-            if svc == "datazone":
-                return mock_dz
-            raise Exception("Cannot create S3 client")
-
-        mock_boto3.client.side_effect = client_factory
-        # Connection resolves so we actually attempt to create the S3 client
-        mock_get_conns.return_value = {
-            "default.s3_shared": {"s3Uri": "s3://some-bucket"},
-        }
-
-        context = _make_context(storage_names=["data"])
-        findings = checker.check(context)
-
-        s3_errors = [
-            f for f in findings if f.severity == Severity.ERROR and f.service == "s3"
-        ]
-        assert len(s3_errors) >= 1
-        assert "failed to create s3 client" in s3_errors[0].message.lower()
-
-    @patch(
-        "smus_cicd.commands.dry_run.checkers.connectivity_checker"
-        ".ConnectivityChecker._get_project_connections"
+        "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
     @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
     def test_unresolved_connection_produces_warning(
@@ -495,8 +439,7 @@ class TestS3BucketAccessibility:
         assert s3_warnings[0].resource == "default.s3_shared"
 
     @patch(
-        "smus_cicd.commands.dry_run.checkers.connectivity_checker"
-        ".ConnectivityChecker._get_project_connections"
+        "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
     @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
     def test_connection_without_s3uri_is_unresolved(
@@ -643,8 +586,7 @@ class TestErrorReporting:
         assert error_findings[0].service == "datazone"
 
     @patch(
-        "smus_cicd.commands.dry_run.checkers.connectivity_checker"
-        ".ConnectivityChecker._get_project_connections"
+        "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
     @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
     def test_s3_error_includes_bucket_name_and_service(

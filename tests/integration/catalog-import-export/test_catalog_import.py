@@ -5,13 +5,13 @@ Tests the simplified catalog import design:
 - content.catalog.skipPublish: false (default) preserves source publish state; true skips all publishing
 - No filter fields in manifest
 - Import uses externalIdentifier (with normalization) or name for mapping
-- Import supports deletion of resources missing from bundle
-- Import returns {created, updated, deleted, failed, published} summary
+- Extra resources in target are preserved (never deleted), logged as skipped
+- Import returns {created, updated, skipped, failed, published} summary
 
 Subtasks covered:
   8.1 End-to-end catalog import during deploy
   8.2 Idempotent re-deploy (update existing resources)
-  8.3 Deletion of resources not in bundle
+  8.3 Extra resources in target are preserved (not deleted)
   8.4 Automatic publishing when enabled
   8.5 No publishing when disabled
   8.6 Publish failures are logged but don't block
@@ -150,7 +150,7 @@ class TestCatalogImport(IntegrationTestBase):
 
         out = r["output"].lower()
         assert "catalog" in out
-        for kw in ["created", "updated", "deleted", "failed"]:
+        for kw in ["created", "updated", "skipped", "failed"]:
             assert kw in out, f"Deploy output should report '{kw}' count"
 
     # ==================================================================
@@ -233,13 +233,14 @@ class TestCatalogImport(IntegrationTestBase):
         ), f"Expected 1 glossary after re-deploy, found {count_second} (duplicated)"
 
     # ==================================================================
-    # 8.3  Deletion of resources not in bundle
+    # 8.3  Extra resources in target are preserved (not deleted)
     # ==================================================================
     @pytest.mark.integration
-    def test_deletion_of_resources_not_in_bundle(self):
-        """Resources in target but not in bundle are deleted on re-deploy.
+    def test_extra_resources_in_target_are_preserved(self):
+        """Resources in target but not in bundle are preserved on re-deploy.
 
-        Validates Requirements: 5.4, 5.5, 5.12
+        Validates that import never deletes resources. Extra resources are
+        logged as 'skipped (extra in target)' and left untouched.
         """
         if not self.verify_aws_connectivity():
             pytest.skip("AWS connectivity not available")
@@ -256,13 +257,7 @@ class TestCatalogImport(IntegrationTestBase):
         ga = _h.create_glossary(
             domain_id, project_id, f"GlossaryA-{ts}", region, description="A"
         )
-        gb = _h.create_glossary(
-            domain_id, project_id, f"GlossaryB-{ts}", region, description="B"
-        )
-        gc = _h.create_glossary(
-            domain_id, project_id, f"GlossaryC-{ts}", region, description="C"
-        )
-        assert ga and gb and gc, "Failed to create source glossaries"
+        assert ga, "Failed to create source glossary"
 
         r = self.run_cli_command(["bundle", "--targets", "dev", "--manifest", pf])
         assert r["success"]
@@ -285,7 +280,7 @@ class TestCatalogImport(IntegrationTestBase):
 
         t_domain, t_project, _, _ = _h.get_project_info(pf, "test")
 
-        # create extra resource D directly in target
+        # create extra resource D directly in target (not in bundle)
         gd = _h.create_glossary(
             t_domain,
             t_project,
@@ -296,15 +291,7 @@ class TestCatalogImport(IntegrationTestBase):
         if not gd:
             pytest.skip("Cannot create extra glossary in target")
 
-        items = _h.search_resources(t_domain, t_project, "GLOSSARY", region)
-        d_count = sum(
-            1
-            for i in items
-            if i.get("glossaryItem", {}).get("name") == f"GlossaryD-{ts}"
-        )
-        assert d_count == 1
-
-        # re-deploy same bundle — D should be deleted
+        # re-deploy same bundle — D should be preserved (not deleted)
         r = self.run_cli_command(
             [
                 "deploy",
@@ -325,9 +312,9 @@ class TestCatalogImport(IntegrationTestBase):
             if i.get("glossaryItem", {}).get("name") == f"GlossaryD-{ts}"
         )
         assert (
-            d_count_after == 0
-        ), f"GlossaryD should have been deleted, found {d_count_after}"
-        assert "deleted" in r["output"].lower()
+            d_count_after == 1
+        ), f"GlossaryD should be preserved after re-deploy, found {d_count_after}"
+        assert "skipped" in r["output"].lower()
 
     # ==================================================================
     # 8.4  Automatic publishing when enabled

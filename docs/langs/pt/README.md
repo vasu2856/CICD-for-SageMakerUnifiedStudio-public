@@ -286,7 +286,7 @@ Workflows GitHub Actions (ou outros sistemas CI/CD) que automatizam a implantaç
 
 **Direct (Git-based):** (Direto (Baseado em Git))
 - Bom para: workflows mais simples, iteração rápida, git como fonte da verdade
-- Comando: `aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test`
+- Comando: `aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test`
 
 Ambos os modos funcionam com qualquer combinação de fontes de armazenamento e git.
 

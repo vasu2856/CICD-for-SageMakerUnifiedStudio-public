@@ -33,26 +33,26 @@ Ensure your source project has catalog resources (glossaries, glossary terms, fo
 ### 2. Bundle
 
 ```bash
-smus-cli bundle --manifest examples/catalog-import-export/manifest.yaml
+aws-smus-cicd-cli bundle --manifest examples/catalog-import-export/manifest.yaml
 ```
 
 ### 3. Deploy
 
 ```bash
 # Deploy to dev
-smus-cli deploy --manifest examples/catalog-import-export/manifest.yaml --targets dev
+aws-smus-cicd-cli deploy --manifest examples/catalog-import-export/manifest.yaml --targets dev
 
 # Deploy to test (creates project if needed)
-smus-cli deploy --manifest examples/catalog-import-export/manifest.yaml --targets test
+aws-smus-cicd-cli deploy --manifest examples/catalog-import-export/manifest.yaml --targets test
 
 # Deploy to prod
-smus-cli deploy --manifest examples/catalog-import-export/manifest.yaml --targets prod
+aws-smus-cicd-cli deploy --manifest examples/catalog-import-export/manifest.yaml --targets prod
 ```
 
 ### 4. Run Validation Tests
 
 ```bash
-smus-cli test --manifest examples/catalog-import-export/manifest.yaml --targets test
+aws-smus-cicd-cli test --manifest examples/catalog-import-export/manifest.yaml --targets test
 ```
 
 ## Deployment Configuration

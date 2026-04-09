@@ -88,34 +88,7 @@ def checker() -> StorageChecker:
 # ---------------------------------------------------------------------------
 
 
-class TestStorageCheckerNoConfig:
-    """When target_config is missing, produce a WARNING."""
-
-    def test_no_target_config_produces_warning(self, checker):
-        ctx = DryRunContext(manifest_file="manifest.yaml", target_config=None)
-        findings = checker.check(ctx)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "Skipping" in findings[0].message
-
-    def test_no_deployment_configuration_produces_ok(self, checker):
-        target = _TargetConfig(deployment_configuration=None)
-        ctx = DryRunContext(manifest_file="manifest.yaml", target_config=target)
-        findings = checker.check(ctx)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.OK
-        assert "No storage items" in findings[0].message
-
-    def test_empty_storage_list_produces_ok(self, checker):
-        ctx = _make_context(storage_items=[])
-        findings = checker.check(ctx)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.OK
-        assert "No storage items" in findings[0].message
-
+# TestStorageCheckerNoConfig tests moved to test_preflight_checker.py
 
 # ---------------------------------------------------------------------------
 # Single storage item
@@ -125,7 +98,9 @@ class TestStorageCheckerNoConfig:
 class TestSingleStorageItem:
     """A single storage item with matching bundle files."""
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_reports_bucket_prefix_and_file_count(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.s3_shared", "real-bucket-123")
@@ -148,7 +123,9 @@ class TestSingleStorageItem:
         assert "src" in f.message
         assert "2 file(s)" in f.message
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_zero_matching_files(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.s3_shared", "real-bucket-123")
@@ -166,7 +143,9 @@ class TestSingleStorageItem:
         assert len(findings) == 1
         assert "0 file(s)" in findings[0].message
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_empty_bundle(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.s3_shared", "real-bucket-123")
@@ -192,7 +171,9 @@ class TestSingleStorageItem:
 class TestMultipleStorageItems:
     """Multiple storage items produce one finding each."""
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_two_items_produce_two_findings(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.s3_shared", "real-bucket-123"),
@@ -232,7 +213,9 @@ class TestMultipleStorageItems:
 class TestBucketDerivation:
     """Bucket name is resolved from DataZone project connections."""
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_resolved_connection_uses_real_bucket(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.my_bucket", "actual-bucket-name")
@@ -247,7 +230,9 @@ class TestBucketDerivation:
         findings = checker.check(ctx)
         assert "actual-bucket-name" in findings[0].message
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_unresolved_connection_shows_placeholder(self, mock_conns, checker):
         """When connection can't be resolved, show an unresolved placeholder."""
         mock_conns.return_value = {}
@@ -259,7 +244,9 @@ class TestBucketDerivation:
         findings = checker.check(ctx)
         assert "<unresolved:mybucket>" in findings[0].message
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_empty_connection_name(self, mock_conns, checker):
         mock_conns.return_value = {}
         items = [_StorageConfig(name="x", connectionName="", targetDirectory="")]
@@ -269,7 +256,9 @@ class TestBucketDerivation:
         # Empty connection → no connection to resolve, shows unknown
         assert "<unknown>" in findings[0].message
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_none_connection_name(self, mock_conns, checker):
         mock_conns.return_value = {}
         items = [_StorageConfig(name="x", connectionName=None, targetDirectory="")]
@@ -278,7 +267,9 @@ class TestBucketDerivation:
         findings = checker.check(ctx)
         assert "<unknown>" in findings[0].message
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_null_project_connections_shows_unresolved(self, mock_conns, checker):
         """When _get_project_connections returns None, show unresolved."""
         mock_conns.return_value = None
@@ -301,7 +292,9 @@ class TestBucketDerivation:
 class TestPrefixReporting:
     """targetDirectory is reported as the S3 prefix."""
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_non_empty_prefix(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.s3_shared", "real-bucket")
@@ -318,7 +311,9 @@ class TestPrefixReporting:
         findings = checker.check(ctx)
         assert "my/prefix" in findings[0].message
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_empty_prefix(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.s3_shared", "real-bucket")
@@ -333,7 +328,9 @@ class TestPrefixReporting:
         findings = checker.check(ctx)
         assert "prefix ''" in findings[0].message
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_none_target_directory(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.s3_shared", "real-bucket")
@@ -357,7 +354,9 @@ class TestPrefixReporting:
 class TestFindingMetadata:
     """Each finding carries resource, service, and details."""
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_finding_has_resource(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.s3_shared", "real-bucket")
@@ -372,7 +371,9 @@ class TestFindingMetadata:
         findings = checker.check(ctx)
         assert findings[0].resource == "code"
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_finding_has_service(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.s3_shared", "real-bucket")
@@ -387,7 +388,9 @@ class TestFindingMetadata:
         findings = checker.check(ctx)
         assert findings[0].service == "s3"
 
-    @patch.object(StorageChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections"
+    )
     def test_finding_has_details(self, mock_conns, checker):
         mock_conns.return_value = _mock_connections(
             ("default.s3_shared", "real-bucket")

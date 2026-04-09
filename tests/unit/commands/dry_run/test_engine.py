@@ -63,7 +63,7 @@ class TestPhaseOrdering:
         report = engine.run()
 
         assert call_order == PHASE_ORDER
-        assert len(report.findings_by_phase) == 12
+        assert len(report.findings_by_phase) == 13
         for phase in PHASE_ORDER:
             assert phase in report.findings_by_phase
 

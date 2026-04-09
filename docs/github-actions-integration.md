@@ -370,10 +370,10 @@ aws-smus-cicd-cli bundle --manifest manifest.yaml --targets test
 #### **3. Pre-Deployment Validation (Dry Run)**
 ```bash
 # Preview deployment without making changes
-smus-cicd-cli deploy --manifest manifest.yaml --targets test --dry-run
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test --dry-run
 
 # JSON output for CI/CD automation
-smus-cicd-cli deploy --manifest manifest.yaml --targets test --dry-run --output json
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test --dry-run --output json
 ```
 
 #### **4. Infrastructure-Aware Deployment**

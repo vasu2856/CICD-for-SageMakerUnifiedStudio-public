@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from typing import List
 
+from smus_cicd.commands.dry_run.checkers import get_project_connections
 from smus_cicd.commands.dry_run.models import DryRunContext, Finding, Severity
 
 logger = logging.getLogger(__name__)
@@ -26,18 +27,6 @@ class StorageChecker:
 
     def check(self, context: DryRunContext) -> List[Finding]:
         findings: List[Finding] = []
-
-        if context.target_config is None:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=(
-                        "Skipping storage deployment check: "
-                        "manifest/target not loaded"
-                    ),
-                )
-            )
-            return findings
 
         dep_cfg = getattr(context.target_config, "deployment_configuration", None)
         storage_items = getattr(dep_cfg, "storage", None) if dep_cfg else None
@@ -53,10 +42,10 @@ class StorageChecker:
             return findings
 
         config = context.config or {}
-        region = config.get("region", "us-east-1")
+        region = config.get("region")
 
         # Resolve real bucket names via DataZone project connections
-        project_connections = self._get_project_connections(context, region)
+        project_connections = get_project_connections(context, region)
 
         for item in storage_items:
             name = getattr(item, "name", str(item))
@@ -102,28 +91,3 @@ class StorageChecker:
             )
 
         return findings
-
-    @staticmethod
-    def _get_project_connections(context: DryRunContext, region: str) -> dict | None:
-        """Attempt to fetch project connections from DataZone.
-
-        Returns the connections dict or ``None`` if resolution fails.
-        """
-        config = context.config or {}
-        project_name = config.get("project_name")
-        if not project_name:
-            project_cfg = getattr(context.target_config, "project", None)
-            project_name = getattr(project_cfg, "name", None) if project_cfg else None
-
-        if not project_name:
-            return None
-
-        try:
-            from smus_cicd.helpers.utils import get_datazone_project_info
-
-            info = get_datazone_project_info(project_name, config)
-            if "error" in info:
-                return None
-            return info.get("connections")
-        except Exception:
-            return None

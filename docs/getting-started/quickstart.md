@@ -342,10 +342,10 @@ Deploy your application to the test environment:
 
 ```bash
 # Option 1: Direct deployment (git-based)
-aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Option 2: Bundle-based deployment (if you created a bundle in Step 6)
-aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml --manifest path/to/bundle.tar.gz
 ```
 
 **See more:** [CLI Commands - deploy](../cli-commands.md#deploy)
@@ -356,10 +356,10 @@ aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml --manifest path/
 
 ```bash
 # Run validation tests
-aws-smus-cicd-cli test --stages test --manifest manifest.yaml
+aws-smus-cicd-cli test --targets test --manifest manifest.yaml
 
 # Trigger workflow manually
-aws-smus-cicd-cli run --stages test --workflow data_processing_dag
+aws-smus-cicd-cli run --targets test --workflow data_processing_dag
 ```
 
 **See more:** [CLI Commands - test & run](../cli-commands.md#test)
@@ -372,7 +372,7 @@ After validating in test, deploy to production:
 
 ```bash
 # Deploy to production
-aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets prod --manifest manifest.yaml
 ```
 
 **See more:** [CLI Commands - deploy](../cli-commands.md#deploy)
@@ -398,7 +398,7 @@ content:
 
 **Deploy with catalog integration:**
 ```bash
-aws-smus-cicd-cli deploy --stages test --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 ```
 
 The CLI will automatically request subscriptions to catalog assets for your project.
@@ -411,13 +411,13 @@ The CLI will automatically request subscriptions to catalog assets for your proj
 
 ```bash
 # Monitor workflow status
-aws-smus-cicd-cli monitor --stages test --manifest manifest.yaml
+aws-smus-cicd-cli monitor --targets test --manifest manifest.yaml
 
 # View workflow logs
-aws-smus-cicd-cli logs --workflow data_processing_dag --stages test --live
+aws-smus-cicd-cli logs --workflow data_processing_dag --targets test --live
 
 # Check deployment history
-aws-smus-cicd-cli describe --stages test --manifest manifest.yaml
+aws-smus-cicd-cli describe --targets test --manifest manifest.yaml
 ```
 
 **See more:** [CLI Commands - monitor & logs](../cli-commands.md#monitor)

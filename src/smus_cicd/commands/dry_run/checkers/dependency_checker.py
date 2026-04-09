@@ -23,8 +23,8 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
-from botocore.exceptions import ClientError
 
+from smus_cicd.commands.dry_run.checkers import is_catalog_disabled
 from smus_cicd.commands.dry_run.models import DryRunContext, Finding, Severity
 from smus_cicd.helpers.catalog_import import (
     DATA_SOURCE_REF_FORM_TYPE,
@@ -54,52 +54,7 @@ class DependencyChecker:
     def check(self, context: DryRunContext) -> List[Finding]:
         findings: List[Finding] = []
 
-        if context.catalog_data is None:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=("Skipping dependency checks: no catalog data available"),
-                    service="datazone",
-                )
-            )
-            return findings
-
-        if context.target_config is None or context.config is None:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=(
-                        "Skipping dependency checks: " "manifest/target not loaded"
-                    ),
-                )
-            )
-            return findings
-
-        config = context.config
-        region = config.get("region", "us-east-1")
-        domain_id = config.get("domain_id", "")
-        project_id = config.get("project_id", "")
-
-        resources = context.catalog_data.get("resources", [])
-        # Support both the real catalog format (keyed by resource type)
-        # and the legacy flat format (single "resources" list)
-        if not resources:
-            # Real format: collect assets/assetTypes from their own keys
-            assets = [
-                r for r in context.catalog_data.get("assets", []) if isinstance(r, dict)
-            ]
-            asset_types = [
-                r
-                for r in context.catalog_data.get("assetTypes", [])
-                if isinstance(r, dict)
-            ]
-            all_resources = assets + asset_types
-        else:
-            all_resources = resources
-            assets = None  # sentinel — will be derived below
-            asset_types = None
-
-        if not all_resources:
+        if context.catalog_data is None or is_catalog_disabled(context):
             findings.append(
                 Finding(
                     severity=Severity.OK,
@@ -109,19 +64,27 @@ class DependencyChecker:
             )
             return findings
 
-        # Separate resources by type (only needed for legacy flat format)
-        if assets is None:
-            assets = [
-                r
-                for r in resources
-                if isinstance(r, dict) and r.get("type") == "assets"
-            ]
-        if asset_types is None:
-            asset_types = [
-                r
-                for r in resources
-                if isinstance(r, dict) and r.get("type") == "assetTypes"
-            ]
+        config = context.config
+        region = config.get("region")
+        domain_id = config.get("domain_id", "")
+        project_id = config.get("project_id", "")
+
+        assets = [
+            r for r in context.catalog_data.get("assets", []) if isinstance(r, dict)
+        ]
+        asset_types = [
+            r for r in context.catalog_data.get("assetTypes", []) if isinstance(r, dict)
+        ]
+
+        if not assets and not asset_types:
+            findings.append(
+                Finding(
+                    severity=Severity.OK,
+                    message="No catalog resources to check dependencies for.",
+                    service="datazone",
+                )
+            )
+            return findings
 
         # 1. Glue Data Catalog resource validation (Req 13.1, 13.2, 13.3, 13.13)
         self._check_glue_resources(assets, region, findings)
@@ -151,17 +114,7 @@ class DependencyChecker:
         findings: List[Finding],
     ) -> None:
         """Validate Glue tables, views, and databases referenced by assets."""
-        try:
-            glue = boto3.client("glue", region_name=region)
-        except Exception as exc:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=f"Failed to create Glue client: {exc}",
-                    service="glue",
-                )
-            )
-            return
+        glue = boto3.client("glue", region_name=region)
 
         for asset in assets:
             asset_name = asset.get("name", "unknown")
@@ -227,10 +180,10 @@ class DependencyChecker:
             glue.get_database(Name=db_name)
             self._db_cache[db_name] = True
             logger.debug("Glue database '%s' exists", db_name)
-        except ClientError as exc:
-            error_code = exc.response.get("Error", {}).get("Code", "")
+        except Exception as exc:
+            error_code = getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+            self._db_cache[db_name] = False
             if error_code == "EntityNotFoundException":
-                self._db_cache[db_name] = False
                 findings.append(
                     Finding(
                         severity=Severity.ERROR,
@@ -249,29 +202,18 @@ class DependencyChecker:
                     )
                 )
             else:
-                self._db_cache[db_name] = False
+                detail = f"{error_code} — {exc}" if error_code else str(exc)
                 findings.append(
                     Finding(
                         severity=Severity.ERROR,
                         message=(
-                            f"Failed to check Glue database '{db_name}': "
-                            f"{error_code} — {exc}"
+                            f"Failed to check Glue database '{db_name}': {detail}"
                         ),
                         resource=db_name,
                         service="glue",
-                        details={"error_code": error_code},
+                        details={"error_code": error_code} if error_code else None,
                     )
                 )
-        except Exception as exc:
-            self._db_cache[db_name] = False
-            findings.append(
-                Finding(
-                    severity=Severity.ERROR,
-                    message=(f"Failed to check Glue database '{db_name}': {exc}"),
-                    resource=db_name,
-                    service="glue",
-                )
-            )
 
     def _check_glue_table(
         self,
@@ -321,10 +263,10 @@ class DependencyChecker:
             # Check partitions for non-view tables
             if not is_view:
                 self._check_partitions(glue, db_name, table_name, asset_name, findings)
-        except ClientError as exc:
-            error_code = exc.response.get("Error", {}).get("Code", "")
+        except Exception as exc:
+            error_code = getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+            self._table_cache[cache_key] = False
             if error_code == "EntityNotFoundException":
-                self._table_cache[cache_key] = False
                 findings.append(
                     Finding(
                         severity=Severity.ERROR,
@@ -344,32 +286,19 @@ class DependencyChecker:
                     )
                 )
             else:
-                self._table_cache[cache_key] = False
+                detail = f"{error_code} — {exc}" if error_code else str(exc)
                 findings.append(
                     Finding(
                         severity=Severity.ERROR,
                         message=(
                             f"Failed to check Glue {resource_type} "
-                            f"'{db_name}.{table_name}': {error_code} — {exc}"
+                            f"'{db_name}.{table_name}': {detail}"
                         ),
                         resource=f"{db_name}.{table_name}",
                         service="glue",
-                        details={"error_code": error_code},
+                        details={"error_code": error_code} if error_code else None,
                     )
                 )
-        except Exception as exc:
-            self._table_cache[cache_key] = False
-            findings.append(
-                Finding(
-                    severity=Severity.ERROR,
-                    message=(
-                        f"Failed to check Glue {resource_type} "
-                        f"'{db_name}.{table_name}': {exc}"
-                    ),
-                    resource=f"{db_name}.{table_name}",
-                    service="glue",
-                )
-            )
 
     def _check_partitions(
         self,
@@ -407,15 +336,16 @@ class DependencyChecker:
             )
             self._partition_cache[cache_key] = True
             logger.debug("Partitions for '%s.%s' are accessible", db_name, table_name)
-        except ClientError as exc:
-            error_code = exc.response.get("Error", {}).get("Code", "")
+        except Exception as exc:
+            error_code = getattr(exc, "response", {}).get("Error", {}).get("Code", "")
             self._partition_cache[cache_key] = False
+            detail = f"{error_code} " if error_code else f"{exc} "
             findings.append(
                 Finding(
                     severity=Severity.WARNING,
                     message=(
                         f"Partitions for Glue table '{db_name}.{table_name}' "
-                        f"are inaccessible: {error_code} "
+                        f"are inaccessible: {detail}"
                         f"(referenced by asset '{asset_name}')"
                     ),
                     resource=f"{db_name}.{table_name}",
@@ -424,22 +354,8 @@ class DependencyChecker:
                         "database_name": db_name,
                         "table_name": table_name,
                         "asset": asset_name,
-                        "error_code": error_code,
+                        **({"error_code": error_code} if error_code else {}),
                     },
-                )
-            )
-        except Exception as exc:
-            self._partition_cache[cache_key] = False
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=(
-                        f"Partitions for Glue table '{db_name}.{table_name}' "
-                        f"are inaccessible: {exc} "
-                        f"(referenced by asset '{asset_name}')"
-                    ),
-                    resource=f"{db_name}.{table_name}",
-                    service="glue",
                 )
             )
 
@@ -459,17 +375,7 @@ class DependencyChecker:
         if not domain_id or not project_id:
             return
 
-        try:
-            dz = boto3.client("datazone", region_name=region)
-        except Exception as exc:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=f"Failed to create DataZone client: {exc}",
-                    service="datazone",
-                )
-            )
-            return
+        dz = boto3.client("datazone", region_name=region)
 
         for asset in assets:
             asset_name = asset.get("name", "unknown")
@@ -601,17 +507,7 @@ class DependencyChecker:
         if not domain_id:
             return
 
-        try:
-            dz = boto3.client("datazone", region_name=region)
-        except Exception as exc:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=f"Failed to create DataZone client: {exc}",
-                    service="datazone",
-                )
-            )
-            return
+        dz = boto3.client("datazone", region_name=region)
 
         for asset_type in asset_types:
             at_name = asset_type.get("name", "unknown")
@@ -687,17 +583,7 @@ class DependencyChecker:
         if not domain_id:
             return
 
-        try:
-            dz = boto3.client("datazone", region_name=region)
-        except Exception as exc:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=f"Failed to create DataZone client: {exc}",
-                    service="datazone",
-                )
-            )
-            return
+        dz = boto3.client("datazone", region_name=region)
 
         for asset in assets:
             asset_name = asset.get("name", "unknown")
@@ -766,17 +652,7 @@ class DependencyChecker:
         if not domain_id:
             return
 
-        try:
-            dz = boto3.client("datazone", region_name=region)
-        except Exception as exc:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=f"Failed to create DataZone client: {exc}",
-                    service="datazone",
-                )
-            )
-            return
+        dz = boto3.client("datazone", region_name=region)
 
         for asset in assets:
             asset_name = asset.get("name", "unknown")
@@ -869,10 +745,6 @@ class DependencyChecker:
                 "name": resp.get("name"),
                 "revision": resp.get("revision"),
             }
-        except ClientError as exc:
-            error_code = exc.response.get("Error", {}).get("Code", "")
-            logger.debug("GetFormType failed for '%s': %s", form_type_id, error_code)
-            return None
         except Exception as exc:
             logger.debug("GetFormType failed for '%s': %s", form_type_id, exc)
             return None
@@ -904,10 +776,6 @@ class DependencyChecker:
             )
             items = resp.get("items", [])
             return len(items) > 0
-        except ClientError as exc:
-            error_code = exc.response.get("Error", {}).get("Code", "")
-            logger.debug("SearchTypes failed for '%s': %s", type_identifier, error_code)
-            return False
         except Exception as exc:
             logger.debug("SearchTypes failed for '%s': %s", type_identifier, exc)
             return False

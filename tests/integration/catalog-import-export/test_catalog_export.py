@@ -179,9 +179,9 @@ class TestCatalogExport(IntegrationTestBase):
         ft = next(x for x in data["formTypes"] if x["name"] == "TestFormType")
         assert "model" in ft
 
-        # Assets — inputForms + externalIdentifier
+        # Assets — formsInput + externalIdentifier
         for asset in data["assets"]:
-            assert "inputForms" in asset
+            assert "formsInput" in asset
 
     # ----------------------------------------------------------------
     # 7.4  Catalog export with no project-owned resources

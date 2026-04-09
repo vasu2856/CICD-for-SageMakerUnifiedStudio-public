@@ -66,60 +66,7 @@ def checker():
 # -----------------------------------------------------------------------
 
 
-class TestProjectCheckerNoConfig:
-    """Tests when manifest/target is not loaded."""
-
-    def test_no_target_config_produces_warning(self, checker):
-        context = DryRunContext(manifest_file="m.yaml", target_config=None)
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "skipping" in findings[0].message.lower()
-
-    def test_no_config_dict_produces_warning(self, checker):
-        context = DryRunContext(
-            manifest_file="m.yaml",
-            target_config=_TargetConfig(),
-            config=None,
-        )
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-
-    def test_no_project_config_produces_warning(self, checker):
-        context = _make_context(has_project_config=False)
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "no project configuration" in findings[0].message.lower()
-
-    def test_no_domain_id_produces_warning(self, checker):
-        context = DryRunContext(
-            manifest_file="m.yaml",
-            target_config=_TargetConfig(project=_ProjectConfig(name="proj")),
-            config={"region": "us-east-1"},
-        )
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "domain_id" in findings[0].message.lower()
-
-    def test_no_project_name_produces_warning(self, checker):
-        context = DryRunContext(
-            manifest_file="m.yaml",
-            target_config=_TargetConfig(project=_ProjectConfig(name="")),
-            config={"region": "us-east-1", "domain_id": "dzd_test"},
-        )
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "project_name" in findings[0].message.lower()
-
+# TestProjectCheckerNoConfig tests moved to test_preflight_checker.py
 
 # -----------------------------------------------------------------------
 # Test: Project exists → OK (Req 5.1)

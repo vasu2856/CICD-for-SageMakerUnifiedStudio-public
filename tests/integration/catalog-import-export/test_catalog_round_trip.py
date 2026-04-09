@@ -115,7 +115,7 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         r = self.run_cli_command(["bundle", "--manifest", pf])
         assert r["success"], f"bundle failed: {r['output']}"
 
-        bundle = _h.find_bundle_zip()
+        bundle = _h.find_bundle_zip(prefix="CatalogImportTest")
         assert bundle
 
         catalog = _h.read_catalog_from_bundle(bundle)
@@ -141,7 +141,7 @@ class TestCatalogRoundTrip(IntegrationTestBase):
             assert "glossaryId" in exported_term
 
         for asset in catalog.get("assets", []):
-            assert "inputForms" in asset
+            assert "formsInput" in asset
 
         # Deploy to target
         r = self.run_cli_command(
@@ -192,7 +192,7 @@ class TestCatalogRoundTrip(IntegrationTestBase):
 
         out = r["output"].lower()
         assert "catalog" in out
-        for kw in ["created", "updated", "deleted", "failed"]:
+        for kw in ["created", "updated", "skipped", "failed"]:
             assert kw in out
 
     # ==================================================================
@@ -286,7 +286,7 @@ class TestCatalogRoundTrip(IntegrationTestBase):
         r = self.run_cli_command(["bundle", "--manifest", pf])
         assert r["success"], f"bundle failed: {r['output']}"
 
-        bundle = _h.find_bundle_zip()
+        bundle = _h.find_bundle_zip(prefix="CatalogImportExportTest")
         assert bundle
 
         catalog = _h.read_catalog_from_bundle(bundle)

@@ -20,6 +20,7 @@ class Phase(enum.Enum):
 
     MANIFEST_VALIDATION = "Manifest Validation"
     BUNDLE_EXPLORATION = "Bundle Exploration"
+    PREFLIGHT = "Preflight Checks"
     PERMISSION_VERIFICATION = "Permission Verification"
     CONNECTIVITY = "Connectivity & Reachability"
     PROJECT_INIT = "Project Initialization"

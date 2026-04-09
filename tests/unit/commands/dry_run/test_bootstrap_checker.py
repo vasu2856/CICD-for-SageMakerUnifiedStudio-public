@@ -6,7 +6,7 @@ Tests cover:
 - Empty actions list → OK "no bootstrap actions configured"
 - Single known action type → OK with type and parameters
 - Multiple actions → one OK finding per action
-- Unknown action type → WARNING "no registered handler found"
+- Unknown action type → ERROR "no registered handler found"
 - Action with no parameters → OK message without parameter summary
 - Action with multiple parameters → OK message with sorted param keys
 - Finding metadata (resource, service, details)
@@ -62,15 +62,7 @@ def checker() -> BootstrapChecker:
 # ---------------------------------------------------------------------------
 
 
-class TestNoTargetConfig:
-    def test_no_target_config_returns_warning(self, checker):
-        ctx = _make_context(target=None)
-        findings = checker.check(ctx)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "manifest/target not loaded" in findings[0].message
-
+# TestNoTargetConfig tests moved to test_preflight_checker.py
 
 # ---------------------------------------------------------------------------
 # No bootstrap actions configured
@@ -214,7 +206,7 @@ class TestUnknownActionType:
         findings = checker.check(ctx)
 
         assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
+        assert findings[0].severity == Severity.ERROR
         assert "no registered handler found" in findings[0].message
         assert "unknown.action" in findings[0].message
 

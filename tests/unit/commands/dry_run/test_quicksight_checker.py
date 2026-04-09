@@ -91,28 +91,7 @@ def checker():
 # -----------------------------------------------------------------------
 
 
-class TestQuickSightCheckerNoConfig:
-    """Tests when manifest/target is not loaded."""
-
-    def test_no_target_config_produces_warning(self, checker):
-        context = DryRunContext(manifest_file="m.yaml", target_config=None)
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "skipping" in findings[0].message.lower()
-
-    def test_no_config_dict_produces_warning(self, checker):
-        context = DryRunContext(
-            manifest_file="m.yaml",
-            target_config=_TargetConfig(),
-            config=None,
-        )
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-
+# TestQuickSightCheckerNoConfig tests moved to test_preflight_checker.py
 
 # -----------------------------------------------------------------------
 # Test: No dashboards configured → OK

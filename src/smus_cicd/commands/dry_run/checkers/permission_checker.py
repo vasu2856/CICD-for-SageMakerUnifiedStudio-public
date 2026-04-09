@@ -19,8 +19,11 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import boto3
-from botocore.exceptions import ClientError as BotocoreClientError
 
+from smus_cicd.commands.dry_run.checkers import (
+    get_project_connections,
+    is_catalog_disabled,
+)
 from smus_cicd.commands.dry_run.models import DryRunContext, Finding, Severity
 from smus_cicd.helpers.catalog_import import has_glue_references
 
@@ -90,19 +93,7 @@ class PermissionChecker:
     def check(self, context: DryRunContext) -> List[Finding]:
         findings: List[Finding] = []
 
-        if context.target_config is None or context.config is None:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=(
-                        "Skipping permission verification: "
-                        "manifest/target not loaded"
-                    ),
-                )
-            )
-            return findings
-
-        region = context.config.get("region", "us-east-1")
+        region = context.config.get("region")
 
         # --- Step 1: Get caller identity ---
         caller_arn = self._get_caller_arn(region, findings)
@@ -290,7 +281,7 @@ class PermissionChecker:
             return
 
         # Resolve real bucket names via DataZone project connections
-        project_connections = self._get_project_connections(context, region)
+        project_connections = get_project_connections(context, region)
 
         seen_buckets: set = set()
         for conn_name in connection_names:
@@ -314,31 +305,6 @@ class PermissionChecker:
             arn = f"arn:aws:s3:::{bucket_name}/*"
             permissions.setdefault(arn, []).extend(["s3:PutObject", "s3:GetObject"])
 
-    @staticmethod
-    def _get_project_connections(context: DryRunContext, region: str) -> dict | None:
-        """Attempt to fetch project connections from DataZone.
-
-        Returns the connections dict or ``None`` if resolution fails.
-        """
-        config = context.config or {}
-        project_name = config.get("project_name")
-        if not project_name:
-            project_cfg = getattr(context.target_config, "project", None)
-            project_name = getattr(project_cfg, "name", None) if project_cfg else None
-
-        if not project_name:
-            return None
-
-        try:
-            from smus_cicd.helpers.utils import get_datazone_project_info
-
-            info = get_datazone_project_info(project_name, config)
-            if "error" in info:
-                return None
-            return info.get("connections")
-        except Exception:
-            return None
-
     def _add_datazone_permissions(
         self,
         target: Any,
@@ -361,7 +327,7 @@ class PermissionChecker:
         dz_arn: str,
     ) -> None:
         """Add catalog import and grant permissions when catalog assets exist."""
-        if context.catalog_data is None:
+        if context.catalog_data is None or is_catalog_disabled(context):
             return
 
         # Catalog import permissions (Req 4.3)
@@ -468,7 +434,7 @@ class PermissionChecker:
         region: str,
     ) -> None:
         """Add Glue permissions when catalog assets contain Glue references."""
-        if not context.catalog_data:
+        if not context.catalog_data or is_catalog_disabled(context):
             return
 
         if has_glue_references(context.catalog_data):
@@ -483,17 +449,7 @@ class PermissionChecker:
         findings: List[Finding],
     ) -> None:
         """Call ``iam:SimulatePrincipalPolicy`` and record findings."""
-        try:
-            iam = boto3.client("iam", region_name=region)
-        except Exception as exc:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=f"Failed to create IAM client: {exc}",
-                    service="iam",
-                )
-            )
-            return
+        iam = boto3.client("iam", region_name=region)
 
         for resource_arn, actions in permissions_map.items():
             # De-duplicate actions for the same resource
@@ -505,8 +461,10 @@ class PermissionChecker:
                     ResourceArns=[resource_arn],
                 )
                 self._process_simulation_results(response, resource_arn, findings)
-            except BotocoreClientError as exc:
-                error_code = exc.response.get("Error", {}).get("Code", "")
+            except Exception as exc:
+                error_code = (
+                    getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+                )
                 if error_code in ("AccessDenied", "AccessDeniedException"):
                     # Fall back to WARNING — we cannot verify but that
                     # doesn't mean permissions are missing (Req 4.6 fallback).
@@ -533,18 +491,6 @@ class PermissionChecker:
                             service="iam",
                         )
                     )
-            except Exception as exc:
-                findings.append(
-                    Finding(
-                        severity=Severity.WARNING,
-                        message=(
-                            f"Unexpected error verifying permissions for "
-                            f"{resource_arn}: {exc}"
-                        ),
-                        resource=resource_arn,
-                        service="iam",
-                    )
-                )
 
     def _process_simulation_results(
         self,
@@ -598,7 +544,7 @@ class PermissionChecker:
         catalog data and, if so, verifies the grant exists via
         ``list_policy_grants``.
         """
-        if context.catalog_data is None:
+        if context.catalog_data is None or is_catalog_disabled(context):
             return
 
         config = context.config or {}
@@ -731,8 +677,10 @@ class PermissionChecker:
                 )
                 if resp.get("grantList"):
                     already_granted = True
-            except BotocoreClientError as exc:
-                error_code = exc.response.get("Error", {}).get("Code", "")
+            except Exception as exc:
+                error_code = (
+                    getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+                )
                 if error_code in ("AccessDenied", "AccessDeniedException"):
                     findings.append(
                         Finding(
@@ -745,15 +693,6 @@ class PermissionChecker:
                         )
                     )
                     continue
-                findings.append(
-                    Finding(
-                        severity=Severity.WARNING,
-                        message=f"Error checking {grant_type} grant: {exc}",
-                        service="datazone",
-                    )
-                )
-                continue
-            except Exception as exc:
                 findings.append(
                     Finding(
                         severity=Severity.WARNING,

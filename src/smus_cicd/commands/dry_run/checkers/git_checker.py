@@ -27,17 +27,6 @@ class GitChecker:
     def check(self, context: DryRunContext) -> List[Finding]:
         findings: List[Finding] = []
 
-        if context.target_config is None:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=(
-                        "Skipping git deployment check: " "manifest/target not loaded"
-                    ),
-                )
-            )
-            return findings
-
         dep_cfg = getattr(context.target_config, "deployment_configuration", None)
         git_items = getattr(dep_cfg, "git", None) if dep_cfg else None
 

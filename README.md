@@ -48,7 +48,7 @@ aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 aws-smus-cicd-cli bundle --manifest manifest.yaml
 
 # Preview deployment (dry run)
-smus-cicd-cli deploy --targets test --manifest manifest.yaml --dry-run
+aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml --dry-run
 
 # Deploy to test environment
 aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
@@ -273,7 +273,7 @@ GitHub Actions workflows (or other CI/CD systems) that automate deployment:
 
 **Direct (Git-based):** Deploy directly from sources without intermediate artifacts
 - Good for: simpler workflows, rapid iteration, git as source of truth
-- Command: `aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test`
+- Command: `aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test`
 
 Both modes work with any combination of storage and git content sources.
 

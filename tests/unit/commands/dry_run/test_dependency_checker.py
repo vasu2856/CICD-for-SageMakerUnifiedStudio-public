@@ -131,38 +131,17 @@ def checker() -> DependencyChecker:
 
 
 class TestDependencyCheckerSkipPaths:
-    def test_no_catalog_data_produces_warning(self, checker):
+    def test_no_catalog_data_produces_ok(self, checker):
         ctx = _make_context(catalog_data=None)
         findings = checker.check(ctx)
         assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "no catalog data" in findings[0].message.lower()
+        assert findings[0].severity == Severity.OK
+        assert "no catalog resources" in findings[0].message.lower()
 
-    def test_no_target_config_produces_warning(self, checker):
-        ctx = _make_context(has_target=False, catalog_data={"resources": []})
-        # target_config is None
-        ctx.target_config = None
-        findings = checker.check(ctx)
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert (
-            "manifest" in findings[0].message.lower()
-            or "target" in findings[0].message.lower()
-        )
-
-    def test_no_config_dict_produces_warning(self, checker):
-        ctx = DryRunContext(
-            manifest_file="m.yaml",
-            target_config=object(),
-            config=None,
-            catalog_data={"resources": [{"type": "assets"}]},
-        )
-        findings = checker.check(ctx)
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
+    # test_no_target_config and test_no_config_dict moved to test_preflight_checker.py
 
     def test_empty_resources_produces_ok(self, checker):
-        ctx = _make_context(catalog_data={"resources": []})
+        ctx = _make_context(catalog_data={"assets": [], "assetTypes": []})
         findings = checker.check(ctx)
         assert len(findings) == 1
         assert findings[0].severity == Severity.OK
@@ -184,7 +163,7 @@ class TestGlueDatabaseValidation:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -198,7 +177,7 @@ class TestGlueDatabaseValidation:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("missing_db", "mytable")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         db_errors = [
@@ -216,7 +195,7 @@ class TestGlueDatabaseValidation:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("secret_db", "mytable")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         errors = [
@@ -233,7 +212,7 @@ class TestGlueDatabaseValidation:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("bad_db", "mytable")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         errors = [
@@ -258,7 +237,7 @@ class TestGlueTableValidation:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "missing_tbl")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         tbl_errors = [
@@ -277,7 +256,7 @@ class TestGlueTableValidation:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "missing_view", table_type="VIRTUAL_VIEW")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         view_errors = [
@@ -296,7 +275,7 @@ class TestGlueTableValidation:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "good_tbl")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         errors = [f for f in findings if f.severity == Severity.ERROR]
@@ -310,7 +289,7 @@ class TestGlueTableValidation:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "secret_tbl")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         errors = [
@@ -328,7 +307,7 @@ class TestGlueTableValidation:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "my_view", table_type="VIEW")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         checker.check(ctx)
 
         glue.get_partitions.assert_not_called()
@@ -349,7 +328,7 @@ class TestPartitionAccessibility:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         warnings = [
@@ -368,7 +347,7 @@ class TestPartitionAccessibility:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         warnings = [
@@ -388,7 +367,7 @@ class TestPartitionAccessibility:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         warnings = [
@@ -423,7 +402,7 @@ class TestDataSourceValidation:
         mock_boto3.client.side_effect = _client_factory
 
         asset = _glue_asset("mydb", "mytable", ds_form=True)
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         ds_warnings = [
@@ -449,7 +428,7 @@ class TestDataSourceValidation:
         mock_boto3.client.side_effect = _client_factory
 
         asset = _glue_asset("mydb", "mytable", ds_form=True)
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         ds_warnings = [
@@ -475,7 +454,7 @@ class TestDataSourceValidation:
         mock_boto3.client.side_effect = _client_factory
 
         asset = _glue_asset("mydb", "mytable", ds_form=True)
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         ds_warnings = [
@@ -494,7 +473,7 @@ class TestDataSourceValidation:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable", ds_form=True)
-        ctx = _make_context(catalog_data={"resources": [asset]}, domain_id="")
+        ctx = _make_context(catalog_data={"assets": [asset]}, domain_id="")
         findings = checker.check(ctx)
 
         ds_warnings = [f for f in findings if "data source" in f.message.lower()]
@@ -521,7 +500,7 @@ class TestCustomFormTypeValidation:
         at = _asset_type_resource(
             forms_input={"myForm": {"typeIdentifier": "custom.MyFormType"}}
         )
-        ctx = _make_context(catalog_data={"resources": [at]})
+        ctx = _make_context(catalog_data={"assetTypes": [at]})
         findings = checker.check(ctx)
 
         ft_errors = [
@@ -545,7 +524,7 @@ class TestCustomFormTypeValidation:
         at = _asset_type_resource(
             forms_input={"myForm": {"typeIdentifier": "custom.MissingForm"}}
         )
-        ctx = _make_context(catalog_data={"resources": [at]})
+        ctx = _make_context(catalog_data={"assetTypes": [at]})
         findings = checker.check(ctx)
 
         ft_errors = [
@@ -568,7 +547,7 @@ class TestCustomFormTypeValidation:
         at = _asset_type_resource(
             forms_input={"managed": {"typeIdentifier": "amazon.datazone.SomeFormType"}}
         )
-        ctx = _make_context(catalog_data={"resources": [at]})
+        ctx = _make_context(catalog_data={"assetTypes": [at]})
         findings = checker.check(ctx)
 
         ft_errors = [
@@ -593,7 +572,7 @@ class TestCustomFormTypeValidation:
         at = _asset_type_resource(
             forms_input={"myForm": {"typeName": "custom.FallbackForm"}}
         )
-        ctx = _make_context(catalog_data={"resources": [at]})
+        ctx = _make_context(catalog_data={"assetTypes": [at]})
         findings = checker.check(ctx)
 
         ft_errors = [
@@ -628,7 +607,7 @@ class TestCustomAssetTypeValidation:
             "typeIdentifier": "custom.MyAssetType",
             "formsInput": [],
         }
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         at_errors = [
@@ -656,7 +635,7 @@ class TestCustomAssetTypeValidation:
             "typeIdentifier": "custom.MissingAssetType",
             "formsInput": [],
         }
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         at_errors = [
@@ -683,7 +662,7 @@ class TestCustomAssetTypeValidation:
             "typeIdentifier": "amazon.datazone.ManagedType",
             "formsInput": [],
         }
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         at_errors = [
@@ -712,7 +691,7 @@ class TestCustomAssetTypeValidation:
             "typeIdentifier": "custom.FailType",
             "formsInput": [],
         }
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         at_errors = [
@@ -752,7 +731,7 @@ class TestFormTypeRevisionValidation:
                 }
             ],
         }
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         rev_warnings = [
@@ -785,7 +764,7 @@ class TestFormTypeRevisionValidation:
                 }
             ],
         }
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         rev_warnings = [
@@ -820,7 +799,7 @@ class TestFormTypeRevisionValidation:
                 }
             ],
         }
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         rev_warnings = [
@@ -854,7 +833,7 @@ class TestFormTypeRevisionValidation:
                 }
             ],
         }
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         # Should not have a revision warning — the form type itself is missing
@@ -887,7 +866,7 @@ class TestFormTypeRevisionValidation:
                 }
             ],
         }
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         rev_warnings = [
@@ -916,7 +895,7 @@ class TestCachingBehaviour:
         # Two assets referencing the same database
         asset1 = _glue_asset("shared_db", "tbl1", asset_name="asset1")
         asset2 = _glue_asset("shared_db", "tbl2", asset_name="asset2")
-        ctx = _make_context(catalog_data={"resources": [asset1, asset2]})
+        ctx = _make_context(catalog_data={"assets": [asset1, asset2]})
         checker.check(ctx)
 
         # get_database should be called only once for "shared_db"
@@ -933,7 +912,7 @@ class TestCachingBehaviour:
         # Two assets referencing the same table
         asset1 = _glue_asset("mydb", "shared_tbl", asset_name="asset1")
         asset2 = _glue_asset("mydb", "shared_tbl", asset_name="asset2")
-        ctx = _make_context(catalog_data={"resources": [asset1, asset2]})
+        ctx = _make_context(catalog_data={"assets": [asset1, asset2]})
         checker.check(ctx)
 
         # get_table should be called only once for ("mydb", "shared_tbl")
@@ -949,7 +928,7 @@ class TestCachingBehaviour:
 
         asset1 = _glue_asset("mydb", "tbl", asset_name="asset1")
         asset2 = _glue_asset("mydb", "tbl", asset_name="asset2")
-        ctx = _make_context(catalog_data={"resources": [asset1, asset2]})
+        ctx = _make_context(catalog_data={"assets": [asset1, asset2]})
         checker.check(ctx)
 
         assert glue.get_partitions.call_count == 1
@@ -964,7 +943,7 @@ class TestCachingBehaviour:
 
         asset1 = _glue_asset("gone_db", "tbl1", asset_name="asset1")
         asset2 = _glue_asset("gone_db", "tbl2", asset_name="asset2")
-        ctx = _make_context(catalog_data={"resources": [asset1, asset2]})
+        ctx = _make_context(catalog_data={"assets": [asset1, asset2]})
         findings = checker.check(ctx)
 
         db_errors = [
@@ -999,7 +978,7 @@ class TestCachingBehaviour:
             name="Type2",
             forms_input={"f": {"typeIdentifier": "custom.SharedForm"}},
         )
-        ctx = _make_context(catalog_data={"resources": [at1, at2]})
+        ctx = _make_context(catalog_data={"assetTypes": [at1, at2]})
         checker.check(ctx)
 
         assert dz.get_form_type.call_count == 1
@@ -1029,7 +1008,7 @@ class TestCachingBehaviour:
             "typeIdentifier": "custom.SharedAssetType",
             "formsInput": [],
         }
-        ctx = _make_context(catalog_data={"resources": [asset1, asset2]})
+        ctx = _make_context(catalog_data={"assets": [asset1, asset2]})
         checker.check(ctx)
 
         assert dz.search_types.call_count == 1
@@ -1053,33 +1032,11 @@ class TestCachingBehaviour:
 
         asset1 = _glue_asset("mydb", "tbl1", asset_name="a1", ds_form=True)
         asset2 = _glue_asset("mydb", "tbl2", asset_name="a2", ds_form=True)
-        ctx = _make_context(catalog_data={"resources": [asset1, asset2]})
+        ctx = _make_context(catalog_data={"assets": [asset1, asset2]})
         checker.check(ctx)
 
         # Both assets have same db_name → same cache key → one API call
         assert dz.list_data_sources.call_count == 1
-
-
-# ---------------------------------------------------------------------------
-# Glue client creation failure
-# ---------------------------------------------------------------------------
-
-
-class TestGlueClientFailure:
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_glue_client_creation_failure_produces_warning(self, mock_boto3, checker):
-        mock_boto3.client.side_effect = RuntimeError("no credentials")
-
-        asset = _glue_asset("mydb", "mytable")
-        ctx = _make_context(catalog_data={"resources": [asset]})
-        findings = checker.check(ctx)
-
-        warnings = [
-            f
-            for f in findings
-            if f.severity == Severity.WARNING and "glue client" in f.message.lower()
-        ]
-        assert len(warnings) >= 1
 
 
 # ---------------------------------------------------------------------------
@@ -1125,7 +1082,7 @@ class TestFindingMetadata:
         mock_boto3.client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable")
-        ctx = _make_context(catalog_data={"resources": [asset]})
+        ctx = _make_context(catalog_data={"assets": [asset]})
         findings = checker.check(ctx)
 
         db_errors = [
@@ -1152,7 +1109,7 @@ class TestFindingMetadata:
         at = _asset_type_resource(
             forms_input={"f": {"typeIdentifier": "custom.MissingForm"}}
         )
-        ctx = _make_context(catalog_data={"resources": [at]})
+        ctx = _make_context(catalog_data={"assetTypes": [at]})
         findings = checker.check(ctx)
 
         ft_errors = [

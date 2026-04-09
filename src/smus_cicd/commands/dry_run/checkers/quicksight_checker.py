@@ -27,17 +27,6 @@ class QuickSightChecker:
     def check(self, context: DryRunContext) -> List[Finding]:
         findings: List[Finding] = []
 
-        if context.target_config is None or context.config is None:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=(
-                        "Skipping QuickSight check: " "manifest/target not loaded"
-                    ),
-                )
-            )
-            return findings
-
         # Collect dashboards from manifest content
         dashboards = []
         manifest = context.manifest
@@ -66,7 +55,7 @@ class QuickSightChecker:
         config = context.config
         region = getattr(
             getattr(context.target_config, "domain", None), "region", None
-        ) or config.get("region", "us-east-1")
+        ) or config.get("region")
         aws_account_id = config.get("aws", {}).get("account_id")
 
         if not aws_account_id:

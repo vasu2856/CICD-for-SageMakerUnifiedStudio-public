@@ -31,17 +31,6 @@ class BootstrapChecker:
     def check(self, context: DryRunContext) -> List[Finding]:
         findings: List[Finding] = []
 
-        if context.target_config is None:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=(
-                        "Skipping bootstrap action check: " "manifest/target not loaded"
-                    ),
-                )
-            )
-            return findings
-
         bootstrap = getattr(context.target_config, "bootstrap", None)
         actions = getattr(bootstrap, "actions", None) or [] if bootstrap else []
 
@@ -84,7 +73,7 @@ class BootstrapChecker:
             else:
                 findings.append(
                     Finding(
-                        severity=Severity.WARNING,
+                        severity=Severity.ERROR,
                         message=(
                             f"Bootstrap action '{action_type}': "
                             f"no registered handler found"

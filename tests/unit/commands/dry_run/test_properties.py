@@ -45,6 +45,16 @@ finding_tuple_strategy = st.tuples(
 )
 
 
+def _group_resources_by_type(resources):
+    """Group a flat list of resource dicts by their 'type' field into keyed format."""
+    grouped = {"metadata": {}}
+    for r in resources:
+        if isinstance(r, dict):
+            rtype = r.get("type", "unknown")
+            grouped.setdefault(rtype, []).append(r)
+    return grouped
+
+
 # Feature: deploy-dry-run, Property 15: Report structure correctness
 # **Validates: Requirements 7.1, 7.2, 7.3**
 @given(finding_tuples=st.lists(finding_tuple_strategy, min_size=0, max_size=50))
@@ -765,7 +775,7 @@ def test_property_9_permission_set_correctness(
                     ],
                 }
             )
-        catalog_data = {"metadata": {}, "resources": resources}
+        catalog_data = _group_resources_by_type(resources)
 
     context = DryRunContext(
         manifest_file="manifest.yaml",
@@ -802,7 +812,10 @@ def test_property_9_permission_set_correctness(
 
     with patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.boto3"
-    ) as mock_boto3:
+    ) as mock_boto3, patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
+        return_value={},
+    ):
         mock_boto3.client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
@@ -983,9 +996,8 @@ def test_property_14_s3_bucket_reachability(bucket_names, fail_flags):
     ) as mock_boto3, patch(
         "smus_cicd.helpers.datazone.get_project_by_name",
         return_value={"name": "test-project"},
-    ), patch.object(
-        ConnectivityChecker,
-        "_get_project_connections",
+    ), patch(
+        "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections",
         return_value=mock_connections,
     ):
         mock_boto3.client.side_effect = lambda svc, **kw: {
@@ -1121,8 +1133,20 @@ def test_property_11_storage_simulation_reporting(storage_items, file_counts):
         bundle_files=bundle_files,
     )
 
+    # Build mock connections from storage items
+    mock_connections = {}
+    for item in storage_items:
+        conn = item[1]  # connectionName
+        bucket = item[2]  # bucket
+        if conn:
+            mock_connections[conn] = {"s3Uri": f"s3://{bucket}"}
+
     checker = StorageChecker()
-    findings = checker.check(context)
+    with patch(
+        "smus_cicd.commands.dry_run.checkers.storage_checker.get_project_connections",
+        return_value=mock_connections,
+    ):
+        findings = checker.check(context)
 
     # Filter to OK findings with service "s3" (storage simulation findings)
     ok_findings = [
@@ -1230,10 +1254,7 @@ def test_property_12_catalog_resource_type_counting(
             }
         )
 
-    catalog_data = {
-        "metadata": {"version": "1.0"},
-        "resources": resources,
-    }
+    catalog_data = _group_resources_by_type(resources)
 
     context = DryRunContext(
         manifest_file="manifest.yaml",
@@ -1317,22 +1338,21 @@ def test_property_12_catalog_resource_type_counting(
 def _build_catalog_resource_with_subset(idx, field_flags):
     """Build a catalog resource dict with a unique index-based identity.
 
-    ``field_flags`` is a 3-tuple of bools indicating whether (type, name,
-    identifier) should be present.
+    ``field_flags`` is a 2-tuple of bools indicating whether (name,
+    identifier) should be present. Type is always set since it's auto-tagged
+    from the key in the keyed format.
     """
-    resource = {}
+    resource = {"type": "glossaries"}
     if field_flags[0]:
-        resource["type"] = "glossaries"
-    if field_flags[1]:
         resource["name"] = f"Resource-{idx}"
-    if field_flags[2]:
+    if field_flags[1]:
         resource["identifier"] = f"res-id-{idx}"
     return resource
 
 
 @given(
     field_flags_list=st.lists(
-        st.tuples(st.booleans(), st.booleans(), st.booleans()),
+        st.tuples(st.booleans(), st.booleans()),
         min_size=1,
         max_size=10,
     )
@@ -1355,10 +1375,7 @@ def test_property_18_catalog_resource_field_validation(field_flags_list):
         for idx, flags in enumerate(field_flags_list)
     ]
 
-    catalog_data = {
-        "metadata": {"version": "1.0"},
-        "resources": resources,
-    }
+    catalog_data = _group_resources_by_type(resources)
 
     context = DryRunContext(
         manifest_file="manifest.yaml",
@@ -1535,10 +1552,7 @@ def test_property_19_catalog_cross_reference_resolution(
             }
         )
 
-    catalog_data = {
-        "metadata": {"version": "1.0"},
-        "resources": resources,
-    }
+    catalog_data = _group_resources_by_type(resources)
 
     context = DryRunContext(
         manifest_file="manifest.yaml",
@@ -2111,7 +2125,7 @@ def test_property_23_glue_data_catalog_dependency(data, num_assets):
             }
         )
 
-    catalog_data = {"metadata": {}, "resources": resources}
+    catalog_data = _group_resources_by_type(resources)
 
     # Build lookup maps keyed by unique resource identifiers.
     # The checker caches by db_name and (db_name, table_name), so the
@@ -2331,7 +2345,7 @@ def test_property_24_data_source_dependency(data, num_assets):
             }
         )
 
-    catalog_data = {"metadata": {}, "resources": resources}
+    catalog_data = _group_resources_by_type(resources)
 
     # Build lookup map keyed by unique (ds_type, db_name) — the checker
     # caches by this tuple, so the *first* occurrence determines the mock
@@ -2533,7 +2547,7 @@ def test_property_25_form_type_dependency(data, num_asset_types):
 
     missing_custom = {ft for ft, exists in custom_exists.items() if not exists}
 
-    catalog_data = {"metadata": {}, "resources": resources}
+    catalog_data = _group_resources_by_type(resources)
 
     # Configure mock DataZone client
     mock_dz = MagicMock()
@@ -2704,7 +2718,7 @@ def test_property_26_asset_type_dependency(data, num_assets):
             }
         )
 
-    catalog_data = {"metadata": {}, "resources": resources}
+    catalog_data = _group_resources_by_type(resources)
 
     # Build lookup map — the checker caches by type_identifier, so the
     # *first* occurrence of each unique type determines the mock response.
@@ -2909,7 +2923,7 @@ def test_property_27_form_type_revision_resolution(data, num_assets):
             }
         )
 
-    catalog_data = {"metadata": {}, "resources": resources}
+    catalog_data = _group_resources_by_type(resources)
 
     # For each custom form type, decide the target domain response:
     # - "exists_matching": form type exists, revision matches any requested revision
@@ -3161,7 +3175,7 @@ def test_property_28_dependency_check_caching(data, num_duplicates):
             }
         )
 
-    catalog_data = {"metadata": {}, "resources": resources}
+    catalog_data = _group_resources_by_type(resources)
 
     def _make_client_error(code: str, op: str) -> ClientError:
         return ClientError({"Error": {"Code": code}}, op)
@@ -3325,17 +3339,17 @@ def test_property_28_dependency_check_caching(data, num_duplicates):
 @given(
     severities=st.lists(
         st.sampled_from(list(Severity)),
-        min_size=12,
-        max_size=12,
+        min_size=13,
+        max_size=13,
     ),
 )
 @settings(max_examples=100)
 def test_property_13_phase_ordering_invariant(severities):
     """For any dry-run execution, the phases in the report shall appear in the
-    order: MANIFEST_VALIDATION → BUNDLE_EXPLORATION → PERMISSION_VERIFICATION →
-    CONNECTIVITY → PROJECT_INIT → QUICKSIGHT → STORAGE_DEPLOYMENT →
-    GIT_DEPLOYMENT → CATALOG_IMPORT → DEPENDENCY_VALIDATION →
-    WORKFLOW_VALIDATION → BOOTSTRAP_ACTIONS.
+    order: MANIFEST_VALIDATION → BUNDLE_EXPLORATION → PREFLIGHT →
+    PERMISSION_VERIFICATION → CONNECTIVITY → PROJECT_INIT → QUICKSIGHT →
+    STORAGE_DEPLOYMENT → GIT_DEPLOYMENT → CATALOG_IMPORT →
+    DEPENDENCY_VALIDATION → WORKFLOW_VALIDATION → BOOTSTRAP_ACTIONS.
     """
     expected_phase_order = list(Phase)
 
@@ -3344,14 +3358,16 @@ def test_property_13_phase_ordering_invariant(severities):
         stage_name="dev",
     )
 
-    # Replace all 12 checkers with mocks that return OK findings
-    # (use the generated severity for the manifest checker to ensure
-    # we only test ordering when manifest passes — i.e. no ERROR on Phase 1)
+    # Replace all 13 checkers with mocks that return OK findings
+    # Ensure manifest and preflight checkers never return ERROR so all phases run
     mock_checkers = []
     for i, phase in enumerate(expected_phase_order):
         mock = MagicMock()
-        # Ensure manifest checker never returns ERROR so all phases run
-        sev = Severity.OK if phase == Phase.MANIFEST_VALIDATION else severities[i]
+        sev = (
+            Severity.OK
+            if phase in (Phase.MANIFEST_VALIDATION, Phase.PREFLIGHT)
+            else severities[i]
+        )
         mock.check.return_value = [
             Finding(severity=sev, message=f"{phase.value} check")
         ]
@@ -3437,13 +3453,13 @@ def test_property_1_no_mutation_invariant(num_checkers):
 @given(
     finding_severities=st.lists(
         st.sampled_from(list(Severity)),
-        min_size=12,
-        max_size=12,
+        min_size=13,
+        max_size=13,
     ),
     finding_messages=st.lists(
         st.text(min_size=1, max_size=40),
-        min_size=12,
-        max_size=12,
+        min_size=13,
+        max_size=13,
     ),
 )
 @settings(max_examples=100)
@@ -3462,10 +3478,10 @@ def test_property_21_dry_run_idempotence(finding_severities, finding_messages):
         mock_checkers = []
         for i, phase in enumerate(phases):
             mock = MagicMock()
-            # Ensure manifest checker never returns ERROR so all phases run
+            # Ensure manifest and preflight checkers never return ERROR so all phases run
             sev = (
                 Severity.OK
-                if phase == Phase.MANIFEST_VALIDATION
+                if phase in (Phase.MANIFEST_VALIDATION, Phase.PREFLIGHT)
                 else finding_severities[i]
             )
             mock.check.return_value = [
@@ -3780,13 +3796,13 @@ def test_property_31_pre_deployment_event_suppression(emit_events):
 @given(
     finding_severities=st.lists(
         st.sampled_from(list(Severity)),
-        min_size=12,
-        max_size=12,
+        min_size=13,
+        max_size=13,
     ),
     finding_messages=st.lists(
         st.text(min_size=1, max_size=40),
-        min_size=12,
-        max_size=12,
+        min_size=13,
+        max_size=13,
     ),
 )
 @settings(max_examples=100)
@@ -3810,10 +3826,10 @@ def test_property_32_pre_deployment_validation_uses_same_engine(
         mock_checkers = []
         for i, phase in enumerate(phases):
             mock = MagicMock()
-            # Ensure manifest checker never returns ERROR so all phases run
+            # Ensure manifest and preflight checkers never return ERROR so all phases run
             sev = (
                 Severity.OK
-                if phase == Phase.MANIFEST_VALIDATION
+                if phase in (Phase.MANIFEST_VALIDATION, Phase.PREFLIGHT)
                 else finding_severities[i]
             )
             mock.check.return_value = [

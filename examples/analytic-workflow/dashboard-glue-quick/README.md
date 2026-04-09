@@ -83,7 +83,7 @@ This creates a clean `TotalDeathByCountry` dashboard in your dev QuickSight acco
 Export the dashboard from dev QuickSight and package it for deployment:
 
 ```bash
-smus-cli bundle --targets dev --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml
+aws-smus-cicd-cli bundle --targets dev --manifest examples/analytic-workflow/dashboard-glue-quick/manifest.yaml
 ```
 
 This exports the live dashboard from dev QuickSight and packages it into `./artifacts/IntegrationTestETLWorkflow.zip`.

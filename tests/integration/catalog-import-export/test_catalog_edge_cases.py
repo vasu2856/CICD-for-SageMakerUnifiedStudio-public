@@ -7,7 +7,7 @@ Covers integration tests from the testing guide:
 
 Tests I18, I20, I21, I23, I24 are already covered by:
   - test_catalog_import.py::test_idempotent_redeploy          (I18)
-  - test_catalog_import.py::test_deletion_of_resources_not_in_bundle (I20)
+  - test_catalog_import.py::test_extra_resources_in_target_are_preserved (I20)
   - test_catalog_export.py::test_export_empty_project          (I21)
   - test_catalog_import.py::test_end_to_end_import             (I23)
   - test_catalog_import.py::test_publish_failures_do_not_block (I24)

@@ -21,11 +21,18 @@ from smus_cicd.commands.dry_run.checkers.dependency_checker import DependencyChe
 from smus_cicd.commands.dry_run.checkers.git_checker import GitChecker
 from smus_cicd.commands.dry_run.checkers.manifest_checker import ManifestChecker
 from smus_cicd.commands.dry_run.checkers.permission_checker import PermissionChecker
+from smus_cicd.commands.dry_run.checkers.preflight_checker import PreflightChecker
 from smus_cicd.commands.dry_run.checkers.project_checker import ProjectChecker
 from smus_cicd.commands.dry_run.checkers.quicksight_checker import QuickSightChecker
 from smus_cicd.commands.dry_run.checkers.storage_checker import StorageChecker
 from smus_cicd.commands.dry_run.checkers.workflow_checker import WorkflowChecker
-from smus_cicd.commands.dry_run.models import DryRunContext, DryRunReport, Phase
+from smus_cicd.commands.dry_run.models import (
+    DryRunContext,
+    DryRunReport,
+    Finding,
+    Phase,
+    Severity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +56,7 @@ class DryRunEngine:
         self._checkers: List[Tuple[Phase, Checker]] = [
             (Phase.MANIFEST_VALIDATION, ManifestChecker()),
             (Phase.BUNDLE_EXPLORATION, BundleChecker()),
+            (Phase.PREFLIGHT, PreflightChecker()),
             (Phase.PERMISSION_VERIFICATION, PermissionChecker()),
             (Phase.CONNECTIVITY, ConnectivityChecker()),
             (Phase.PROJECT_INIT, ProjectChecker()),
@@ -71,7 +79,20 @@ class DryRunEngine:
         report = DryRunReport()
 
         for phase, checker in self._checkers:
-            findings = checker.check(context)
+            try:
+                findings = checker.check(context)
+            except Exception as exc:
+                logger.error(
+                    "Checker for %s raised an unexpected error: %s",
+                    phase.value,
+                    exc,
+                )
+                findings = [
+                    Finding(
+                        severity=Severity.ERROR,
+                        message=f"{phase.value} failed: {exc}",
+                    )
+                ]
             report.add_findings(phase, findings)
 
             # Fail-fast: if manifest validation has blocking errors, stop
@@ -81,6 +102,11 @@ class DryRunEngine:
                 logger.warning(
                     "Manifest validation failed with errors — skipping remaining phases"
                 )
+                return report
+
+            # Fail-fast: if preflight has blocking errors, stop
+            if phase == Phase.PREFLIGHT and report.has_blocking_errors(Phase.PREFLIGHT):
+                logger.warning("Preflight checks failed — skipping remaining phases")
                 return report
 
             # After manifest validation succeeds, resolve target domain/region

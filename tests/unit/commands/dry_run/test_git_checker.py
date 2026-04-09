@@ -75,34 +75,7 @@ def checker() -> GitChecker:
 # ---------------------------------------------------------------------------
 
 
-class TestGitCheckerNoConfig:
-    """When target_config is missing, produce a WARNING."""
-
-    def test_no_target_config_produces_warning(self, checker):
-        ctx = DryRunContext(manifest_file="manifest.yaml", target_config=None)
-        findings = checker.check(ctx)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "Skipping" in findings[0].message
-
-    def test_no_deployment_configuration_produces_ok(self, checker):
-        target = _TargetConfig(deployment_configuration=None)
-        ctx = DryRunContext(manifest_file="manifest.yaml", target_config=target)
-        findings = checker.check(ctx)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.OK
-        assert "No git items" in findings[0].message
-
-    def test_empty_git_list_produces_ok(self, checker):
-        ctx = _make_context(git_items=[])
-        findings = checker.check(ctx)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.OK
-        assert "No git items" in findings[0].message
-
+# TestGitCheckerNoConfig tests moved to test_preflight_checker.py
 
 # ---------------------------------------------------------------------------
 # Single git item

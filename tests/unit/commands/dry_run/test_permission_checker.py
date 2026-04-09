@@ -129,9 +129,8 @@ def _make_context(
     if catalog_with_glue and cd is None:
         cd = {
             "metadata": {},
-            "resources": [
+            "assets": [
                 {
-                    "type": "assets",
                     "name": "test-asset",
                     "identifier": "id-1",
                     "formsInput": [
@@ -197,28 +196,7 @@ def checker():
 # -----------------------------------------------------------------------
 
 
-class TestPermissionCheckerNoConfig:
-    """Tests when manifest/target is not loaded."""
-
-    def test_no_target_config_produces_warning(self, checker):
-        context = DryRunContext(manifest_file="m.yaml", target_config=None)
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-        assert "skipping" in findings[0].message.lower()
-
-    def test_no_config_dict_produces_warning(self, checker):
-        context = DryRunContext(
-            manifest_file="m.yaml",
-            target_config=_TargetConfig(),
-            config=None,
-        )
-        findings = checker.check(context)
-
-        assert len(findings) == 1
-        assert findings[0].severity == Severity.WARNING
-
+# TestPermissionCheckerNoConfig tests moved to test_preflight_checker.py
 
 # -----------------------------------------------------------------------
 # Test: STS caller identity failure
@@ -241,8 +219,12 @@ class TestPermissionCheckerCallerIdentity:
         assert len(error_findings) == 1
         assert "caller identity" in error_findings[0].message.lower()
 
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
+        return_value={},
+    )
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_sts_success_records_caller_arn(self, mock_boto3, checker):
+    def test_sts_success_records_caller_arn(self, mock_boto3, mock_conns, checker):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -269,7 +251,9 @@ class TestPermissionCheckerCallerIdentity:
         assert len(caller_findings) == 1
 
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    @patch.object(PermissionChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
+    )
     def test_assumed_role_arn_converted_to_iam_role(
         self, mock_conns, mock_boto3, checker
     ):
@@ -313,7 +297,9 @@ class TestPermissionCheckerS3:
     """Tests for S3 storage permission verification."""
 
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    @patch.object(PermissionChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
+    )
     def test_s3_permissions_checked(self, mock_conns, mock_boto3, checker):
         mock_conns.return_value = {
             "default.s3_shared": {"s3Uri": "s3://real-bucket-123"}
@@ -343,7 +329,9 @@ class TestPermissionCheckerS3:
         assert any("s3:GetObject" in m for m in ok_msgs)
 
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    @patch.object(PermissionChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
+    )
     def test_s3_denied_produces_error(self, mock_conns, mock_boto3, checker):
         mock_conns.return_value = {
             "default.s3_shared": {"s3Uri": "s3://real-bucket-123"}
@@ -371,7 +359,9 @@ class TestPermissionCheckerS3:
         assert len(error_findings) >= 2  # s3:PutObject + s3:GetObject denied
 
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    @patch.object(PermissionChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
+    )
     def test_s3_uses_real_bucket_arn(self, mock_conns, mock_boto3, checker):
         """Verify the S3 ARN uses the resolved bucket name, not the connection suffix."""
         mock_conns.return_value = {
@@ -404,7 +394,9 @@ class TestPermissionCheckerS3:
         assert not any("s3_shared" in a for a in s3_arns)
 
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    @patch.object(PermissionChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
+    )
     def test_s3_unresolved_falls_back_to_wildcard(
         self, mock_conns, mock_boto3, checker
     ):
@@ -497,7 +489,7 @@ class TestPermissionCheckerCatalog:
         )
 
         context = _make_context(has_catalog=True)
-        context.catalog_data = {"metadata": {}, "resources": []}
+        context.catalog_data = {"metadata": {}, "glossaries": [], "assets": []}
         findings = checker.check(context)
 
         ok_msgs = [f.message for f in findings if f.severity == Severity.OK]
@@ -679,8 +671,14 @@ class TestPermissionCheckerBootstrap:
 class TestPermissionCheckerGlue:
     """Tests for Glue permission verification when catalog has Glue references."""
 
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
+        return_value={},
+    )
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_glue_permissions_added_for_glue_refs(self, mock_boto3, checker):
+    def test_glue_permissions_added_for_glue_refs(
+        self, mock_boto3, mock_conns, checker
+    ):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -727,9 +725,8 @@ class TestPermissionCheckerGlue:
         context = _make_context(has_catalog=True)
         context.catalog_data = {
             "metadata": {},
-            "resources": [
+            "glossaries": [
                 {
-                    "type": "glossaries",
                     "name": "test-glossary",
                     "identifier": "g-1",
                 }
@@ -749,8 +746,14 @@ class TestPermissionCheckerGlue:
 class TestPermissionCheckerAccessDeniedFallback:
     """Tests for fallback to WARNING when SimulatePrincipalPolicy is denied."""
 
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
+        return_value={},
+    )
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_access_denied_produces_warning_not_error(self, mock_boto3, checker):
+    def test_access_denied_produces_warning_not_error(
+        self, mock_boto3, mock_conns, checker
+    ):
         from botocore.exceptions import ClientError
 
         mock_sts = MagicMock()
@@ -782,8 +785,14 @@ class TestPermissionCheckerAccessDeniedFallback:
         sim_warnings = [f for f in warning_findings if "AccessDenied" in f.message]
         assert len(sim_warnings) >= 1
 
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
+        return_value={},
+    )
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_access_denied_exception_also_produces_warning(self, mock_boto3, checker):
+    def test_access_denied_exception_also_produces_warning(
+        self, mock_boto3, mock_conns, checker
+    ):
         from botocore.exceptions import ClientError
 
         mock_sts = MagicMock()
@@ -853,8 +862,12 @@ class TestPermissionCheckerEmptyConfig:
 class TestPermissionCheckerMixedResults:
     """Tests for mixed allowed/denied simulation results."""
 
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
+        return_value={},
+    )
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_mixed_results_report_each_action(self, mock_boto3, checker):
+    def test_mixed_results_report_each_action(self, mock_boto3, mock_conns, checker):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -893,8 +906,14 @@ class TestPermissionCheckerMixedResults:
         get_ok = [f for f in ok_findings if "s3:GetObject" in f.message]
         assert len(get_ok) >= 1
 
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
+        return_value={},
+    )
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_denied_finding_contains_action_and_resource(self, mock_boto3, checker):
+    def test_denied_finding_contains_action_and_resource(
+        self, mock_boto3, mock_conns, checker
+    ):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -1284,7 +1303,9 @@ class TestPermissionCheckerSkipMissingResources:
     contain files for the declared resource type."""
 
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    @patch.object(PermissionChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
+    )
     def test_s3_permissions_skipped_when_bundle_has_no_storage_files(
         self, mock_conns, mock_boto3, checker
     ):
@@ -1323,7 +1344,9 @@ class TestPermissionCheckerSkipMissingResources:
         assert not any("s3:GetObject" in m for m in all_msgs)
 
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    @patch.object(PermissionChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
+    )
     def test_s3_permissions_checked_when_bundle_has_storage_files(
         self, mock_conns, mock_boto3, checker
     ):
@@ -1412,7 +1435,9 @@ class TestPermissionCheckerSkipMissingResources:
         assert any("quicksight:DescribeDashboard" in m for m in ok_msgs)
 
     @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    @patch.object(PermissionChecker, "_get_project_connections")
+    @patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
+    )
     def test_s3_permissions_still_checked_when_bundle_not_explored(
         self, mock_conns, mock_boto3, checker
     ):

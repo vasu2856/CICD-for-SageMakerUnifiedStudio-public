@@ -846,7 +846,7 @@ Resource Deployment Outlook
 Summary: 48 OK, 1 warning(s), 1 error(s)
 ```
 
-**Note on DataZone permissions:** When the manifest identifies the domain by tags (rather than a direct `domain_id`), the dry run automatically resolves the domain ID via DataZone API. For `SimulatePrincipalPolicy`, if the domain ID or account ID cannot be resolved, a wildcard resource ARN (`*`) is used instead of a partial-wildcard ARN to avoid false-positive permission denials.
+**Note on DataZone permissions:** When the manifest identifies the domain by tags (rather than a direct `domain: id:`), the dry run automatically resolves the domain ID via DataZone API. For `SimulatePrincipalPolicy`, if the domain ID or account ID cannot be resolved, a wildcard resource ARN (`*`) is used instead of a partial-wildcard ARN to avoid false-positive permission denials.
 
 **Example Dry Run Output (json):**
 ```json

@@ -18,8 +18,8 @@ from collections import Counter
 from typing import Any, List, Set
 
 import boto3
-from botocore.exceptions import ClientError
 
+from smus_cicd.commands.dry_run.checkers import is_catalog_disabled
 from smus_cicd.commands.dry_run.models import DryRunContext, Finding, Severity
 from smus_cicd.helpers.catalog_import import (
     CREATION_ORDER,
@@ -41,7 +41,7 @@ class CatalogChecker:
     def check(self, context: DryRunContext) -> List[Finding]:
         findings: List[Finding] = []
 
-        if context.catalog_data is None:
+        if context.catalog_data is None or is_catalog_disabled(context):
             findings.append(
                 Finding(
                     severity=Severity.OK,
@@ -53,21 +53,17 @@ class CatalogChecker:
 
         catalog_data = context.catalog_data
 
-        # Collect all resources from the real catalog format (keyed by type)
-        # Also support legacy flat "resources" list for backward compat
-        resources: list = catalog_data.get("resources", [])
-        if not resources:
-            # Real format: flatten all resource-type lists, tagging each
-            # with its type key so downstream logic can identify them
-            for key in CREATION_ORDER:
-                for item in catalog_data.get(key, []):
-                    if isinstance(item, dict):
-                        tagged = dict(item)
-                        tagged.setdefault("type", key)
-                        # Map sourceId → identifier for uniform access
-                        if "identifier" not in tagged and "sourceId" in tagged:
-                            tagged["identifier"] = tagged["sourceId"]
-                        resources.append(tagged)
+        # Flatten all resource-type lists, tagging each with its type key
+        resources: list = []
+        for key in CREATION_ORDER:
+            for item in catalog_data.get(key, []):
+                if isinstance(item, dict):
+                    tagged = dict(item)
+                    tagged.setdefault("type", key)
+                    # Map sourceId → identifier for uniform access
+                    if "identifier" not in tagged and "sourceId" in tagged:
+                        tagged["identifier"] = tagged["sourceId"]
+                    resources.append(tagged)
 
         if not resources:
             findings.append(
@@ -265,34 +261,32 @@ class CatalogChecker:
         if not bundle_form_types:
             return
 
-        try:
-            client = boto3.client("datazone", region_name=context.target_region)
-            for ft_name in bundle_form_types:
-                try:
-                    resp = client.get_form_type(
-                        domainIdentifier=context.target_domain_id,
-                        formTypeIdentifier=ft_name,
-                    )
-                    status = resp.get("status")
-                    if status == "DISABLED":
-                        findings.append(
-                            Finding(
-                                severity=Severity.WARNING,
-                                message=(
-                                    f"Form type '{ft_name}' exists in the target "
-                                    f"but is DISABLED. It will be re-enabled during import."
-                                ),
-                                resource=ft_name,
-                                service="form types",
-                            )
+        client = boto3.client("datazone", region_name=context.target_region)
+        for ft_name in bundle_form_types:
+            try:
+                resp = client.get_form_type(
+                    domainIdentifier=context.target_domain_id,
+                    formTypeIdentifier=ft_name,
+                )
+                status = resp.get("status")
+                if status == "DISABLED":
+                    findings.append(
+                        Finding(
+                            severity=Severity.WARNING,
+                            message=(
+                                f"Form type '{ft_name}' exists in the target "
+                                f"but is DISABLED. It will be re-enabled during import."
+                            ),
+                            resource=ft_name,
+                            service="form types",
                         )
-                except ClientError as e:
-                    if e.response["Error"]["Code"] == "ResourceNotFoundException":
-                        pass  # Doesn't exist yet, will be created
-                    else:
-                        logger.debug(f"Failed to check form type {ft_name}: {e}")
-        except Exception as e:
-            logger.debug(f"Could not check form type status in target: {e}")
+                    )
+            except Exception as e:
+                error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+                if error_code == "ResourceNotFoundException":
+                    pass  # Doesn't exist yet, will be created
+                else:
+                    logger.debug(f"Failed to check form type {ft_name}: {e}")
 
     def _emit_per_resource_outcomes(
         self,

@@ -15,8 +15,8 @@ import logging
 from typing import List, Set
 
 import boto3
-from botocore.exceptions import ClientError
 
+from smus_cicd.commands.dry_run.checkers import get_project_connections
 from smus_cicd.commands.dry_run.models import DryRunContext, Finding, Severity
 
 logger = logging.getLogger(__name__)
@@ -28,19 +28,8 @@ class ConnectivityChecker:
     def check(self, context: DryRunContext) -> List[Finding]:
         findings: List[Finding] = []
 
-        if context.target_config is None or context.config is None:
-            findings.append(
-                Finding(
-                    severity=Severity.WARNING,
-                    message=(
-                        "Skipping connectivity checks: " "manifest/target not loaded"
-                    ),
-                )
-            )
-            return findings
-
         config = context.config
-        region = config.get("region", "us-east-1")
+        region = config.get("region")
 
         # Resolve domain_id — may come from config directly, or via
         # domain name/tags lookup when the manifest uses tags.
@@ -87,7 +76,7 @@ class ConnectivityChecker:
         if not domain_id:
             findings.append(
                 Finding(
-                    severity=Severity.WARNING,
+                    severity=Severity.ERROR,
                     message="No domain_id in config; skipping domain reachability check",
                     service="datazone",
                 )
@@ -105,27 +94,16 @@ class ConnectivityChecker:
                     service="datazone",
                 )
             )
-        except ClientError as exc:
-            error_code = exc.response.get("Error", {}).get("Code", "")
-            findings.append(
-                Finding(
-                    severity=Severity.ERROR,
-                    message=(
-                        f"DataZone domain '{domain_id}' is unreachable: "
-                        f"{error_code} — {exc}"
-                    ),
-                    resource=domain_id,
-                    service="datazone",
-                    details={"error_code": error_code},
-                )
-            )
         except Exception as exc:
+            error_code = getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+            detail = f"{error_code} — {exc}" if error_code else str(exc)
             findings.append(
                 Finding(
                     severity=Severity.ERROR,
-                    message=(f"DataZone domain '{domain_id}' is unreachable: {exc}"),
+                    message=f"DataZone domain '{domain_id}' is unreachable: {detail}",
                     resource=domain_id,
                     service="datazone",
+                    details={"error_code": error_code} if error_code else None,
                 )
             )
 
@@ -140,7 +118,7 @@ class ConnectivityChecker:
         if not project_name or not domain_id:
             findings.append(
                 Finding(
-                    severity=Severity.WARNING,
+                    severity=Severity.ERROR,
                     message=(
                         "No project_name or domain_id in config; "
                         "skipping project existence check"
@@ -225,17 +203,7 @@ class ConnectivityChecker:
         if not resolved:
             return
 
-        try:
-            s3 = boto3.client("s3", region_name=region)
-        except Exception as exc:
-            findings.append(
-                Finding(
-                    severity=Severity.ERROR,
-                    message=f"Failed to create S3 client: {exc}",
-                    service="s3",
-                )
-            )
-            return
+        s3 = boto3.client("s3", region_name=region)
 
         for bucket in sorted(resolved):
             try:
@@ -248,27 +216,18 @@ class ConnectivityChecker:
                         service="s3",
                     )
                 )
-            except ClientError as exc:
-                error_code = exc.response.get("Error", {}).get("Code", "")
-                findings.append(
-                    Finding(
-                        severity=Severity.ERROR,
-                        message=(
-                            f"S3 bucket '{bucket}' is not accessible: "
-                            f"{error_code} — {exc}"
-                        ),
-                        resource=bucket,
-                        service="s3",
-                        details={"error_code": error_code},
-                    )
-                )
             except Exception as exc:
+                error_code = (
+                    getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+                )
+                detail = f"{error_code} — {exc}" if error_code else str(exc)
                 findings.append(
                     Finding(
                         severity=Severity.ERROR,
-                        message=(f"S3 bucket '{bucket}' is not accessible: {exc}"),
+                        message=f"S3 bucket '{bucket}' is not accessible: {detail}",
                         resource=bucket,
                         service="s3",
+                        details={"error_code": error_code} if error_code else None,
                     )
                 )
 
@@ -304,7 +263,7 @@ class ConnectivityChecker:
             return resolved, unresolved
 
         # Try to resolve connections via DataZone project info
-        project_connections = self._get_project_connections(context, region)
+        project_connections = get_project_connections(context, region)
 
         for conn_name in connection_names:
             conn_info = (
@@ -321,31 +280,6 @@ class ConnectivityChecker:
             unresolved.add(conn_name)
 
         return resolved, unresolved
-
-    @staticmethod
-    def _get_project_connections(context: DryRunContext, region: str) -> dict | None:
-        """Attempt to fetch project connections from DataZone.
-
-        Returns the connections dict or ``None`` if resolution fails.
-        """
-        config = context.config or {}
-        project_name = config.get("project_name")
-        if not project_name:
-            project_cfg = getattr(context.target_config, "project", None)
-            project_name = getattr(project_cfg, "name", None) if project_cfg else None
-
-        if not project_name:
-            return None
-
-        try:
-            from smus_cicd.helpers.utils import get_datazone_project_info
-
-            info = get_datazone_project_info(project_name, config)
-            if "error" in info:
-                return None
-            return info.get("connections")
-        except Exception:
-            return None
 
     def _check_airflow(
         self,
