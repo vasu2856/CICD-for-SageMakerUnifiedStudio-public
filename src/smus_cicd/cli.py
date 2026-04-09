@@ -14,10 +14,10 @@ from .commands.bundle import bundle_command
 from .commands.create import create_command_with_output
 from .commands.delete import delete_command
 from .commands.deploy import deploy_command
-from .commands.dry_run.engine import DryRunEngine
 
 # Import command functions
 from .commands.describe import describe_command
+from .commands.dry_run.engine import DryRunEngine
 from .commands.integrate import integrate_qcli
 from .commands.logs import logs_command
 from .commands.monitor import monitor_command
@@ -281,10 +281,14 @@ def deploy(
             "Pre-deployment validation passed. %d warning(s). Proceeding with deployment.",
             report.warning_count,
         )
-        deploy_command(final_targets, manifest_file, bundle, emit_events, event_bus_name)
+        deploy_command(
+            final_targets, manifest_file, bundle, emit_events, event_bus_name
+        )
     else:
         # Path 3: Normal deploy without validation (--skip-validation)
-        deploy_command(final_targets, manifest_file, bundle, emit_events, event_bus_name)
+        deploy_command(
+            final_targets, manifest_file, bundle, emit_events, event_bus_name
+        )
 
 
 @app.command(
