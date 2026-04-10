@@ -9,11 +9,11 @@ workflow execution.
 All operations are idempotent — safe to run multiple times.
 
 Usage:
-    python idc_domain_data_notebooks_setup.py \
+    python idc_domain_project_setup.py \
         --manifest example-notebooks/manifest.yaml
 
     # Dry run:
-    python idc_domain_data_notebooks_setup.py \
+    python idc_domain_project_setup.py \
         --manifest example-notebooks/manifest.yaml --dry-run
 """
 

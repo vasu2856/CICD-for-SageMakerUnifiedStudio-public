@@ -971,19 +971,19 @@ The examples above support both IAM-based and IAM Identity Center (IdC)-based do
 
 | Example | Setup Script | What It Does |
 |---------|-------------|--------------|
-| Data Notebooks | [`idc_domain_data_notebooks_setup.py`](examples/analytic-workflow/data-notebooks/idc_domain_data_notebooks_setup.py) | VPC networking (S3 gateway endpoint, NAT gateway), Lake Formation permissions on `sagemaker_sample_db` |
-| ML Training | [`idc_domain_setup.py`](examples/analytic-workflow/ml/training/idc_domain_setup.py) | MLflow tracking server access, CloudWatch Logs permissions |
+| Data Notebooks | [`idc_domain_project_setup.py`](examples/analytic-workflow/data-notebooks/idc_domain_project_setup.py) | VPC networking (S3 gateway endpoint, NAT gateway), Lake Formation permissions on `sagemaker_sample_db` |
+| ML Training | [`idc_domain_project_setup.py`](examples/analytic-workflow/ml/training/idc_domain_project_setup.py) | MLflow tracking server access, CloudWatch Logs permissions |
 | ML Deployment | Uses the same project role as ML Training | No additional setup beyond ML Training |
 
 ```bash
 # Run setup for data-notebooks (IdC domain)
-TEST_DOMAIN_REGION=us-east-1 python examples/analytic-workflow/data-notebooks/idc_domain_data_notebooks_setup.py
+TEST_DOMAIN_REGION=us-east-1 python examples/analytic-workflow/data-notebooks/idc_domain_project_setup.py
 
 # Run setup for ML training (IdC domain)
-TEST_DOMAIN_REGION=us-east-1 python examples/analytic-workflow/ml/training/idc_domain_setup.py
+TEST_DOMAIN_REGION=us-east-1 python examples/analytic-workflow/ml/training/idc_domain_project_setup.py
 
 # Dry run to preview changes
-python examples/analytic-workflow/data-notebooks/idc_domain_data_notebooks_setup.py --dry-run
+python examples/analytic-workflow/data-notebooks/idc_domain_project_setup.py --dry-run
 ```
 
 All setup scripts are idempotent and safe to run multiple times. Use `--dry-run` to preview changes before applying.

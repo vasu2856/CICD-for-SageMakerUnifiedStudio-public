@@ -13,7 +13,6 @@
 
 - ✅ AWS account with admin access
 - ✅ SageMaker Unified Studio domain and project(s) created manually in the portal (the CLI cannot create these)
-- ✅ SMUS domain using IAM-based or IAM Identity Center (IdC)-based authentication
 - ✅ Python 3.8+ and AWS CLI installed
 - ✅ Understanding of AWS IAM and S3
 
@@ -53,8 +52,6 @@ The CLI supports three deployment approaches:
 1. **Direct Git-Based** - Deploy directly from git branches to stages (no bundle creation)
 2. **Bundle-Based** - Create versioned bundles, then deploy them to stages (all content from bundle)
 3. **Hybrid** - Create bundle for static content (data, configs), pull workflows from git branches per stage
-
-**See more:** [Deployment Approaches Guide](../deployment.md)
 
 ### Stage Configuration
 

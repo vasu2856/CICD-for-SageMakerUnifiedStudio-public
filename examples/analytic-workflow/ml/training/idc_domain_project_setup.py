@@ -6,7 +6,7 @@ Adds MLflow and CloudWatch Logs permissions to the project role.
 All operations are idempotent.
 
 Usage:
-    TEST_DOMAIN_REGION=us-east-1 python idc_domain_setup.py
+    TEST_DOMAIN_REGION=us-east-1 python idc_domain_project_setup.py
 """
 
 import argparse

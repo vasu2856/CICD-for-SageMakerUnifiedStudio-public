@@ -28,7 +28,7 @@ This example demonstrates parallel execution of multiple notebooks using SageMak
 - AWS credentials configured
 - For IdC-based domains, run the setup script first:
   ```bash
-  TEST_DOMAIN_REGION=us-east-1 python examples/analytic-workflow/data-notebooks/idc_domain_data_notebooks_setup.py
+  TEST_DOMAIN_REGION=us-east-1 python examples/analytic-workflow/data-notebooks/idc_domain_project_setup.py
   ```
   This configures VPC networking (S3 gateway endpoint, NAT gateway) and Lake Formation permissions.
 
