@@ -23,7 +23,7 @@
 
 > **[プレビュー]** Amazon SageMaker Unified Studio CI/CD CLIは現在プレビュー段階であり、変更される可能性があります。コマンド、設定フォーマット、APIはお客様のフィードバックに基づいて進化する可能性があります。プレビュー期間中は本番環境以外での評価をお勧めします。フィードバックやバグ報告については、以下のイシューを開いてください：https://github.com/aws/CICD-for-SageMakerUnifiedStudio/issues
 
-> **[IAMドメインのみ]** 現在このCLIは、IAMベースの認証を使用するSMUSドメインのみをサポートしています。IAM Identity Center (IdC)ベースのドメインのサポートは近日公開予定です。
+> **[IAM + IdCドメイン]** このCLIは、IAMベースおよびIAM Identity Center (IdC)ベースの認証を使用するSMUSドメインをサポートしています。IdCドメインの場合、追加のセットアップ（VPCネットワーキング、Lake Formation権限、インラインIAMポリシー）が必要になる場合があります — 各サンプルディレクトリのセットアップスクリプトを参照してください。
 
 **SageMaker Unified Studio環境全体でのデータアプリケーションのデプロイを自動化**
 

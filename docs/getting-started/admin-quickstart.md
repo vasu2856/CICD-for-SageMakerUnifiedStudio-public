@@ -13,7 +13,7 @@
 
 - ✅ AWS account with admin access
 - ✅ SageMaker Unified Studio domain and project(s) created manually in the portal (the CLI cannot create these)
-- ✅ SMUS domain must use IAM-based authentication — IdC-based domains are not yet supported
+- ✅ SMUS domain using IAM-based or IAM Identity Center (IdC)-based authentication
 - ✅ Python 3.8+ and AWS CLI installed
 - ✅ Understanding of AWS IAM and S3
 

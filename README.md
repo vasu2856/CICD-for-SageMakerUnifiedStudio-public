@@ -10,7 +10,7 @@
 
 > **[Preview]** Amazon SageMaker Unified Studio CI/CD CLI is currently in preview and is subject to change. Commands, configuration formats, and APIs may evolve based on customer feedback. We recommend evaluating this tool in non-production environments during preview. For feedback and bug reports, please open an issue https://github.com/aws/CICD-for-SageMakerUnifiedStudio/issues
 
-> **[IAM Domains Only]** This CLI currently supports SMUS domains using IAM-based authentication only. Support for IAM Identity Center (IdC)-based domains is coming soon.
+> **[IAM + IdC Domains]** This CLI supports both IAM-based and IAM Identity Center (IdC)-based SMUS domains. For IdC domains, additional setup (VPC networking, Lake Formation permissions, inline IAM policies) may be required — see the setup scripts in each example directory.
 
 **Automate deployment of data applications across SageMaker Unified Studio environments**
 
@@ -962,6 +962,31 @@ genai_dev_workflow:
 ---
 
 **[See All Examples with Detailed Walkthroughs →](docs/examples-guide.md)**
+
+---
+
+### 🔐 IdC Domain Setup
+
+The examples above support both IAM-based and IAM Identity Center (IdC)-based domains. IdC domains require additional one-time setup due to VpcOnly networking and tag-based IAM policies. Each example includes a setup script:
+
+| Example | Setup Script | What It Does |
+|---------|-------------|--------------|
+| Data Notebooks | [`idc_domain_data_notebooks_setup.py`](examples/analytic-workflow/data-notebooks/idc_domain_data_notebooks_setup.py) | VPC networking (S3 gateway endpoint, NAT gateway), Lake Formation permissions on `sagemaker_sample_db` |
+| ML Training | [`idc_domain_setup.py`](examples/analytic-workflow/ml/training/idc_domain_setup.py) | MLflow tracking server access, CloudWatch Logs permissions |
+| ML Deployment | Uses the same project role as ML Training | No additional setup beyond ML Training |
+
+```bash
+# Run setup for data-notebooks (IdC domain)
+TEST_DOMAIN_REGION=us-east-1 python examples/analytic-workflow/data-notebooks/idc_domain_data_notebooks_setup.py
+
+# Run setup for ML training (IdC domain)
+TEST_DOMAIN_REGION=us-east-1 python examples/analytic-workflow/ml/training/idc_domain_setup.py
+
+# Dry run to preview changes
+python examples/analytic-workflow/data-notebooks/idc_domain_data_notebooks_setup.py --dry-run
+```
+
+All setup scripts are idempotent and safe to run multiple times. Use `--dry-run` to preview changes before applying.
 
 ---
 
