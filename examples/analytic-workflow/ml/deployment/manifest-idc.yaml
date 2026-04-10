@@ -1,4 +1,4 @@
-applicationName: IntegrationTestMLDeployment
+applicationName: IntegrationTestMLDeploymentIdC
 content:
   storage:
   - name: deployment-code

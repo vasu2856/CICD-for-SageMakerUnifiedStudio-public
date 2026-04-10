@@ -1,52 +1,49 @@
-applicationName: IntegrationTestNotebooks
+# ML Training Application Manifest (IdC Domains)
+applicationName: IntegrationTestMLTrainingIdC
 content:
   storage:
-  - name: notebooks
+  - name: training-code
     include:
-    - notebooks/
-    exclude:
-    - .ipynb_checkpoints/
-    - __pycache__/
-  - name: workflows
+    - code
+  - name: training-workflows
     include:
-    - workflows/
+    - workflows
   workflows:
-  - workflowName: notebooks_workflow
+  - workflowName: ml_training_workflow
     connectionName: default.workflow_serverless
 stages:
-  test:
+  test-idc:
     stage: TEST
     domain:
-      tags:
-        purpose: smus-cicd-testing
+      name: smus-idc-test-domain
       region: ${TEST_DOMAIN_REGION}
     project:
       name: test-marketing
       owners:
-      - Eng1
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
     environment_variables:
       S3_PREFIX: test
     deployment_configuration:
       storage:
-      - name: notebooks
+      - name: training-code
         connectionName: default.s3_shared
-        targetDirectory: notebooks/bundle/notebooks
-      - name: workflows
+        targetDirectory: ml/bundle/training-code
+        compression: gz
+      - name: training-workflows
         connectionName: default.s3_shared
-        targetDirectory: notebooks/bundle/workflows
+        targetDirectory: ml/bundle/training-workflows
     bootstrap:
       actions:
       - type: datazone.create_connection
         name: mlflow-server
         connection_type: MLFLOW
         properties:
-          trackingServerArn: arn:aws:sagemaker:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:mlflow-tracking-server/${MLFLOW_TRACKING_SERVER_NAME:smus-integration-mlflow-use2}
+          trackingServerArn: arn:aws:sagemaker:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:mlflow-tracking-server/${MLFLOW_TRACKING_SERVER_NAME:smus-integration-mlflow-us-east-1}
       - type: workflow.create
-        workflowName: notebooks_workflow
+        workflowName: ml_training_workflow
       - type: workflow.run
-        workflowName: notebooks_workflow
+        workflowName: ml_training_workflow
         trailLogs: true
 tests:
-  folder: examples/analytic-workflow/data-notebooks/app_tests/
+  folder: examples/analytic-workflow/ml/training/app_tests/

@@ -1,4 +1,4 @@
-applicationName: IntegrationTestNotebooks
+applicationName: IntegrationTestNotebooksIdC
 content:
   storage:
   - name: notebooks
@@ -14,16 +14,14 @@ content:
   - workflowName: notebooks_workflow
     connectionName: default.workflow_serverless
 stages:
-  test:
+  test-idc:
     stage: TEST
     domain:
-      tags:
-        purpose: smus-cicd-testing
+      name: smus-idc-test-domain
       region: ${TEST_DOMAIN_REGION}
     project:
       name: test-marketing
       owners:
-      - Eng1
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
     environment_variables:
@@ -42,7 +40,14 @@ stages:
         name: mlflow-server
         connection_type: MLFLOW
         properties:
-          trackingServerArn: arn:aws:sagemaker:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:mlflow-tracking-server/${MLFLOW_TRACKING_SERVER_NAME:smus-integration-mlflow-use2}
+          trackingServerArn: arn:aws:sagemaker:${TEST_DOMAIN_REGION}:${AWS_ACCOUNT_ID}:mlflow-tracking-server/${MLFLOW_TRACKING_SERVER_NAME:smus-integration-mlflow-use1}
+      - type: datazone.create_connection
+        name: default.spark
+        connection_type: SPARK_GLUE
+        properties:
+          glue_version: "5.0"
+          worker_type: G.1X
+          num_workers: 10
       - type: workflow.create
         workflowName: notebooks_workflow
       - type: workflow.run

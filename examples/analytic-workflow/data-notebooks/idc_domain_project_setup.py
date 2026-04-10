@@ -381,7 +381,7 @@ def main():
     )
     parser.add_argument(
         "--manifest",
-        default="examples/analytic-workflow/data-notebooks/manifest.yaml",
+        default="examples/analytic-workflow/data-notebooks/manifest-idc.yaml",
         help="Path to manifest YAML",
     )
     parser.add_argument("--stage", default=STAGE_NAME, help="Stage name (default: test-idc)")

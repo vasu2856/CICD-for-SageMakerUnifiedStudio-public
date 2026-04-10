@@ -142,7 +142,7 @@ def setup_cw_logs_permissions(role_name, region, dry_run=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Setup IdC domain for ML training example")
-    parser.add_argument("--manifest", default="examples/analytic-workflow/ml/training/manifest.yaml")
+    parser.add_argument("--manifest", default="examples/analytic-workflow/ml/training/manifest-idc.yaml")
     parser.add_argument("--stage", default=STAGE_NAME)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

@@ -3,7 +3,7 @@ ml_training_workflow:
   tasks:
     ml_training_notebook:
       operator: "airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator"
-      retries: 0
+      retries: 1
       input_config:
         input_path: "ml/bundle/training-workflows/ml_training_notebook.ipynb"
         input_params:
