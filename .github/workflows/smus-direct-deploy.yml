@@ -152,54 +152,52 @@ jobs:
         run: |
           
           
-          # Extract workflow names from manifest
+          # Extract workflow name from manifest
+          echo "📥 Downloading workflow output notebooks..."
           python3 << 'EOF'
           import yaml
+          import subprocess
           import sys
+          import os
           
           manifest_path = "${{ inputs.manifest_path }}"
+          test_target = "${{ inputs.test_target }}"
+          region = "${{ vars.DOMAIN_REGION }}"
+          
           try:
+              # Resolve env vars in manifest
               with open(manifest_path, 'r') as f:
-                  manifest = yaml.safe_load(f)
+                  manifest = yaml.safe_load(f.read())
               
               app_name = manifest.get('applicationName', '')
+              stages = manifest.get('stages', {})
+              target_config = stages.get(test_target, {})
+              project_name = target_config.get('project', {}).get('name', '')
               workflows = manifest.get('content', {}).get('workflows', [])
               
-              if not workflows:
-                  print("No workflows found in manifest")
+              if not workflows or not project_name:
+                  print("No workflows or project name found in manifest")
                   sys.exit(0)
               
-              # Get project name from test target
-              project_name = "${{ inputs.test_target }}-marketing"
-              
-              # Download outputs for each workflow
               for workflow in workflows:
                   workflow_name = workflow.get('workflowName', '')
                   if workflow_name:
                       full_name = f"{app_name}_{project_name}_{workflow_name}"
-                      print(f"📥 Downloading outputs for workflow: {full_name}")
-                      
-                      import subprocess
+                      print(f"📥 Downloading outputs for: {full_name}")
                       result = subprocess.run([
                           'python3', 'tests/scripts/download_workflow_outputs_from_xcom.py',
                           full_name,
-                          '--region', '${{ vars.DOMAIN_REGION }}',
+                          '--region', region,
                           '--output-dir', 'tests/test-outputs/notebooks'
                       ], capture_output=True, text=True)
-                      
                       if result.stdout:
                           print(result.stdout)
-                      if result.stderr:
-                          print(result.stderr)
-                      
                       if result.returncode == 0:
                           print(f"✅ Downloaded outputs for {workflow_name}")
                       else:
                           print(f"⚠️ No outputs found for {workflow_name}")
-          
           except Exception as e:
-              print(f"❌ Error downloading notebooks: {e}")
-              sys.exit(0)  # Don't fail the workflow
+              print(f"⚠️ Error downloading notebooks: {e}")
           EOF
 
       - name: Upload workflow output notebooks
