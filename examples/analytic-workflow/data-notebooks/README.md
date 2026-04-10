@@ -26,6 +26,11 @@ This example demonstrates parallel execution of multiple notebooks using SageMak
 
 - SMUS domain and project created manually in the console — the CLI cannot create these
 - AWS credentials configured
+- For IdC-based domains, run the setup script first:
+  ```bash
+  TEST_DOMAIN_REGION=us-east-1 python examples/analytic-workflow/data-notebooks/idc_domain_project_setup.py
+  ```
+  This configures VPC networking (S3 gateway endpoint, NAT gateway) and Lake Formation permissions.
 
 ### Deploy Pipeline
 

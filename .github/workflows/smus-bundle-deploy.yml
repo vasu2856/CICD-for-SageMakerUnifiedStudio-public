@@ -82,7 +82,7 @@ jobs:
   bundle:
     name: Bundle Application
     runs-on: ubuntu-latest
-    environment: ${{ fromJSON('{"dev":"dev-aws-account","test":"test-aws-account","prod":"prod-aws-account"}')[inputs.bundle_from_target] || 'dev-aws-account' }}
+    environment: ${{ fromJSON('{"dev":"dev-aws-account","test":"test-aws-account","prod":"prod-aws-account","dev-idc":"dev-aws-account","test-idc":"test-aws-account","prod-idc":"prod-aws-account"}')[inputs.bundle_from_target] || 'dev-aws-account' }}
     
     steps:
       - uses: actions/checkout@v4
@@ -102,18 +102,18 @@ jobs:
         id: bundle-role
         run: |
           case "${{ inputs.bundle_from_target }}" in
-            dev)
+            dev|dev-idc)
               echo "role-arn=${{ secrets.AWS_ROLE_ARN_DEV }}" >> $GITHUB_OUTPUT
               ;;
-            test)
+            test|test-idc)
               echo "role-arn=${{ secrets.AWS_ROLE_ARN_TEST }}" >> $GITHUB_OUTPUT
               ;;
-            prod)
+            prod|prod-idc)
               echo "role-arn=${{ secrets.AWS_ROLE_ARN_PROD }}" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "❌ Invalid bundle_from_target: ${{ inputs.bundle_from_target }}"
-              echo "   Valid values: dev, test, prod"
+              echo "   Valid values: dev, test, prod, dev-idc, test-idc, prod-idc"
               exit 1
               ;;
           esac

@@ -13,7 +13,6 @@
 - ✅ Python 3.8+ installed
 - ✅ AWS CLI configured with credentials
 - ✅ SageMaker Unified Studio domain and project created manually in the console (the CLI cannot create these)
-- ✅ SMUS domain must use IAM-based authentication — IdC-based domains are not yet supported
 - ✅ Basic understanding of Jupyter notebooks
 
 ---

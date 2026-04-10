@@ -1,0 +1,80 @@
+applicationName: IntegrationTestMLDeployment
+content:
+  storage:
+  - name: deployment-code
+    include:
+    - code
+  - name: deployment-workflows
+    include:
+    - workflows/ml_deployment_workflow.yaml
+    - workflows/ml_deployment_notebook.ipynb
+  - name: model-artifacts
+    connectionName: default.s3_shared
+    include:
+    - ml/output/model-artifacts
+  workflows:
+  - workflowName: ml_deployment_workflow
+    connectionName: default.workflow_serverless
+stages:
+  test-idc:
+    stage: TEST
+    domain:
+      name: smus-idc-test-domain
+      region: ${TEST_DOMAIN_REGION}
+    project:
+      name: test-marketing
+      owners:
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
+    environment_variables:
+      S3_PREFIX: test
+    deployment_configuration:
+      storage:
+      - name: deployment-code
+        connectionName: default.s3_shared
+        targetDirectory: ml/bundle/deployment-code
+      - name: deployment-workflows
+        connectionName: default.s3_shared
+        targetDirectory: ml/bundle/deployment-workflows
+      - name: model-artifacts
+        connectionName: default.s3_shared
+        targetDirectory: ml/bundle/model-artifacts
+    bootstrap:
+      actions:
+      - type: workflow.create
+        workflowName: ml_deployment_workflow
+      - type: workflow.run
+        workflowName: ml_deployment_workflow
+        trailLogs: true
+  prod-idc:
+    stage: PROD
+    domain:
+      name: smus-idc-prod-domain
+      region: ${PROD_DOMAIN_REGION}
+    project:
+      name: prod-marketing
+      owners:
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests
+      - arn:aws:iam::${AWS_ACCOUNT_ID}:role/Admin
+    environment_variables:
+      S3_PREFIX: prod
+    deployment_configuration:
+      storage:
+      - name: deployment-code
+        connectionName: default.s3_shared
+        targetDirectory: ml/bundle/deployment-code
+      - name: deployment-workflows
+        connectionName: default.s3_shared
+        targetDirectory: ml/bundle/deployment-workflows
+      - name: model-artifacts
+        connectionName: default.s3_shared
+        targetDirectory: ml/bundle/model-artifacts
+    bootstrap:
+      actions:
+      - type: workflow.create
+        workflowName: ml_deployment_workflow
+      - type: workflow.run
+        workflowName: ml_deployment_workflow
+        trailLogs: true
+tests:
+  folder: examples/analytic-workflow/ml/deployment/app_tests/
