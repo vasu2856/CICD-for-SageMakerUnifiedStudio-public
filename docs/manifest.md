@@ -34,8 +34,8 @@ Your application content can come from:
 aws-smus-cicd-cli bundle --manifest manifest.yaml --output ./bundles/
 
 # Step 2: Deploy the same bundle to multiple targets
-aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test --manifest myapp-v1.0.0.tar.gz
-aws-smus-cicd-cli deploy --manifest manifest.yaml --stage prod --manifest myapp-v1.0.0.tar.gz
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test --manifest myapp-v1.0.0.tar.gz
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod --manifest myapp-v1.0.0.tar.gz
 ```
 
 **What happens:**
@@ -844,7 +844,7 @@ export AWS_REGION=us-west-2
 export PROJECT_PREFIX=analytics
 export TEAM_NAME=datascience
 
-aws-smus-cicd-cli deploy --manifest manifest.yaml --stage dev
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets dev
 ```
 
 **Resolution Rules:**

@@ -129,6 +129,99 @@ def _is_managed_resource(name: str) -> bool:
     return name.startswith(_MANAGED_FORM_TYPE_PREFIX) if name else False
 
 
+# Display names for resource types used in dry-run reports
+RESOURCE_TYPE_DISPLAY_NAMES: Dict[str, str] = {
+    "glossaries": "glossaries",
+    "glossaryTerms": "glossary terms",
+    "formTypes": "form types",
+    "assetTypes": "custom asset types",
+    "assets": "assets",
+    "dataProducts": "data products",
+}
+
+# Cross-reference fields: maps resource_type → list of (field_name, target_type)
+# Used by dry-run CatalogChecker to verify references between catalog resources.
+CROSS_REFERENCE_FIELDS: Dict[str, List[Tuple[str, str]]] = {
+    "glossaryTerms": [("glossaryId", "glossaries")],
+    "assets": [("typeIdentifier", "assetTypes")],
+    "dataProducts": [],
+    "assetTypes": [],
+    "formTypes": [],
+    "glossaries": [],
+}
+
+
+def get_form_type_ref(form: Dict[str, Any]) -> str:
+    """Extract the form type identifier from a formsInput entry.
+
+    Checks ``typeIdentifier`` first, then falls back to ``typeName``.
+    Returns empty string if neither is present.
+    """
+    return form.get("typeIdentifier") or form.get("typeName") or ""
+
+
+# Form type identifiers used for dependency checking
+GLUE_TABLE_FORM_TYPE = "GlueTableFormType"
+DATA_SOURCE_REF_FORM_TYPE = "DataSourceReferenceFormType"
+
+# Valid data source statuses for matching
+DATA_SOURCE_VALID_STATUSES = {"READY", "RUNNING", "CREATING"}
+
+
+def parse_form_content(content: Any) -> Optional[Dict[str, Any]]:
+    """Parse form content which may be a JSON string or already a dict.
+
+    Returns the parsed dict or None if parsing fails.
+    """
+    if content is None:
+        return None
+    if isinstance(content, dict):
+        return content
+    if isinstance(content, str):
+        try:
+            parsed = json.loads(content)
+            return parsed if isinstance(parsed, dict) else None
+        except (json.JSONDecodeError, TypeError):
+            return None
+    return None
+
+
+def extract_database_name_from_forms(
+    forms_input: List[Dict[str, Any]],
+) -> Optional[str]:
+    """Extract database name from GlueTableFormType in a formsInput list.
+
+    Returns the database name or None if not found.
+    """
+    for form in forms_input:
+        if not isinstance(form, dict):
+            continue
+        type_id = get_form_type_ref(form)
+        if GLUE_TABLE_FORM_TYPE not in type_id:
+            continue
+        content = parse_form_content(form.get("content"))
+        if content and content.get("databaseName"):
+            return content["databaseName"]
+    return None
+
+
+def has_glue_references(catalog_data: Dict[str, Any]) -> bool:
+    """Return True if any asset in the catalog references Glue Data Catalog resources."""
+    for asset in catalog_data.get("assets", []):
+        if not isinstance(asset, dict):
+            continue
+        forms_input = asset.get("formsInput", [])
+        if not isinstance(forms_input, list):
+            continue
+        for form in forms_input:
+            if not isinstance(form, dict):
+                continue
+            type_id = get_form_type_ref(form)
+            if GLUE_TABLE_FORM_TYPE in type_id:
+                return True
+    return False
+
+
 def _ensure_import_permissions(client, domain_id: str, project_id: str) -> List[str]:
     """
     Ensure the project's domain unit has the policy grants needed for catalog

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Remove all project-owned catalog resources from the test target domain/project."""
+"""Remove project-owned business catalog resources from the test target domain/project.
+
+Skips Glue-backed assets (GlueTable, GlueDatabase, etc.) and only cleans up
+resources created in the business data catalog (glossaries, glossary terms,
+form types, asset types, custom assets, and data products).
+"""
 
 import boto3
 import os
@@ -15,6 +20,24 @@ if endpoint_url:
     kwargs["endpoint_url"] = endpoint_url
 
 client = boto3.client("datazone", **kwargs)
+
+# AWS-managed asset types backed by Glue/physical infrastructure — never delete these
+GLUE_ASSET_TYPES = {
+    "amazon.datazone.GlueTableAssetType",
+    "amazon.datazone.GlueDatabaseAssetType",
+    "amazon.datazone.GlueViewAssetType",
+    "GlueTable",
+    "GlueDatabase",
+    "GlueView",
+}
+
+
+def is_glue_asset(item):
+    """Return True if the asset is backed by a Glue/physical resource."""
+    asset = item.get("assetItem", {})
+    type_id = asset.get("typeIdentifier", "")
+    # Match exact known types or any type containing 'Glue'
+    return type_id in GLUE_ASSET_TYPES or "Glue" in type_id
 
 
 def search_resources(search_scope):
@@ -325,6 +348,13 @@ for scope, api_type in deletion_order:
     for item in items:
         rid = get_id(item, scope)
         name = get_name(item, scope)
+
+        # Skip Glue-backed assets — only clean up business catalog resources
+        if scope == "ASSET" and is_glue_asset(item):
+            type_id = item.get("assetItem", {}).get("typeIdentifier", "unknown")
+            print(f"  ⏭️  Skipping Glue asset: {name} (type={type_id})")
+            continue
+
         if rid:
             if delete_resource(rid, scope, name):
                 total_deleted += 1

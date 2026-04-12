@@ -442,7 +442,7 @@ Validates import correctness properties across randomly generated catalog data.
 
 ## Part 3: Integration Tests (Manual)
 
-These tests require real AWS credentials and DataZone domains. Run via `smus-cli` commands from the `CICD-for-SageMakerUnifiedStudio-public/` directory after sourcing `.env`.
+These tests require real AWS credentials and DataZone domains. Run via `aws-smus-cicd-cli` commands from the `CICD-for-SageMakerUnifiedStudio-public/` directory after sourcing `.env`.
 
 ---
 
@@ -450,13 +450,13 @@ These tests require real AWS credentials and DataZone domains. Run via `smus-cli
 
 | # | Description | Key Assertions | Status |
 |---|-------------|----------------|--------|
-| I1 | `smus-cli bundle` with `content.catalog.enabled: true` produces a ZIP containing `catalog/catalog_export.json` | File exists in ZIP | ✅ |
+| I1 | `aws-smus-cicd-cli bundle` with `content.catalog.enabled: true` produces a ZIP containing `catalog/catalog_export.json` | File exists in ZIP | ✅ |
 | I2 | The exported JSON contains all 7 top-level keys with correct metadata | Keys and metadata present | ✅ |
 | I3 | Assets in the export have populated `formsInput` (from GetAsset enrichment) | `formsInput` non-empty | ✅ |
 | I4 | Data products in the export have populated `items` (from GetDataProduct enrichment) | `items` non-empty | ✅ |
 | I5 | Glossary terms in the export have `termRelations` when relations exist in source | `termRelations` present | ✅ |
 | I6 | `listingStatus` is "ACTIVE" for published assets (not "LISTED") | Value is "ACTIVE" | ✅ |
-| I7 | `smus-cli bundle` with `content.catalog.enabled: false` produces a ZIP without `catalog/` directory | No catalog directory | ✅ |
+| I7 | `aws-smus-cicd-cli bundle` with `content.catalog.enabled: false` produces a ZIP without `catalog/` directory | No catalog directory | ✅ |
 
 ---
 
@@ -464,7 +464,7 @@ These tests require real AWS credentials and DataZone domains. Run via `smus-cli
 
 | # | Description | Key Assertions | Status |
 |---|-------------|----------------|--------|
-| I8 | `smus-cli deploy` with a catalog bundle creates resources in the target project | Resources visible in target | ✅ |
+| I8 | `aws-smus-cicd-cli deploy` with a catalog bundle creates resources in the target project | Resources visible in target | ✅ |
 | I9 | Permission check runs before import and reports missing grants if any | Error message lists missing grants | ✅ |
 | I10 | Glossaries are created before glossary terms (dependency order) | Glossaries exist when terms reference them | ✅ |
 | I11 | Form types are created before asset types and assets | Form types exist when referenced | ✅ |
@@ -481,7 +481,7 @@ These tests require real AWS credentials and DataZone domains. Run via `smus-cli
 
 | # | Description | Key Assertions | Status |
 |---|-------------|----------------|--------|
-| I18 | Running `smus-cli deploy` a second time with the same bundle updates existing resources instead of creating duplicates | No duplicate resources | ✅ |
+| I18 | Running `aws-smus-cicd-cli deploy` a second time with the same bundle updates existing resources instead of creating duplicates | No duplicate resources | ✅ |
 | I19 | Updated resources retain their target identifiers | IDs unchanged after re-deploy | ✅ |
 | I20 | Resources deleted from the source bundle are deleted from the target on re-deploy | Extra resources removed | ✅ |
 

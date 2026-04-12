@@ -6,7 +6,7 @@ This feature adds support for importing and exporting DataZone catalog assets (G
 
 ## Glossary
 
-- **CLI**: The `smus-cli` command-line interface for SMUS CI/CD operations
+- **CLI**: The `aws-smus-cicd-cli` command-line interface for SMUS CI/CD operations
 - **Bundle_Command**: The CLI command that packages application content (S3 files, QuickSight dashboards, Git repos, and now catalog assets) into a deployable ZIP archive
 - **Deploy_Command**: The CLI command that deploys a bundle archive to a target stage's DataZone project
 - **Catalog_Exporter**: The component responsible for querying DataZone Search/SearchTypes APIs and serializing catalog resources to JSON

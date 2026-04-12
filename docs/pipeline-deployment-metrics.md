@@ -32,7 +32,7 @@ monitoring:
 ### 2. Deploy with Monitoring
 
 ```bash
-aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets prod --manifest manifest.yaml
 ```
 
 ### 3. Create EventBridge Rule
@@ -111,13 +111,13 @@ Override manifest configuration with CLI flags:
 
 ```bash
 # Enable events
-aws-smus-cicd-cli deploy --stages prod --emit-events
+aws-smus-cicd-cli deploy --targets prod --emit-events
 
 # Disable events
-aws-smus-cicd-cli deploy --stages prod --no-events
+aws-smus-cicd-cli deploy --targets prod --no-events
 
 # Use custom event bus
-aws-smus-cicd-cli deploy --stages prod --event-bus-name my-custom-bus
+aws-smus-cicd-cli deploy --targets prod --event-bus-name my-custom-bus
 ```
 
 ## Event Types

@@ -615,10 +615,10 @@ Document connection requirements in your README:
 Validate connections after creation:
 ```bash
 # Describe project to see connections
-aws-smus-cicd-cli describe --manifest manifest.yaml --stages test --connect
+aws-smus-cicd-cli describe --manifest manifest.yaml --targets test --connect
 
 # Test workflow that uses connections
-aws-smus-cicd-cli run --stages test --workflow test_connections
+aws-smus-cicd-cli run --targets test --workflow test_connections
 ```
 
 ---

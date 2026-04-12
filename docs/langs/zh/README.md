@@ -294,7 +294,7 @@ Workflow 以 YAML 格式定义为 Airflow DAG（有向无环图）。支持 [MWA
 
 **Direct (Git-based):** (直接（基于 Git）：)无需中间制品，直接从源代码部署
 - 适用于：更简单的工作流、快速迭代、git 作为真实来源
-- 命令：`aws-smus-cicd-cli deploy --manifest manifest.yaml --stage test`
+- 命令：`aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test`
 
 这两种模式都适用于任何存储和 git 内容源的组合。
 

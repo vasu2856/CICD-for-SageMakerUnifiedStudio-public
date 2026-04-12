@@ -161,6 +161,23 @@ src/smus_cicd/
     ├── describe.py           # Validate and describe manifest
     ├── bundle.py             # Create deployment bundles
     ├── deploy.py             # Deploy to target environments
+    ├── dry_run/              # Deploy dry-run validation engine
+    │   ├── engine.py         # DryRunEngine orchestrator
+    │   ├── models.py         # Finding, DryRunReport, Severity, Phase
+    │   ├── report.py         # Text and JSON report formatters
+    │   └── checkers/         # Phase-specific validation checkers
+    │       ├── manifest_checker.py
+    │       ├── bundle_checker.py
+    │       ├── permission_checker.py
+    │       ├── connectivity_checker.py
+    │       ├── project_checker.py
+    │       ├── quicksight_checker.py
+    │       ├── storage_checker.py
+    │       ├── git_checker.py
+    │       ├── catalog_checker.py
+    │       ├── dependency_checker.py
+    │       ├── workflow_checker.py
+    │       └── bootstrap_checker.py
     ├── monitor.py            # Monitor workflow status
     ├── run.py                # Execute workflows
     ├── logs.py               # Fetch workflow logs
@@ -176,6 +193,7 @@ src/smus_cicd/
 - Parse command-line arguments
 - Validate user inputs
 - Orchestrate command execution
+- Run pre-deployment dry-run validation (automatic, skippable with `--skip-validation`)
 - Format and display output (TEXT/JSON)
 - Handle errors and provide user feedback
 
@@ -877,6 +895,7 @@ def my_command(
 - Schema validation failures
 - Missing required fields
 - Invalid environment variables
+- Dry-run pre-deployment validation failures (missing permissions, unreachable resources, missing dependencies)
 
 **AWS Service Errors:**
 - Permission denied

@@ -326,6 +326,25 @@ jobs:
           
           aws-smus-cicd-cli describe --manifest ${{ inputs.manifest_path }} --targets ${{ inputs.test_target }} --connect
       
+      - name: aws-smus-cicd-cli deploy --dry-run (pre-deploy validation)
+        env:
+          DOMAIN_REGION: ${{ vars.DOMAIN_REGION }}
+          DEV_DOMAIN_REGION: ${{ vars.DOMAIN_REGION }}
+          TEST_DOMAIN_REGION: ${{ vars.DOMAIN_REGION }}
+          PROD_DOMAIN_REGION: ${{ vars.DOMAIN_REGION }}
+          STS_REGION: ${{ vars.DOMAIN_REGION }}
+          STS_ACCOUNT_ID: ${{ steps.aws-account-test.outputs.account-id }}
+          AWS_ACCOUNT_ID: ${{ steps.aws-account-test.outputs.account-id }}
+        run: |
+          echo "🔍 Running dry-run validation before deploying to test..."
+          BUNDLE_FILE=$(ls ${{ runner.temp }}/smus-bundles-${{ github.run_id }}/*.zip | head -1)
+          
+          aws-smus-cicd-cli deploy \
+            --manifest ${{ inputs.manifest_path }} \
+            --targets ${{ inputs.test_target }} \
+            --bundle-archive-path "$BUNDLE_FILE" \
+            --dry-run
+
       - name: aws-smus-cicd-cli deploy to test
         env:
           DOMAIN_REGION: ${{ vars.DOMAIN_REGION }}

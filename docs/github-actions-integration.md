@@ -123,7 +123,7 @@ The SMUS CI/CD CLI intelligently manages infrastructure creation and updates:
 #### **Domain Management**
 ```bash
 # CLI automatically creates DataZone domain if missing
-aws-smus-cicd-cli deploy --manifest manifest.yaml --stages test
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test
 # Creates domain "my-studio-domain" if it doesn't exist
 # Uses existing domain if already present
 ```
@@ -131,7 +131,7 @@ aws-smus-cicd-cli deploy --manifest manifest.yaml --stages test
 #### **Project Creation**
 ```bash
 # CLI creates SageMaker projects as needed
-aws-smus-cicd-cli deploy --manifest manifest.yaml --stages test,prod
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test,prod
 # Creates "my-project-test" and "my-project-prod" projects
 # Skips creation if projects already exist
 ```
@@ -264,7 +264,7 @@ The CLI handles infrastructure creation during deployment:
 
 ```bash
 # Single command creates all required infrastructure
-aws-smus-cicd-cli deploy --manifest manifest.yaml --stages test
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test
 
 # CLI automatically:
 # 1. Creates DataZone domain if missing
@@ -327,7 +327,7 @@ deploy-production:
   steps:
     - name: Deploy to Production
       run: |
-        aws-smus-cicd-cli deploy --manifest manifest.yaml --stages prod
+        aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
 ```
 
 **GitLab CI Example:**
@@ -339,7 +339,7 @@ deploy-production:
     action: start
   when: manual  # Requires manual trigger
   script:
-    - aws-smus-cicd-cli deploy --manifest manifest.yaml --stages prod
+    - aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
 ```
 
 #### **Approval Workflow Process**
@@ -367,28 +367,38 @@ aws-smus-cicd-cli describe --manifest manifest.yaml --connect
 aws-smus-cicd-cli bundle --manifest manifest.yaml --targets test
 ```
 
-#### **3. Infrastructure-Aware Deployment**
+#### **3. Pre-Deployment Validation (Dry Run)**
+```bash
+# Preview deployment without making changes
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test --dry-run
+
+# JSON output for CI/CD automation
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test --dry-run --output json
+```
+
+#### **4. Infrastructure-Aware Deployment**
 ```bash
 # Deploys with automatic infrastructure creation
-aws-smus-cicd-cli deploy --manifest manifest.yaml --stages test
+# (automatic pre-deployment validation runs first; skip with --skip-validation)
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test
 ```
 
-#### **4. Test Execution**
+#### **5. Test Execution**
 ```bash
 # Runs validation tests on deployed environment
-aws-smus-cicd-cli test --manifest manifest.yaml --stages test
+aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 ```
 
-#### **5. Production Deployment**
+#### **6. Production Deployment**
 ```bash
 # Deploys to production with approval gates
-aws-smus-cicd-cli deploy --manifest manifest.yaml --stages prod
+aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
 ```
 
-#### **6. Monitoring and Status**
+#### **7. Monitoring and Status**
 ```bash
 # Monitors deployment status and health
-aws-smus-cicd-cli monitor --manifest manifest.yaml --stages prod
+aws-smus-cicd-cli monitor --manifest manifest.yaml --targets prod
 ```
 
 ## Manual Reviewers and Approval Process
@@ -431,7 +441,7 @@ deploy-production:
       when: manual
       allow_failure: false
   script:
-    - aws-smus-cicd-cli deploy --manifest manifest.yaml --stages prod
+    - aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
 ```
 
 ### Approval Workflow Mechanics
@@ -544,7 +554,7 @@ deploy-test:
 ```
 
 **Purpose**: Deploys to test environment with automatic infrastructure provisioning
-**CLI Command**: `aws-smus-cicd-cli deploy --manifest manifest.yaml --stages test`
+**CLI Command**: `aws-smus-cicd-cli deploy --manifest manifest.yaml --targets test`
 **Infrastructure Created**:
 - SageMaker project (if missing)
 - Lakehouse environment (if missing)
@@ -561,7 +571,7 @@ run-tests:
 ```
 
 **Purpose**: Validates deployment through automated testing
-**CLI Command**: `aws-smus-cicd-cli test --manifest manifest.yaml --stages test`
+**CLI Command**: `aws-smus-cicd-cli test --manifest manifest.yaml --targets test`
 
 #### **Job 5: Production Deployment (Manual Approval)**
 ```yaml
@@ -573,7 +583,7 @@ deploy-prod:
 ```
 
 **Manual Approval Gate**: Uses GitHub environment `aws-env-amirbo-6778` with protection rules
-**CLI Command**: `aws-smus-cicd-cli deploy --manifest manifest.yaml --stages prod`
+**CLI Command**: `aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod`
 **Infrastructure Management**: Creates production infrastructure idempotently
 
 ### Repository-Specific Features
@@ -641,7 +651,7 @@ The workflow demonstrates automatic catalog asset management:
 # CLI automatically handles catalog asset subscriptions
 - name: Deploy with Catalog Assets
   run: |
-    aws-smus-cicd-cli deploy --manifest manifest.yaml --stages prod
+    aws-smus-cicd-cli deploy --manifest manifest.yaml --targets prod
     # CLI automatically:
     # 1. Identifies catalog assets in bundle
     # 2. Requests subscriptions for production project
