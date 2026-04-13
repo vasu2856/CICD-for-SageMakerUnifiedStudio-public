@@ -76,7 +76,7 @@ class BundleChecker:
             bundle_path = find_bundle_file(
                 "./artifacts",
                 context.manifest.application_name,
-                str(context.config.get("region", "")) if context.config else "",
+                context.config.get("region") if context.config else None,
             )
             if bundle_path:
                 findings.append(

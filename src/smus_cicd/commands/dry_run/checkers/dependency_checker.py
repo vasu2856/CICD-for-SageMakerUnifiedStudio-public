@@ -66,8 +66,8 @@ class DependencyChecker:
 
         config = context.config
         region = config.get("region")
-        domain_id = config.get("domain_id", "")
-        project_id = config.get("project_id", "")
+        domain_id = config.get("domain_id")
+        project_id = config.get("project_id")
 
         assets = [
             r for r in context.catalog_data.get("assets", []) if isinstance(r, dict)

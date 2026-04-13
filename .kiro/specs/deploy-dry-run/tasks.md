@@ -136,7 +136,7 @@ Implement the `--dry-run` option for `smus-cicd deploy` by building a `DryRunEng
     - Test project_checker, quicksight_checker, storage_checker, git_checker, catalog_checker, workflow_checker, bootstrap_checker with valid/invalid inputs and edge cases
     - _Requirements: 10.2, 10.5_
 
-- [-] 6. Implement dependency checker
+- [x] 6. Implement dependency checker
   - [x] 6.1 Create `checkers/dependency_checker.py` — validate pre-existing AWS resources and DataZone types referenced by catalog export data. Implement Glue Data Catalog resource validation (tables, views, databases via `glue:GetTable`, `glue:GetDatabase`, `glue:GetPartitions`), data source validation (`datazone:ListDataSources`), custom form type validation (`datazone:GetFormType`), custom asset type validation (`datazone:SearchTypes`), form type revision validation, managed resource skipping (`amazon.datazone.` prefix), and caching for all API calls
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 13.9, 13.10, 13.11, 13.12, 13.13_
 
@@ -171,23 +171,23 @@ Implement the `--dry-run` option for `smus-cicd deploy` by building a `DryRunEng
 - [x] 7. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 8. Implement DryRunEngine orchestrator
+- [x] 8. Implement DryRunEngine orchestrator
   - [x] 8.1 Create `src/smus_cicd/commands/dry_run/engine.py` — instantiate all 12 checkers in phase order, call `checker.check(context)` for each, add findings to `DryRunReport`. Implement fail-fast on manifest errors (Phase 1 ERROR → return immediately). Continue through all other phases even when errors are found
     - _Requirements: 5.7, 7.1, 7.2, 7.3_
 
-  - [ ] 8.2 Write property test for phase ordering invariant
+  - [x] 8.2 Write property test for phase ordering invariant
     - **Property 13: Phase ordering invariant**
     - **Validates: Requirements 5.7**
 
-  - [ ] 8.3 Write property test for no-mutation invariant
+  - [x] 8.3 Write property test for no-mutation invariant
     - **Property 1: No-mutation invariant**
     - **Validates: Requirements 1.1**
 
-  - [ ] 8.4 Write property test for dry-run idempotence
+  - [x] 8.4 Write property test for dry-run idempotence
     - **Property 21: Dry-run idempotence**
     - **Validates: Requirements 11.6**
 
-  - [ ] 8.5 Write unit tests for DryRunEngine
+  - [x] 8.5 Write unit tests for DryRunEngine
     - Test phase ordering, early termination on manifest error, full flow with mixed findings
     - _Requirements: 10.2_
 

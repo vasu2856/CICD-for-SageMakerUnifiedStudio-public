@@ -4,6 +4,8 @@
 
 The Deploy Dry Run feature adds a `--dry-run` option to the existing `smus-cicd deploy` command. When enabled, the CLI walks through every phase of the deployment pipeline — manifest loading, bundle exploration, project initialization, storage deployment, git deployment, catalog import, QuickSight dashboard deployment, workflow creation, and bootstrap actions — without creating, modifying, or deleting any actual resources. It also proactively verifies IAM permissions, S3 bucket accessibility, DataZone domain/project reachability, and catalog asset availability, producing a structured report of what would happen and any issues detected. The goal is to let operators confirm a deployment will succeed before committing to it, avoiding partial deployment failures.
 
+**Important: Best-Effort Validation.** The dry run is a best-effort validation mechanism. A successful dry run significantly reduces the risk of deployment failure but does not guarantee that the actual deployment will succeed. Conditions such as transient AWS service errors, IAM policy changes between validation and deployment, concurrent resource modifications by other actors, eventual consistency delays, and service quotas or throttling limits may cause a deployment to fail even after a clean dry-run report. Operators should treat a passing dry run as a strong signal of readiness, not an absolute guarantee.
+
 ## Glossary
 
 - **CLI**: The `smus-cicd` command-line interface built with Typer.
@@ -114,7 +116,7 @@ The Deploy Dry Run feature adds a `--dry-run` option to the existing `smus-cicd 
 1. THE Dry_Run_Report SHALL include a summary section listing the total count of planned actions, warnings, and errors.
 2. THE Dry_Run_Report SHALL organize findings by deployment phase (manifest validation, project initialization, storage deployment, git deployment, catalog import, dependency validation, QuickSight deployment, workflow validation, bootstrap actions).
 3. THE Dry_Run_Report SHALL classify each finding as one of: `OK` (check passed), `WARNING` (non-blocking issue), or `ERROR` (blocking issue that would cause deployment failure).
-4. WHEN all checks pass with no errors, THE CLI SHALL exit with exit code 0 and display a success message indicating the deployment is expected to succeed.
+4. WHEN all checks pass with no errors, THE CLI SHALL exit with exit code 0 and display a success message indicating the deployment is likely to succeed, along with a disclaimer that the dry run is best-effort and does not guarantee deployment success.
 5. WHEN one or more errors are detected, THE CLI SHALL exit with a non-zero exit code and display a failure message indicating the deployment would fail.
 6. THE CLI SHALL output the Dry_Run_Report in human-readable text format by default.
 7. WHERE the `--output json` option is provided, THE CLI SHALL output the Dry_Run_Report in machine-readable JSON format.
