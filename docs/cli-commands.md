@@ -255,8 +255,14 @@ Bundle creation complete for target: dev
 
 Deploys bundle files to target environments (auto-initializes if needed). The deploy command performs the following operations:
 
+0. **Pre-Deployment Validation (automatic)**: Runs a dry-run validation before deployment to catch errors early. If any blocking errors are found, the deployment is aborted before any resources are created or modified. This prevents partial deployments that leave resources in an inconsistent state. Skip with `--skip-validation`.
 1. **Bundle Deployment**: Uploads workflow and storage files to target project connections
-2. **Catalog Asset Access**: Processes catalog assets defined in the bundle manifest
+2. **Catalog Asset Access**: Processes catalog assets defined in the bundle manifest:
+   - Searches for assets in the DataZone catalog
+   - Creates subscription requests for required access
+   - Waits for subscription approval (up to 5 minutes)
+   - Verifies subscription grants are completed
+   - Fails deployment if catalog access cannot be obtained
 3. **Workflow Validation**: Ensures deployed workflows are accessible by the target environment
 4. **Bootstrap Actions**: Executes post-deployment actions defined in the manifest (if configured) — see [Bootstrap Actions](bootstrap-actions.md)
 5. **Deployment Metrics**: Optionally emits deployment lifecycle events to EventBridge — see [Bundle Deployment Metrics](pipeline-deployment-metrics.md)
@@ -269,6 +275,9 @@ aws-smus-cicd-cli deploy [OPTIONS] [TARGET_POSITIONAL]
 - **`-m, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
 - **`-t, --targets`**: Target name(s) - single target or comma-separated list (uses default target if not specified)
 - **`-b, --bundle-archive-path`**: Path to pre-created bundle file (optional)
+- **`--dry-run`**: Preview the deployment without making any changes. Validates the manifest, bundle, IAM permissions, resource reachability, catalog dependencies, and workflow definitions, then produces a structured report of what would happen and any issues detected. No resources are created, modified, or deleted.
+- **`--output`**: Output format for the dry-run report: `text` (default, human-readable) or `json` (machine-readable). Only applies when `--dry-run` is used.
+- **`--skip-validation`**: Skip the automatic pre-deployment dry-run validation step and proceed directly to deployment. Useful when you have already validated with `--dry-run` or need to bypass validation for speed.
 - **`--emit-events`**: Enable EventBridge event emission for deployment tracking
 - **`--no-events`**: Disable EventBridge event emission
 - **`--event-bus-name`**: Custom EventBridge event bus name
@@ -291,7 +300,43 @@ aws-smus-cicd-cli deploy --targets prod --emit-events
 
 # Deploy using positional argument (backward compatibility)
 aws-smus-cicd-cli deploy test
+
+# Preview deployment without making changes (dry run)
+aws-smus-cicd-cli deploy --dry-run --targets test
+
+# Dry run with JSON output for automation
+aws-smus-cicd-cli deploy --dry-run --targets test --output json
+
+# Skip pre-deployment validation for faster deployment
+aws-smus-cicd-cli deploy --targets test --skip-validation
 ```
+
+#### Dry Run Mode
+
+Use `--dry-run` to preview a deployment without creating, modifying, or deleting any resources. The dry run walks through every deployment phase in read-only mode:
+
+1. **Manifest Validation** — Loads and validates the manifest YAML, resolves the target stage, builds domain configuration, checks environment variable references
+2. **Bundle Exploration** — Opens the bundle archive, enumerates files, validates catalog export data if present
+3. **Permission Verification** — Uses `iam:SimulatePrincipalPolicy` to check that the current IAM identity has all required permissions (S3, DataZone, Glue, IAM, QuickSight, Airflow, etc.). Also checks DataZone policy grants on the project's domain unit when catalog resources are present.
+4. **Connectivity & Reachability** — Verifies that the DataZone domain and project are reachable, S3 buckets are accessible, and Airflow environments respond
+5. **Project Initialization** — Checks whether the target project exists or would need to be created
+6. **Deployment Simulation** — Simulates each deployment phase (QuickSight, storage, git, catalog import, workflows, bootstrap actions) and reports what would happen
+7. **Dependency Validation** — Checks that pre-existing AWS resources referenced by catalog export data exist in the target environment
+8. **Workflow Validation** — Validates workflow YAML files for correct syntax, required Airflow DAG keys, and environment variable references
+
+The report ends with a Resource Deployment Outlook section that groups resources by deployment phase and shows which will deploy successfully vs. which will fail.
+
+Exit codes for dry run:
+- `0` — All checks passed (zero errors). Deployment is expected to succeed.
+- `1` — One or more blocking errors detected. Deployment would fail.
+
+#### Pre-Deployment Validation
+
+By default, every `deploy` invocation (without `--dry-run`) automatically runs a dry-run validation step before beginning the actual deployment. This catches errors early and prevents partial deployments.
+
+- If the validation finds errors, the deployment is aborted and the report is displayed.
+- If the validation finds only warnings or passes cleanly, the deployment proceeds normally.
+- Use `--skip-validation` to bypass this step when you've already validated or need faster deployments.
 
 #### Example Output
 ```
