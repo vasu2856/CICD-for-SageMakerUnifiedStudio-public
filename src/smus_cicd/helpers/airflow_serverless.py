@@ -426,9 +426,7 @@ def get_workflow_definition(
         response = client.get_workflow(WorkflowArn=workflow_arn)
         return response.get("WorkflowDefinition", "")
     except Exception as e:
-        logger.warning(
-            "Could not get workflow definition for %s: %s", workflow_arn, e
-        )
+        logger.warning("Could not get workflow definition for %s: %s", workflow_arn, e)
         return ""
 
 

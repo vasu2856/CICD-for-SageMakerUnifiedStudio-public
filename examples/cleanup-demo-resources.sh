@@ -45,7 +45,6 @@ echo ""
 echo "🗑️  Cleaning up demo resources..."
 echo ""
 echo "ℹ️  Use 'destroy' to remove all deployed resources (S3, Airflow, QuickSight, Glue, catalog)."
-echo "   Use 'delete' to remove only the DataZone project."
 echo ""
 
 # Destroy all deployed resources for test target (most common demo target)
