@@ -11,7 +11,7 @@ The heavy lifting is split across helper modules:
 """
 
 import json
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import typer
 from rich.console import Console
@@ -21,18 +21,11 @@ from rich.prompt import Confirm
 from ..application import ApplicationManifest
 from ..helpers.destroy_executor import _destroy_stage
 from ..helpers.destroy_models import (
-    DESTROY_SUPPORTED_RESOURCE_TYPES,
     ResourceResult,
     ResourceToDelete,
-    S3Target,
     ValidationResult,
 )
-from ..helpers.destroy_validator import (
-    _discover_workflow_created_resources,
-    _resolve_resource_prefix,
-    _resolve_s3_targets,
-    _validate_stage,
-)
+from ..helpers.destroy_validator import _validate_stage
 
 console = Console()
 err_console = Console(stderr=True)
@@ -167,7 +160,9 @@ def destroy_command(
                     total_resources += 1
 
         if vr.active_workflow_runs:
-            _out("    [yellow]Active workflow runs (will be terminated when workflow is deleted):[/yellow]")
+            _out(
+                "    [yellow]Active workflow runs (will be terminated when workflow is deleted):[/yellow]"
+            )
             for wf_name, run_ids in vr.active_workflow_runs.items():
                 _out(f"      {wf_name}: {run_ids}")
 
@@ -225,11 +220,15 @@ def destroy_command(
                 output=output,
             )
         except Exception as e:
-            _out(f"  [red]❌ Unexpected error destroying stage '{stage_name}': {e}[/red]")
+            _out(
+                f"  [red]❌ Unexpected error destroying stage '{stage_name}': {e}[/red]"
+            )
             stage_results = [
                 ResourceResult(
-                    resource_type="stage", resource_id=stage_name,
-                    status="error", message=str(e),
+                    resource_type="stage",
+                    resource_id=stage_name,
+                    status="error",
+                    message=str(e),
                 )
             ]
         all_results[stage_name] = stage_results

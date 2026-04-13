@@ -326,6 +326,89 @@ Use `--dry-run` to preview a deployment without creating, modifying, or deleting
 
 The report ends with a Resource Deployment Outlook section that groups resources by deployment phase and shows which will deploy successfully vs. which will fail.
 
+**Example Dry Run Output (text):**
+```
+Dry Run Report
+========================================
+
+--- Manifest Validation ---
+  ✅ Manifest loaded successfully from manifest.yaml
+  ✅ Target stage 'test' resolved successfully
+  ✅ Domain configuration built successfully
+  ✅ All environment variable references are resolved
+
+--- Bundle Exploration ---
+  ✅ Bundle resolved from ./artifacts: ./artifacts/MyApp.zip
+  ✅ Bundle contains 1 file(s)
+  ✅ Catalog export validated: 19 resource(s) found
+
+--- Permission Verification ---
+  ✅ Caller identity: arn:aws:sts::123456789012:assumed-role/Admin/session
+  ✅ Permission 'datazone:GetDomain' allowed on *
+  ✅ Permission 's3:PutObject' allowed on arn:aws:s3:::my-bucket/*
+  ⚠️  Could not verify quicksight:DescribeDashboard: AccessDenied
+
+--- Connectivity & Reachability ---
+  ✅ DataZone domain 'dzd-abc123' is reachable
+  ✅ DataZone project 'my-project' exists in domain 'dzd-abc123'
+  ✅ S3 bucket 'my-bucket' is accessible
+
+--- Project Initialization ---
+  ✅ Project 'my-project' exists in domain 'dzd-abc123'. No creation needed.
+
+--- Catalog Import ---
+  ✅ Catalog import would process 19 resource(s): 1 glossaries, 3 glossary terms, ...
+
+--- Workflow Validation ---
+  ✅ No workflows configured; skipping.
+
+--- Bootstrap Actions ---
+  ✅ No bootstrap actions configured.
+
+========================================
+Resource Deployment Outlook
+----------------------------------------
+  Will deploy (15):
+    [Catalog Import]
+      ✅ Business_Glossary  (glossaries)
+      ✅ my_dataset  (assets)
+      ...
+  Will fail (1):
+    [Permission Verification]
+      ❌ CREATE_GLOSSARY  (datazone)
+         └─ DataZone policy grant 'CREATE_GLOSSARY' is MISSING on domain unit 'dpxyz123'.
+========================================
+Summary: 48 OK, 1 warning(s), 1 error(s)
+```
+
+**Note on DataZone permissions:** When the manifest identifies the domain by tags (rather than a direct `domain: id:`), the dry run automatically resolves the domain ID via DataZone API. For `SimulatePrincipalPolicy`, if the domain ID or account ID cannot be resolved, a wildcard resource ARN (`*`) is used instead of a partial-wildcard ARN to avoid false-positive permission denials.
+
+**Example Dry Run Output (json):**
+```json
+{
+  "summary": { "ok": 48, "warnings": 1, "errors": 1 },
+  "phases": {
+    "Manifest Validation": [
+      { "severity": "OK", "message": "Manifest loaded successfully from manifest.yaml" },
+      { "severity": "OK", "message": "Target stage 'test' resolved successfully" }
+    ],
+    "Permission Verification": [
+      { "severity": "OK", "message": "Permission 'datazone:GetDomain' allowed on *" },
+      { "severity": "WARNING", "message": "Could not verify quicksight:DescribeDashboard: AccessDenied" }
+    ]
+  },
+  "resource_outlook": {
+    "will_deploy": [
+      { "resource": "Business_Glossary", "type": "glossaries", "phase": "Catalog Import" }
+    ],
+    "will_fail": [
+      { "resource": "CREATE_GLOSSARY", "service": "datazone", "phase": "Permission Verification",
+        "message": "DataZone policy grant 'CREATE_GLOSSARY' is MISSING on domain unit 'dpxyz123'." }
+    ]
+  }
+}
+```
+
 Exit codes for dry run:
 - `0` — All checks passed (zero errors). Deployment is expected to succeed.
 - `1` — One or more blocking errors detected. Deployment would fail.

@@ -73,45 +73,77 @@ def _destroy_stage(
             registry_entry = _resource_type_to_registry.get(resource.resource_type)
 
         if not registry_entry:
-            results.append(ResourceResult(
-                resource_type=resource.resource_type, resource_id=resource.resource_id,
-                status="skipped", message="No registry entry found",
-            ))
+            results.append(
+                ResourceResult(
+                    resource_type=resource.resource_type,
+                    resource_id=resource.resource_id,
+                    status="skipped",
+                    message="No registry entry found",
+                )
+            )
             continue
 
         try:
             registry_entry["delete_fn"](resource.resource_id, effective_region)
             _log(f"  ✅ Deleted {resource.resource_type}: {resource.resource_id}")
-            results.append(ResourceResult(
-                resource_type=resource.resource_type, resource_id=resource.resource_id,
-                status="deleted", message="Deleted successfully",
-            ))
+            results.append(
+                ResourceResult(
+                    resource_type=resource.resource_type,
+                    resource_id=resource.resource_id,
+                    status="deleted",
+                    message="Deleted successfully",
+                )
+            )
         except ResourceNotFoundError:
-            _log(f"  [yellow]⚠️  {resource.resource_type} not found: {resource.resource_id}[/yellow]")
-            results.append(ResourceResult(
-                resource_type=resource.resource_type, resource_id=resource.resource_id,
-                status="not_found", message="Resource not found",
-            ))
+            _log(
+                f"  [yellow]⚠️  {resource.resource_type} not found: {resource.resource_id}[/yellow]"
+            )
+            results.append(
+                ResourceResult(
+                    resource_type=resource.resource_type,
+                    resource_id=resource.resource_id,
+                    status="not_found",
+                    message="Resource not found",
+                )
+            )
         except ClientError as e:
             code = e.response["Error"]["Code"]
             if code == "EntityNotFoundException":
-                _log(f"  [yellow]⚠️  {resource.resource_type} not found: {resource.resource_id}[/yellow]")
-                results.append(ResourceResult(
-                    resource_type=resource.resource_type, resource_id=resource.resource_id,
-                    status="not_found", message="Resource not found",
-                ))
+                _log(
+                    f"  [yellow]⚠️  {resource.resource_type} not found: {resource.resource_id}[/yellow]"
+                )
+                results.append(
+                    ResourceResult(
+                        resource_type=resource.resource_type,
+                        resource_id=resource.resource_id,
+                        status="not_found",
+                        message="Resource not found",
+                    )
+                )
             else:
-                _log(f"  [red]❌ Error deleting {resource.resource_type} {resource.resource_id}: {e}[/red]")
-                results.append(ResourceResult(
-                    resource_type=resource.resource_type, resource_id=resource.resource_id,
-                    status="error", message=str(e),
-                ))
+                _log(
+                    f"  [red]❌ Error deleting {resource.resource_type} {resource.resource_id}: {e}[/red]"
+                )
+                results.append(
+                    ResourceResult(
+                        resource_type=resource.resource_type,
+                        resource_id=resource.resource_id,
+                        status="error",
+                        message=str(e),
+                    )
+                )
         except Exception as e:
-            _log(f"  [red]❌ Error deleting {resource.resource_type} {resource.resource_id}: {e}[/red]")
-            results.append(ResourceResult(
-                resource_type=resource.resource_type, resource_id=resource.resource_id,
-                status="error", message=str(e),
-            ))
+            _log(
+                f"  [red]❌ Error deleting {resource.resource_type} {resource.resource_id}: {e}[/red]"
+            )
+            results.append(
+                ResourceResult(
+                    resource_type=resource.resource_type,
+                    resource_id=resource.resource_id,
+                    status="error",
+                    message=str(e),
+                )
+            )
 
     # -----------------------------------------------------------------------
     # Step b: Delete Airflow workflows
@@ -123,24 +155,40 @@ def _destroy_stage(
         try:
             delete_workflow(workflow_arn, region=effective_region)
             _log(f"  ✅ Deleted Airflow workflow: {workflow_arn}")
-            results.append(ResourceResult(
-                resource_type="airflow_workflow", resource_id=workflow_arn,
-                status="deleted", message="Deleted successfully",
-            ))
+            results.append(
+                ResourceResult(
+                    resource_type="airflow_workflow",
+                    resource_id=workflow_arn,
+                    status="deleted",
+                    message="Deleted successfully",
+                )
+            )
         except Exception as e:
             err_str = str(e).lower()
             if "not found" in err_str or "resourcenotfound" in err_str:
-                _log(f"  [yellow]⚠️  Airflow workflow not found: {workflow_arn}[/yellow]")
-                results.append(ResourceResult(
-                    resource_type="airflow_workflow", resource_id=workflow_arn,
-                    status="not_found", message="Workflow not found",
-                ))
+                _log(
+                    f"  [yellow]⚠️  Airflow workflow not found: {workflow_arn}[/yellow]"
+                )
+                results.append(
+                    ResourceResult(
+                        resource_type="airflow_workflow",
+                        resource_id=workflow_arn,
+                        status="not_found",
+                        message="Workflow not found",
+                    )
+                )
             else:
-                _log(f"  [red]❌ Error deleting Airflow workflow {workflow_arn}: {e}[/red]")
-                results.append(ResourceResult(
-                    resource_type="airflow_workflow", resource_id=workflow_arn,
-                    status="error", message=str(e),
-                ))
+                _log(
+                    f"  [red]❌ Error deleting Airflow workflow {workflow_arn}: {e}[/red]"
+                )
+                results.append(
+                    ResourceResult(
+                        resource_type="airflow_workflow",
+                        resource_id=workflow_arn,
+                        status="error",
+                        message=str(e),
+                    )
+                )
 
     # -----------------------------------------------------------------------
     # Step c: Delete Bootstrap_Connections
@@ -152,40 +200,64 @@ def _destroy_stage(
         connection_id = resource.metadata.get("connection_id", "")
         domain_id = resource.metadata.get("domain_id", "")
         if not connection_id or not domain_id:
-            _log(f"  [yellow]⚠️  Skipping connection '{conn_name}' — missing ID or domain[/yellow]")
-            results.append(ResourceResult(
-                resource_type="datazone_connection", resource_id=conn_name,
-                status="skipped", message="Missing connection ID or domain ID",
-            ))
+            _log(
+                f"  [yellow]⚠️  Skipping connection '{conn_name}' — missing ID or domain[/yellow]"
+            )
+            results.append(
+                ResourceResult(
+                    resource_type="datazone_connection",
+                    resource_id=conn_name,
+                    status="skipped",
+                    message="Missing connection ID or domain ID",
+                )
+            )
             continue
         try:
             dz_client = boto3.client("datazone", region_name=effective_region)
-            dz_client.delete_connection(domainIdentifier=domain_id, identifier=connection_id)
+            dz_client.delete_connection(
+                domainIdentifier=domain_id, identifier=connection_id
+            )
             _log(f"  ✅ Deleted DataZone connection: {conn_name} ({connection_id})")
-            results.append(ResourceResult(
-                resource_type="datazone_connection", resource_id=conn_name,
-                status="deleted", message="Deleted successfully",
-            ))
+            results.append(
+                ResourceResult(
+                    resource_type="datazone_connection",
+                    resource_id=conn_name,
+                    status="deleted",
+                    message="Deleted successfully",
+                )
+            )
         except ClientError as e:
             code = e.response["Error"]["Code"]
             if code in ("ResourceNotFoundException", "EntityNotFoundException"):
                 _log(f"  [yellow]⚠️  Connection not found: {conn_name}[/yellow]")
-                results.append(ResourceResult(
-                    resource_type="datazone_connection", resource_id=conn_name,
-                    status="not_found", message="Connection not found",
-                ))
+                results.append(
+                    ResourceResult(
+                        resource_type="datazone_connection",
+                        resource_id=conn_name,
+                        status="not_found",
+                        message="Connection not found",
+                    )
+                )
             else:
                 _log(f"  [red]❌ Error deleting connection '{conn_name}': {e}[/red]")
-                results.append(ResourceResult(
-                    resource_type="datazone_connection", resource_id=conn_name,
-                    status="error", message=str(e),
-                ))
+                results.append(
+                    ResourceResult(
+                        resource_type="datazone_connection",
+                        resource_id=conn_name,
+                        status="error",
+                        message=str(e),
+                    )
+                )
         except Exception as e:
             _log(f"  [red]❌ Error deleting connection '{conn_name}': {e}[/red]")
-            results.append(ResourceResult(
-                resource_type="datazone_connection", resource_id=conn_name,
-                status="error", message=str(e),
-            ))
+            results.append(
+                ResourceResult(
+                    resource_type="datazone_connection",
+                    resource_id=conn_name,
+                    status="error",
+                    message=str(e),
+                )
+            )
 
     # -----------------------------------------------------------------------
     # Step d: Delete QuickSight (dashboards → datasets → data sources)
@@ -199,43 +271,69 @@ def _destroy_stage(
 
     qs_client = boto3.client("quicksight", region_name=effective_region)
 
-    for qs_type in ("quicksight_dashboard", "quicksight_dataset", "quicksight_data_source"):
+    for qs_type in (
+        "quicksight_dashboard",
+        "quicksight_dataset",
+        "quicksight_data_source",
+    ):
         for resource in validation_result.resources:
             if resource.resource_type != qs_type:
                 continue
             resource_id = resource.resource_id
             try:
                 if qs_type == "quicksight_dashboard":
-                    qs_client.delete_dashboard(AwsAccountId=account_id, DashboardId=resource_id)
+                    qs_client.delete_dashboard(
+                        AwsAccountId=account_id, DashboardId=resource_id
+                    )
                 elif qs_type == "quicksight_dataset":
-                    qs_client.delete_data_set(AwsAccountId=account_id, DataSetId=resource_id)
+                    qs_client.delete_data_set(
+                        AwsAccountId=account_id, DataSetId=resource_id
+                    )
                 elif qs_type == "quicksight_data_source":
-                    qs_client.delete_data_source(AwsAccountId=account_id, DataSourceId=resource_id)
+                    qs_client.delete_data_source(
+                        AwsAccountId=account_id, DataSourceId=resource_id
+                    )
                 _log(f"  ✅ Deleted {qs_type}: {resource_id}")
-                results.append(ResourceResult(
-                    resource_type=qs_type, resource_id=resource_id,
-                    status="deleted", message="Deleted successfully",
-                ))
+                results.append(
+                    ResourceResult(
+                        resource_type=qs_type,
+                        resource_id=resource_id,
+                        status="deleted",
+                        message="Deleted successfully",
+                    )
+                )
             except ClientError as e:
                 code = e.response["Error"]["Code"]
                 if code == "ResourceNotFoundException":
                     _log(f"  [yellow]⚠️  {qs_type} not found: {resource_id}[/yellow]")
-                    results.append(ResourceResult(
-                        resource_type=qs_type, resource_id=resource_id,
-                        status="not_found", message="Resource not found",
-                    ))
+                    results.append(
+                        ResourceResult(
+                            resource_type=qs_type,
+                            resource_id=resource_id,
+                            status="not_found",
+                            message="Resource not found",
+                        )
+                    )
                 else:
                     _log(f"  [red]❌ Error deleting {qs_type} {resource_id}: {e}[/red]")
-                    results.append(ResourceResult(
-                        resource_type=qs_type, resource_id=resource_id,
-                        status="error", message=str(e),
-                    ))
+                    results.append(
+                        ResourceResult(
+                            resource_type=qs_type,
+                            resource_id=resource_id,
+                            status="error",
+                            message=str(e),
+                        )
+                    )
             except Exception as e:
                 _log(f"  [red]❌ Error deleting {qs_type} {resource_id}: {e}[/red]")
-                results.append(ResourceResult(
-                    resource_type=qs_type, resource_id=resource_id,
-                    status="error", message=str(e),
-                ))
+                results.append(
+                    ResourceResult(
+                        resource_type=qs_type,
+                        resource_id=resource_id,
+                        status="error",
+                        message=str(e),
+                    )
+                )
 
     # -----------------------------------------------------------------------
     # Step e: Delete S3 objects
@@ -249,42 +347,75 @@ def _destroy_stage(
             continue
         try:
             object_keys = [
-                obj["Key"] for obj in s3_helper.list_objects(bucket, prefix, region=effective_region)
+                obj["Key"]
+                for obj in s3_helper.list_objects(
+                    bucket, prefix, region=effective_region
+                )
             ]
             if not object_keys:
                 _log(f"  [yellow]⚠️  S3 prefix empty: s3://{bucket}/{prefix}[/yellow]")
-                results.append(ResourceResult(
-                    resource_type="s3_prefix", resource_id=resource.resource_id,
-                    status="not_found", message="S3 prefix is empty or does not exist",
-                ))
+                results.append(
+                    ResourceResult(
+                        resource_type="s3_prefix",
+                        resource_id=resource.resource_id,
+                        status="not_found",
+                        message="S3 prefix is empty or does not exist",
+                    )
+                )
                 continue
             s3_helper.delete_objects(bucket, object_keys, region=effective_region)
             _log(f"  ✅ Deleted {len(object_keys)} objects from s3://{bucket}/{prefix}")
-            results.append(ResourceResult(
-                resource_type="s3_prefix", resource_id=resource.resource_id,
-                status="deleted", message=f"Deleted {len(object_keys)} objects",
-            ))
+            results.append(
+                ResourceResult(
+                    resource_type="s3_prefix",
+                    resource_id=resource.resource_id,
+                    status="deleted",
+                    message=f"Deleted {len(object_keys)} objects",
+                )
+            )
         except Exception as e:
-            _log(f"  [red]❌ Error deleting S3 prefix s3://{bucket}/{prefix}: {e}[/red]")
-            results.append(ResourceResult(
-                resource_type="s3_prefix", resource_id=resource.resource_id,
-                status="error", message=str(e),
-            ))
+            _log(
+                f"  [red]❌ Error deleting S3 prefix s3://{bucket}/{prefix}: {e}[/red]"
+            )
+            results.append(
+                ResourceResult(
+                    resource_type="s3_prefix",
+                    resource_id=resource.resource_id,
+                    status="error",
+                    message=str(e),
+                )
+            )
 
     # -----------------------------------------------------------------------
     # Step f: Delete catalog resources (reverse dependency order)
     # -----------------------------------------------------------------------
     CATALOG_DELETION_ORDER = [
-        "catalog_data_product", "catalog_asset", "catalog_asset_type",
-        "catalog_form_type", "catalog_glossary_term", "catalog_glossary",
+        "catalog_data_product",
+        "catalog_asset",
+        "catalog_asset_type",
+        "catalog_form_type",
+        "catalog_glossary_term",
+        "catalog_glossary",
     ]
     CATALOG_DELETE_API = {
-        "catalog_data_product": lambda dz, did, rid: dz.delete_data_product(domainIdentifier=did, identifier=rid),
-        "catalog_asset": lambda dz, did, rid: dz.delete_asset(domainIdentifier=did, identifier=rid),
-        "catalog_asset_type": lambda dz, did, rid: dz.delete_asset_type(domainIdentifier=did, identifier=rid),
-        "catalog_form_type": lambda dz, did, rid: dz.delete_form_type(domainIdentifier=did, formTypeIdentifier=rid),
-        "catalog_glossary_term": lambda dz, did, rid: dz.delete_glossary_term(domainIdentifier=did, identifier=rid),
-        "catalog_glossary": lambda dz, did, rid: dz.delete_glossary(domainIdentifier=did, identifier=rid),
+        "catalog_data_product": lambda dz, did, rid: dz.delete_data_product(
+            domainIdentifier=did, identifier=rid
+        ),
+        "catalog_asset": lambda dz, did, rid: dz.delete_asset(
+            domainIdentifier=did, identifier=rid
+        ),
+        "catalog_asset_type": lambda dz, did, rid: dz.delete_asset_type(
+            domainIdentifier=did, identifier=rid
+        ),
+        "catalog_form_type": lambda dz, did, rid: dz.delete_form_type(
+            domainIdentifier=did, formTypeIdentifier=rid
+        ),
+        "catalog_glossary_term": lambda dz, did, rid: dz.delete_glossary_term(
+            domainIdentifier=did, identifier=rid
+        ),
+        "catalog_glossary": lambda dz, did, rid: dz.delete_glossary(
+            domainIdentifier=did, identifier=rid
+        ),
     }
 
     for catalog_type in CATALOG_DELETION_ORDER:
@@ -295,40 +426,68 @@ def _destroy_stage(
             domain_id_cat = resource.metadata.get("domain_id", "")
             resource_name = resource.metadata.get("name", resource_id)
             if not domain_id_cat:
-                _log(f"  [yellow]⚠️  Skipping {catalog_type} '{resource_name}' — missing domain ID[/yellow]")
-                results.append(ResourceResult(
-                    resource_type=catalog_type, resource_id=resource_id,
-                    status="skipped", message="Missing domain ID",
-                ))
+                _log(
+                    f"  [yellow]⚠️  Skipping {catalog_type} '{resource_name}' — missing domain ID[/yellow]"
+                )
+                results.append(
+                    ResourceResult(
+                        resource_type=catalog_type,
+                        resource_id=resource_id,
+                        status="skipped",
+                        message="Missing domain ID",
+                    )
+                )
                 continue
             try:
                 dz_client = boto3.client("datazone", region_name=effective_region)
                 CATALOG_DELETE_API[catalog_type](dz_client, domain_id_cat, resource_id)
                 _log(f"  ✅ Deleted {catalog_type}: {resource_name} ({resource_id})")
-                results.append(ResourceResult(
-                    resource_type=catalog_type, resource_id=resource_id,
-                    status="deleted", message="Deleted successfully",
-                ))
+                results.append(
+                    ResourceResult(
+                        resource_type=catalog_type,
+                        resource_id=resource_id,
+                        status="deleted",
+                        message="Deleted successfully",
+                    )
+                )
             except ClientError as e:
                 code = e.response["Error"]["Code"]
                 if code in ("ResourceNotFoundException", "EntityNotFoundException"):
-                    _log(f"  [yellow]⚠️  {catalog_type} not found: {resource_name}[/yellow]")
-                    results.append(ResourceResult(
-                        resource_type=catalog_type, resource_id=resource_id,
-                        status="not_found", message="Resource not found",
-                    ))
+                    _log(
+                        f"  [yellow]⚠️  {catalog_type} not found: {resource_name}[/yellow]"
+                    )
+                    results.append(
+                        ResourceResult(
+                            resource_type=catalog_type,
+                            resource_id=resource_id,
+                            status="not_found",
+                            message="Resource not found",
+                        )
+                    )
                 else:
-                    _log(f"  [red]❌ Error deleting {catalog_type} '{resource_name}': {e}[/red]")
-                    results.append(ResourceResult(
-                        resource_type=catalog_type, resource_id=resource_id,
-                        status="error", message=str(e),
-                    ))
+                    _log(
+                        f"  [red]❌ Error deleting {catalog_type} '{resource_name}': {e}[/red]"
+                    )
+                    results.append(
+                        ResourceResult(
+                            resource_type=catalog_type,
+                            resource_id=resource_id,
+                            status="error",
+                            message=str(e),
+                        )
+                    )
             except Exception as e:
-                _log(f"  [red]❌ Error deleting {catalog_type} '{resource_name}': {e}[/red]")
-                results.append(ResourceResult(
-                    resource_type=catalog_type, resource_id=resource_id,
-                    status="error", message=str(e),
-                ))
+                _log(
+                    f"  [red]❌ Error deleting {catalog_type} '{resource_name}': {e}[/red]"
+                )
+                results.append(
+                    ResourceResult(
+                        resource_type=catalog_type,
+                        resource_id=resource_id,
+                        status="error",
+                        message=str(e),
+                    )
+                )
 
     # -----------------------------------------------------------------------
     # Step g: Delete DataZone project (only if project.create=True)
@@ -342,41 +501,67 @@ def _destroy_stage(
                 stage_config.project.name, domain_id, effective_region
             )
             if not project_id:
-                _log(f"  [yellow]⚠️  DataZone project not found: '{stage_config.project.name}'[/yellow]")
-                results.append(ResourceResult(
-                    resource_type="datazone_project", resource_id=stage_config.project.name,
-                    status="not_found", message="Project not found",
-                ))
+                _log(
+                    f"  [yellow]⚠️  DataZone project not found: '{stage_config.project.name}'[/yellow]"
+                )
+                results.append(
+                    ResourceResult(
+                        resource_type="datazone_project",
+                        resource_id=stage_config.project.name,
+                        status="not_found",
+                        message="Project not found",
+                    )
+                )
             else:
                 delete_project(domain_name, project_id, effective_region)
                 _log(f"  ✅ Deleted DataZone project: {stage_config.project.name}")
-                results.append(ResourceResult(
-                    resource_type="datazone_project", resource_id=stage_config.project.name,
-                    status="deleted", message="Deleted successfully",
-                ))
+                results.append(
+                    ResourceResult(
+                        resource_type="datazone_project",
+                        resource_id=stage_config.project.name,
+                        status="deleted",
+                        message="Deleted successfully",
+                    )
+                )
         except Exception as e:
             err_str = str(e).lower()
             if "not found" in err_str or "resourcenotfound" in err_str:
-                _log(f"  [yellow]⚠️  DataZone project not found: '{stage_config.project.name}'[/yellow]")
-                results.append(ResourceResult(
-                    resource_type="datazone_project", resource_id=stage_config.project.name,
-                    status="not_found", message="Project not found",
-                ))
+                _log(
+                    f"  [yellow]⚠️  DataZone project not found: '{stage_config.project.name}'[/yellow]"
+                )
+                results.append(
+                    ResourceResult(
+                        resource_type="datazone_project",
+                        resource_id=stage_config.project.name,
+                        status="not_found",
+                        message="Project not found",
+                    )
+                )
             else:
-                _log(f"  [red]❌ Error deleting DataZone project '{stage_config.project.name}': {e}[/red]")
-                results.append(ResourceResult(
-                    resource_type="datazone_project", resource_id=stage_config.project.name,
-                    status="error", message=str(e),
-                ))
+                _log(
+                    f"  [red]❌ Error deleting DataZone project '{stage_config.project.name}': {e}[/red]"
+                )
+                results.append(
+                    ResourceResult(
+                        resource_type="datazone_project",
+                        resource_id=stage_config.project.name,
+                        status="error",
+                        message=str(e),
+                    )
+                )
 
     # Handle skipped resources from validation
     for resource in validation_result.resources:
         if resource.resource_type == "skipped":
             reason = resource.metadata.get("reason", "")
             _log(f"  [dim]⏭️  Skipped task '{resource.resource_id}': {reason}[/dim]")
-            results.append(ResourceResult(
-                resource_type="skipped", resource_id=resource.resource_id,
-                status="skipped", message=reason,
-            ))
+            results.append(
+                ResourceResult(
+                    resource_type="skipped",
+                    resource_id=resource.resource_id,
+                    status="skipped",
+                    message=reason,
+                )
+            )
 
     return results

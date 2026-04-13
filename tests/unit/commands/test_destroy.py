@@ -1343,7 +1343,7 @@ class TestDeployDestroyDrift:
 
     def test_destroy_covers_all_deploy_resource_types(self):
         from smus_cicd.resource_types import DEPLOY_RESOURCE_TYPES
-        from smus_cicd.commands.destroy import DESTROY_SUPPORTED_RESOURCE_TYPES
+        from smus_cicd.helpers.destroy_models import DESTROY_SUPPORTED_RESOURCE_TYPES
 
         missing = DEPLOY_RESOURCE_TYPES - DESTROY_SUPPORTED_RESOURCE_TYPES
         extra = DESTROY_SUPPORTED_RESOURCE_TYPES - DEPLOY_RESOURCE_TYPES

@@ -243,7 +243,9 @@ def _validate_stage(
     except Exception as e:
         errors.append(f"[{stage_name}] Could not resolve domain: {e}")
         return ValidationResult(
-            errors=errors, warnings=warnings, resources=resources,
+            errors=errors,
+            warnings=warnings,
+            resources=resources,
             active_workflow_runs=active_workflow_runs,
         )
 
@@ -262,7 +264,9 @@ def _validate_stage(
     if project_id:
         try:
             connections = get_project_connections(
-                project_id=project_id, domain_id=domain_id, region=effective_region,
+                project_id=project_id,
+                domain_id=domain_id,
+                region=effective_region,
             )
         except Exception as e:
             warnings.append(f"[{stage_name}] Could not resolve S3 connections: {e}")
@@ -288,7 +292,8 @@ def _validate_stage(
             try:
                 all_dashboards = list_dashboards(account_id, effective_region)
                 matched_dashboards = [
-                    d for d in all_dashboards
+                    d
+                    for d in all_dashboards
                     if d.get("DashboardId", "").startswith(prefix)
                 ]
                 if len(matched_dashboards) > declared_count:
@@ -300,11 +305,14 @@ def _validate_stage(
                     )
                 else:
                     for d in matched_dashboards:
-                        resources.append(ResourceToDelete(
-                            resource_type="quicksight_dashboard",
-                            resource_id=d["DashboardId"], stage=stage_name,
-                            metadata={"name": d.get("Name", "")},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="quicksight_dashboard",
+                                resource_id=d["DashboardId"],
+                                stage=stage_name,
+                                metadata={"name": d.get("Name", "")},
+                            )
+                        )
             except QuickSightDeploymentError as e:
                 errors.append(f"[{stage_name}] QuickSight dashboard list failed: {e}")
 
@@ -323,11 +331,14 @@ def _validate_stage(
                     )
                 else:
                     for d in matched_datasets:
-                        resources.append(ResourceToDelete(
-                            resource_type="quicksight_dataset",
-                            resource_id=d["DataSetId"], stage=stage_name,
-                            metadata={"name": d.get("Name", "")},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="quicksight_dataset",
+                                resource_id=d["DataSetId"],
+                                stage=stage_name,
+                                metadata={"name": d.get("Name", "")},
+                            )
+                        )
             except QuickSightDeploymentError as e:
                 errors.append(f"[{stage_name}] QuickSight dataset list failed: {e}")
 
@@ -335,7 +346,8 @@ def _validate_stage(
             try:
                 all_sources = list_data_sources(account_id, effective_region)
                 matched_sources = [
-                    d for d in all_sources
+                    d
+                    for d in all_sources
                     if d.get("DataSourceId", "").startswith(prefix)
                 ]
                 if len(matched_sources) > declared_count:
@@ -347,11 +359,14 @@ def _validate_stage(
                     )
                 else:
                     for d in matched_sources:
-                        resources.append(ResourceToDelete(
-                            resource_type="quicksight_data_source",
-                            resource_id=d["DataSourceId"], stage=stage_name,
-                            metadata={"name": d.get("Name", "")},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="quicksight_data_source",
+                                resource_id=d["DataSourceId"],
+                                stage=stage_name,
+                                metadata={"name": d.get("Name", "")},
+                            )
+                        )
             except QuickSightDeploymentError as e:
                 errors.append(f"[{stage_name}] QuickSight data source list failed: {e}")
 
@@ -384,10 +399,14 @@ def _validate_stage(
         workflow_arn = None
         if len(matched) == 1:
             workflow_arn = matched[0]["workflow_arn"]
-            resources.append(ResourceToDelete(
-                resource_type="airflow_workflow", resource_id=workflow_arn,
-                stage=stage_name, metadata={"workflow_name": workflow_name},
-            ))
+            resources.append(
+                ResourceToDelete(
+                    resource_type="airflow_workflow",
+                    resource_id=workflow_arn,
+                    stage=stage_name,
+                    metadata={"workflow_name": workflow_name},
+                )
+            )
 
             try:
                 runs = list_workflow_runs(workflow_arn, region=effective_region)
@@ -441,15 +460,18 @@ def _validate_stage(
         try:
             s3_targets = _resolve_s3_targets(stage_config, connections)
             for target in s3_targets:
-                resources.append(ResourceToDelete(
-                    resource_type="s3_prefix",
-                    resource_id=f"s3://{target.bucket}/{target.prefix}",
-                    stage=stage_name,
-                    metadata={
-                        "bucket": target.bucket, "prefix": target.prefix,
-                        "connection_name": target.connection_name,
-                    },
-                ))
+                resources.append(
+                    ResourceToDelete(
+                        resource_type="s3_prefix",
+                        resource_id=f"s3://{target.bucket}/{target.prefix}",
+                        stage=stage_name,
+                        metadata={
+                            "bucket": target.bucket,
+                            "prefix": target.prefix,
+                            "connection_name": target.connection_name,
+                        },
+                    )
+                )
         except Exception as e:
             warnings.append(f"[{stage_name}] Could not resolve S3 targets: {e}")
 
@@ -460,60 +482,110 @@ def _validate_stage(
         if not catalog_disabled and project_id and domain_id:
             try:
                 from ..helpers.catalog_import import (
-                    _is_managed_resource, _search_target_resources,
+                    _is_managed_resource,
+                    _search_target_resources,
                     _search_target_type_resources,
                 )
+
                 dz_client = boto3.client("datazone", region_name=effective_region)
 
-                for item in _search_target_resources(dz_client, domain_id, project_id, "GLOSSARY"):
+                for item in _search_target_resources(
+                    dz_client, domain_id, project_id, "GLOSSARY"
+                ):
                     g = item.get("glossaryItem", {})
                     if g.get("id"):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_glossary", resource_id=g["id"],
-                            stage=stage_name, metadata={"name": g.get("name", ""), "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_glossary",
+                                resource_id=g["id"],
+                                stage=stage_name,
+                                metadata={
+                                    "name": g.get("name", ""),
+                                    "domain_id": domain_id,
+                                },
+                            )
+                        )
 
-                for item in _search_target_resources(dz_client, domain_id, project_id, "GLOSSARY_TERM"):
+                for item in _search_target_resources(
+                    dz_client, domain_id, project_id, "GLOSSARY_TERM"
+                ):
                     t = item.get("glossaryTermItem", {})
                     if t.get("id"):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_glossary_term", resource_id=t["id"],
-                            stage=stage_name, metadata={"name": t.get("name", ""), "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_glossary_term",
+                                resource_id=t["id"],
+                                stage=stage_name,
+                                metadata={
+                                    "name": t.get("name", ""),
+                                    "domain_id": domain_id,
+                                },
+                            )
+                        )
 
-                for item in _search_target_type_resources(dz_client, domain_id, project_id, "FORM_TYPE"):
+                for item in _search_target_type_resources(
+                    dz_client, domain_id, project_id, "FORM_TYPE"
+                ):
                     ft = item.get("formTypeItem", {})
                     name = ft.get("name", "")
                     if name and not _is_managed_resource(name):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_form_type", resource_id=name,
-                            stage=stage_name, metadata={"name": name, "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_form_type",
+                                resource_id=name,
+                                stage=stage_name,
+                                metadata={"name": name, "domain_id": domain_id},
+                            )
+                        )
 
-                for item in _search_target_type_resources(dz_client, domain_id, project_id, "ASSET_TYPE"):
+                for item in _search_target_type_resources(
+                    dz_client, domain_id, project_id, "ASSET_TYPE"
+                ):
                     at = item.get("assetTypeItem", {})
                     name = at.get("name", "")
                     if name and not _is_managed_resource(name):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_asset_type", resource_id=name,
-                            stage=stage_name, metadata={"name": name, "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_asset_type",
+                                resource_id=name,
+                                stage=stage_name,
+                                metadata={"name": name, "domain_id": domain_id},
+                            )
+                        )
 
-                for item in _search_target_resources(dz_client, domain_id, project_id, "ASSET"):
+                for item in _search_target_resources(
+                    dz_client, domain_id, project_id, "ASSET"
+                ):
                     a = item.get("assetItem", {})
                     if a.get("identifier"):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_asset", resource_id=a["identifier"],
-                            stage=stage_name, metadata={"name": a.get("name", ""), "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_asset",
+                                resource_id=a["identifier"],
+                                stage=stage_name,
+                                metadata={
+                                    "name": a.get("name", ""),
+                                    "domain_id": domain_id,
+                                },
+                            )
+                        )
 
-                for item in _search_target_resources(dz_client, domain_id, project_id, "DATA_PRODUCT"):
+                for item in _search_target_resources(
+                    dz_client, domain_id, project_id, "DATA_PRODUCT"
+                ):
                     dp = item.get("dataProductItem", {})
                     if dp.get("id"):
-                        resources.append(ResourceToDelete(
-                            resource_type="catalog_data_product", resource_id=dp["id"],
-                            stage=stage_name, metadata={"name": dp.get("name", ""), "domain_id": domain_id},
-                        ))
+                        resources.append(
+                            ResourceToDelete(
+                                resource_type="catalog_data_product",
+                                resource_id=dp["id"],
+                                stage=stage_name,
+                                metadata={
+                                    "name": dp.get("name", ""),
+                                    "domain_id": domain_id,
+                                },
+                            )
+                        )
 
                 if any(r.resource_type.startswith("catalog_") for r in resources):
                     warnings.append(
@@ -523,7 +595,9 @@ def _validate_stage(
                         "`deployment_configuration.catalog` in your manifest."
                     )
             except Exception as e:
-                warnings.append(f"[{stage_name}] Could not enumerate catalog resources: {e}")
+                warnings.append(
+                    f"[{stage_name}] Could not enumerate catalog resources: {e}"
+                )
         elif catalog_disabled:
             warnings.append(
                 f"[{stage_name}] Catalog deletion is disabled (disable: true) — skipping."
@@ -547,11 +621,17 @@ def _validate_stage(
                 conn_info = connections[conn_name]
                 connection_id = conn_info.get("connectionId", "")
                 if connection_id:
-                    resources.append(ResourceToDelete(
-                        resource_type="datazone_connection", resource_id=conn_name,
-                        stage=stage_name,
-                        metadata={"connection_id": connection_id, "domain_id": domain_id},
-                    ))
+                    resources.append(
+                        ResourceToDelete(
+                            resource_type="datazone_connection",
+                            resource_id=conn_name,
+                            stage=stage_name,
+                            metadata={
+                                "connection_id": connection_id,
+                                "domain_id": domain_id,
+                            },
+                        )
+                    )
                 else:
                     warnings.append(
                         f"[{stage_name}] Connection '{conn_name}' found but has no ID — skipping"
@@ -563,6 +643,8 @@ def _validate_stage(
                 )
 
     return ValidationResult(
-        errors=errors, warnings=warnings, resources=resources,
+        errors=errors,
+        warnings=warnings,
+        resources=resources,
         active_workflow_runs=active_workflow_runs,
     )

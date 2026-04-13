@@ -3,7 +3,6 @@
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-
 # ---------------------------------------------------------------------------
 # Resource types that destroy knows how to handle.
 # A unit test asserts this matches DEPLOY_RESOURCE_TYPES from resource_types.py
