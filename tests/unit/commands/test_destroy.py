@@ -23,18 +23,22 @@ from smus_cicd.helpers.quicksight import (
     list_data_sources,
 )
 from smus_cicd.commands.destroy import (
+    destroy_command,
+)
+from smus_cicd.helpers.destroy_models import (
     ResourceResult,
     ResourceToDelete,
     S3Target,
     ValidationResult,
+)
+from smus_cicd.helpers.destroy_validator import (
     _discover_workflow_created_resources,
-    _destroy_stage,
-    _get_active_workflow_runs,
-    _parse_workflow_yaml_from_s3,
     _resolve_resource_prefix,
     _resolve_s3_targets,
     _validate_stage,
-    destroy_command,
+)
+from smus_cicd.helpers.destroy_executor import (
+    _destroy_stage,
 )
 from smus_cicd.application.application_manifest import (
     ApplicationManifest,
@@ -60,22 +64,20 @@ PATCH_FROM_FILE = "smus_cicd.commands.destroy.ApplicationManifest.from_file"
 PATCH_VALIDATE = "smus_cicd.commands.destroy._validate_stage"
 PATCH_DESTROY_STAGE = "smus_cicd.commands.destroy._destroy_stage"
 PATCH_CONFIRM = "smus_cicd.commands.destroy.Confirm.ask"
-PATCH_STOP_RUN = "smus_cicd.commands.destroy.stop_workflow_run"
-PATCH_DELETE_WF = "smus_cicd.commands.destroy.delete_workflow"
-PATCH_GET_ACTIVE = "smus_cicd.commands.destroy._get_active_workflow_runs"
-PATCH_DOMAIN = "smus_cicd.commands.destroy.get_domain_from_target_config"
-PATCH_PROJECT_ID = "smus_cicd.commands.destroy.get_project_id_by_name"
-PATCH_DELETE_PROJECT = "smus_cicd.commands.destroy.delete_project"
-PATCH_BOTO3 = "smus_cicd.commands.destroy.boto3"
-PATCH_CONNECTIONS = "smus_cicd.commands.destroy.get_project_connections"
-PATCH_DASHBOARDS = "smus_cicd.commands.destroy.list_dashboards"
-PATCH_DATASETS = "smus_cicd.commands.destroy.list_datasets"
-PATCH_DATASOURCES = "smus_cicd.commands.destroy.list_data_sources"
-PATCH_LIST_WORKFLOWS = "smus_cicd.commands.destroy.list_workflows"
-PATCH_LIST_RUNS = "smus_cicd.commands.destroy.list_workflow_runs"
-PATCH_IS_ACTIVE = "smus_cicd.commands.destroy.is_workflow_run_active"
-PATCH_PARSE_YAML = "smus_cicd.commands.destroy._parse_workflow_yaml_from_s3"
-PATCH_STS = "smus_cicd.commands.destroy.boto3"
+PATCH_DELETE_WF = "smus_cicd.helpers.destroy_executor.delete_workflow"
+PATCH_DOMAIN = "smus_cicd.helpers.destroy_validator.get_domain_from_target_config"
+PATCH_PROJECT_ID = "smus_cicd.helpers.destroy_validator.get_project_id_by_name"
+PATCH_DELETE_PROJECT = "smus_cicd.helpers.destroy_executor.delete_project"
+PATCH_BOTO3 = "smus_cicd.helpers.destroy_executor.boto3"
+PATCH_CONNECTIONS = "smus_cicd.helpers.destroy_validator.get_project_connections"
+PATCH_DASHBOARDS = "smus_cicd.helpers.destroy_validator.list_dashboards"
+PATCH_DATASETS = "smus_cicd.helpers.destroy_validator.list_datasets"
+PATCH_DATASOURCES = "smus_cicd.helpers.destroy_validator.list_data_sources"
+PATCH_LIST_WORKFLOWS = "smus_cicd.helpers.destroy_validator.list_workflows"
+PATCH_LIST_RUNS = "smus_cicd.helpers.destroy_validator.list_workflow_runs"
+PATCH_IS_ACTIVE = "smus_cicd.helpers.destroy_validator.is_workflow_run_active"
+PATCH_GET_WF_DEF = "smus_cicd.helpers.destroy_validator.get_workflow_definition"
+PATCH_STS = "smus_cicd.helpers.destroy_validator.boto3"
 
 
 def _make_manifest(app_name="TestApp", quicksight_assets=None, workflows=None, storage=None):
@@ -388,7 +390,7 @@ class TestResolveS3Targets:
 # ---------------------------------------------------------------------------
 
 class TestValidateStageClean:
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS, return_value=[])
     @patch(PATCH_CONNECTIONS, return_value={})
@@ -455,7 +457,7 @@ class TestValidateStageQuickSightCollisions:
 
 
 class TestValidateStageWorkflows:
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS)
     @patch(PATCH_CONNECTIONS, return_value={})
@@ -471,7 +473,7 @@ class TestValidateStageWorkflows:
                                  "us-east-1")
         assert any("collision" in e.lower() or "workflow" in e.lower() for e in result.errors)
 
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_IS_ACTIVE, return_value=True)
     @patch(PATCH_LIST_RUNS)
     @patch(PATCH_LIST_WORKFLOWS)
@@ -496,14 +498,14 @@ class TestValidateStageWorkflows:
         sc = _make_stage_config(project_name="test-project",
                                 storage=[{"name": "workflows", "connectionName": "c1", "targetDirectory": "wf"}])
         with patch(PATCH_CONNECTIONS, return_value={"c1": {"s3Uri": "s3://bkt/base/", "bucket_name": "bkt"}}):
-            with patch(PATCH_PARSE_YAML, return_value={}):
+            with patch(PATCH_GET_WF_DEF, return_value=""):
                 result = _validate_stage("dev", sc,
                                          _make_manifest(app_name="TestApp", workflows=[{"workflowName": "my-dag"}]),
                                          "us-east-1")
         assert any("yaml" in w.lower() or "workflow" in w.lower() for w in result.warnings)
         assert result.errors == []
 
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS)
     @patch(PATCH_CONNECTIONS, return_value={})
@@ -539,17 +541,14 @@ def _simple_manifest():
 
 class TestDestroyOrdering:
     @patch(PATCH_DELETE_PROJECT)
-    @patch(PATCH_PROJECT_ID, return_value="proj-123")
-    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    @patch("smus_cicd.helpers.destroy_executor.get_project_id_by_name", return_value="proj-123")
+    @patch("smus_cicd.helpers.destroy_executor.get_domain_from_target_config", return_value=("dom-123", "my-domain"))
     @patch(PATCH_BOTO3)
     @patch(PATCH_DELETE_WF)
-    @patch(PATCH_STOP_RUN)
-    @patch(PATCH_GET_ACTIVE, return_value=["run-001"])
-    def test_u37_destruction_order(self, mock_get_active, mock_stop, mock_delete_wf,
+    def test_u37_destruction_order(self, mock_delete_wf,
                                    mock_boto3, mock_domain, mock_project_id, mock_delete_project):
-        """U37: stop_run → glue_delete → delete_workflow → QS → S3 → delete_project."""
+        """U37: glue_delete → delete_workflow → QS → S3 → delete_project."""
         call_order = []
-        mock_stop.side_effect = lambda **kw: call_order.append("stop_run") or {"success": True}
         mock_delete_wf.side_effect = lambda arn, region: call_order.append("delete_workflow")
 
         sts_client = MagicMock()
@@ -572,7 +571,7 @@ class TestDestroyOrdering:
 
         with patch("smus_cicd.helpers.operator_registry.boto3") as mock_glue_boto3:
             mock_glue_boto3.client.return_value = glue_client
-            with patch("smus_cicd.commands.destroy.s3_helper") as mock_s3:
+            with patch("smus_cicd.helpers.destroy_executor.s3_helper") as mock_s3:
                 mock_s3.list_objects.return_value = [{"Key": "k1"}]
                 mock_s3.delete_objects.side_effect = lambda *a, **kw: call_order.append("delete_s3")
                 wf_arn = "arn:aws:airflow:us-east-1:111:workflow/wf1"
@@ -582,68 +581,19 @@ class TestDestroyOrdering:
                     ResourceToDelete("quicksight_dashboard", "deployed-dev-dash1", "dev", {}),
                     ResourceToDelete("s3_prefix", "s3://bucket/prefix", "dev", {"bucket": "bucket", "prefix": "prefix"}),
                 ]
-                vr = _make_vr(resources=resources, active_runs={"App_proj_dag": ["run-001"]})
+                vr = _make_vr(resources=resources)
                 _destroy_stage("dev", _make_stage_config(create=True), _simple_manifest(), vr, "us-east-1", "TEXT")
 
-        assert call_order.index("stop_run") < call_order.index("delete_workflow")
         assert call_order.index("delete_glue") < call_order.index("delete_workflow")
         assert call_order.index("delete_workflow") < call_order.index("delete_dashboard")
         assert call_order.index("delete_dashboard") < call_order.index("delete_s3")
         assert call_order.index("delete_s3") < call_order.index("delete_project")
 
 
-class TestStopWorkflowRunFailure:
-    @patch(PATCH_DELETE_WF)
-    @patch(PATCH_STOP_RUN, side_effect=Exception("Stop failed"))
-    @patch(PATCH_GET_ACTIVE, return_value=["run-001"])
-    @patch(PATCH_BOTO3)
-    def test_u38_stop_fails_workflow_not_deleted(self, mock_boto3, mock_get_active, mock_stop, mock_delete_wf):
-        sts = MagicMock()
-        sts.get_caller_identity.return_value = {"Account": "111122223333"}
-        mock_boto3.client.return_value = sts
-        wf_arn = "arn:aws:airflow:us-east-1:111:workflow/wf1"
-        vr = _make_vr(resources=[ResourceToDelete("airflow_workflow", wf_arn, "dev", {"workflow_name": "my_wf"})],
-                      active_runs={"my_wf": ["run-001"]})
-        results = _destroy_stage("dev", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
-        mock_delete_wf.assert_not_called()
-        assert any(r.status == "error" for r in results)
-
-
-class TestWorkflowRunRecheck:
-    @patch(PATCH_DELETE_WF)
-    @patch(PATCH_STOP_RUN)
-    @patch(PATCH_GET_ACTIVE, return_value=[])
-    @patch(PATCH_BOTO3)
-    def test_u39_completed_run_not_stopped(self, mock_boto3, mock_get_active, mock_stop, mock_delete_wf):
-        sts = MagicMock()
-        sts.get_caller_identity.return_value = {"Account": "111122223333"}
-        mock_boto3.client.return_value = sts
-        wf_arn = "arn:aws:airflow:us-east-1:111:workflow/wf1"
-        vr = _make_vr(resources=[ResourceToDelete("airflow_workflow", wf_arn, "dev", {"workflow_name": "my_wf"})],
-                      active_runs={"my_wf": ["run-001"]})
-        _destroy_stage("dev", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
-        mock_stop.assert_not_called()
-
-    @patch(PATCH_DELETE_WF)
-    @patch(PATCH_STOP_RUN)
-    @patch(PATCH_GET_ACTIVE, return_value=["new-run-002"])
-    @patch(PATCH_BOTO3)
-    def test_u40_new_run_after_validation_stopped(self, mock_boto3, mock_get_active, mock_stop, mock_delete_wf):
-        sts = MagicMock()
-        sts.get_caller_identity.return_value = {"Account": "111122223333"}
-        mock_boto3.client.return_value = sts
-        wf_arn = "arn:aws:airflow:us-east-1:111:workflow/wf1"
-        vr = _make_vr(resources=[ResourceToDelete("airflow_workflow", wf_arn, "dev", {"workflow_name": "my_wf"})],
-                      active_runs={"my_wf": ["old-run-001"]})
-        _destroy_stage("dev", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
-        mock_stop.assert_called_once()
-        assert "new-run-002" in str(mock_stop.call_args)
-
-
 class TestProjectCreateFlag:
     @patch(PATCH_DELETE_PROJECT)
-    @patch(PATCH_PROJECT_ID, return_value="proj-123")
-    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    @patch("smus_cicd.helpers.destroy_executor.get_project_id_by_name", return_value="proj-123")
+    @patch("smus_cicd.helpers.destroy_executor.get_domain_from_target_config", return_value=("dom-123", "my-domain"))
     @patch(PATCH_BOTO3)
     def test_u41_project_create_false_no_delete(self, mock_boto3, mock_domain, mock_project_id, mock_delete_project):
         sts = MagicMock()
@@ -653,8 +603,8 @@ class TestProjectCreateFlag:
         mock_delete_project.assert_not_called()
 
     @patch(PATCH_DELETE_PROJECT)
-    @patch(PATCH_PROJECT_ID, return_value="proj-123")
-    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    @patch("smus_cicd.helpers.destroy_executor.get_project_id_by_name", return_value="proj-123")
+    @patch("smus_cicd.helpers.destroy_executor.get_domain_from_target_config", return_value=("dom-123", "my-domain"))
     @patch(PATCH_BOTO3)
     def test_u42_project_create_true_delete_called(self, mock_boto3, mock_domain, mock_project_id, mock_delete_project):
         sts = MagicMock()
@@ -776,7 +726,7 @@ class TestErrorResilience:
         mock_boto3.client.return_value = sts
         deleted_keys = []
 
-        with patch("smus_cicd.commands.destroy.s3_helper") as mock_s3:
+        with patch("smus_cicd.helpers.destroy_executor.s3_helper") as mock_s3:
             mock_s3.list_objects.side_effect = lambda bucket, prefix, region=None: (
                 [{"Key": "base/bundle/f1.py"}, {"Key": "base/bundle/f2.py"}]
                 if prefix == "base/bundle" else []
@@ -810,7 +760,7 @@ class TestInvalidStageName:
 class TestManifestNotFound:
     @patch(PATCH_FROM_FILE, side_effect=ValueError("Not found"))
     def test_u51_manifest_not_found_exits_1(self, _):
-        result = runner.invoke(app, ["destroy", "--manifest", "nonexistent.yaml", "--force"])
+        result = runner.invoke(app, ["destroy", "--manifest", "nonexistent.yaml", "--targets", "dev", "--force"])
         assert result.exit_code == 1
 
 
@@ -990,22 +940,6 @@ class TestEdgeCases:
     def test_u69_workflow_yaml_no_tasks_empty_list(self):
         assert _discover_workflow_created_resources({"wf": {"tasks": {}}}, "dev") == []
 
-    def test_u70_parse_yaml_s3_error_returns_empty(self):
-        with patch("smus_cicd.commands.destroy.boto3") as mock_boto3:
-            mock_client = MagicMock()
-            mock_client.get_object.side_effect = Exception("S3 error")
-            mock_boto3.client.return_value = mock_client
-            assert _parse_workflow_yaml_from_s3("bucket", "key.yaml", "us-east-1") == {}
-
-    def test_u71_parse_yaml_invalid_yaml_returns_empty(self):
-        with patch("smus_cicd.commands.destroy.boto3") as mock_boto3:
-            mock_client = MagicMock()
-            body = MagicMock()
-            body.read.return_value = b": invalid: yaml: {"
-            mock_client.get_object.return_value = {"Body": body}
-            mock_boto3.client.return_value = mock_client
-            assert _parse_workflow_yaml_from_s3("bucket", "key.yaml", "us-east-1") == {}
-
     @patch(PATCH_DESTROY_STAGE, return_value=_ok_results())
     @patch(PATCH_VALIDATE)
     @patch(PATCH_FROM_FILE)
@@ -1019,12 +953,13 @@ class TestEdgeCases:
     @patch(PATCH_DESTROY_STAGE, return_value=_ok_results())
     @patch(PATCH_VALIDATE)
     @patch(PATCH_FROM_FILE)
-    def test_u73_default_targets_all_stages(self, mock_from_file, mock_validate, mock_destroy):
+    def test_u73_missing_targets_exits_1(self, mock_from_file, mock_validate, mock_destroy):
+        """Omitting --targets should exit with error, not default to all stages."""
         mock_from_file.return_value = _make_manifest_mock(stages=["dev", "test", "prod"])
         mock_validate.return_value = _make_vr()
-        runner.invoke(app, ["destroy", "--manifest", "m.yaml", "--force"])
-        assert mock_validate.call_count == 3
-        assert mock_destroy.call_count == 3
+        result = runner.invoke(app, ["destroy", "--manifest", "m.yaml", "--force"])
+        assert result.exit_code != 0
+        mock_destroy.assert_not_called()
 
 
 
@@ -1035,7 +970,7 @@ class TestEdgeCases:
 class TestBootstrapConnectionDiscovery:
     """Validation phase: connection discovery from bootstrap actions."""
 
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS, return_value=[])
     @patch(PATCH_CONNECTIONS)
@@ -1067,7 +1002,7 @@ class TestBootstrapConnectionDiscovery:
         assert conn_resources[0].resource_id == "mlflow-server"
         assert conn_resources[0].metadata["connection_id"] == "conn-abc"
 
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS, return_value=[])
     @patch(PATCH_CONNECTIONS, return_value={})
@@ -1094,7 +1029,7 @@ class TestBootstrapConnectionDiscovery:
         assert conn_resources == []
         assert any("mlflow-server" in w for w in result.warnings)
 
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS, return_value=[])
     @patch(PATCH_CONNECTIONS)
@@ -1125,7 +1060,7 @@ class TestBootstrapConnectionDiscovery:
         assert conn_resources == []
         assert any("default.s3_shared" in w for w in result.warnings)
 
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS, return_value=[])
     @patch(PATCH_CONNECTIONS)
@@ -1223,7 +1158,7 @@ class TestBootstrapConnectionDeletion:
 class TestCatalogResourceDiscovery:
     """Validation phase: catalog resource discovery."""
 
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS, return_value=[])
     @patch(PATCH_CONNECTIONS, return_value={})
@@ -1244,7 +1179,7 @@ class TestCatalogResourceDiscovery:
             {"glossaryItem": {"id": "g-1", "name": "MyGlossary"}},
         ])
         mock_search_types = MagicMock(return_value=[])
-        with patch("smus_cicd.commands.destroy.boto3") as mock_boto3:
+        with patch("smus_cicd.helpers.destroy_validator.boto3") as mock_boto3:
             sts = MagicMock()
             sts.get_caller_identity.return_value = {"Account": "111122223333"}
             dz = MagicMock()
@@ -1257,7 +1192,7 @@ class TestCatalogResourceDiscovery:
         assert catalog_resources[0].resource_type == "catalog_glossary"
         assert catalog_resources[0].resource_id == "g-1"
 
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS, return_value=[])
     @patch(PATCH_CONNECTIONS, return_value={})
@@ -1279,7 +1214,7 @@ class TestCatalogResourceDiscovery:
         assert catalog_resources == []
         assert any("disabled" in w.lower() or "disable" in w.lower() for w in result.warnings)
 
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS, return_value=[])
     @patch(PATCH_CONNECTIONS, return_value={})
@@ -1300,7 +1235,7 @@ class TestCatalogResourceDiscovery:
         catalog_resources = [r for r in result.resources if r.resource_type.startswith("catalog_")]
         assert catalog_resources == []
 
-    @patch(PATCH_PARSE_YAML, return_value={})
+    @patch(PATCH_GET_WF_DEF, return_value="")
     @patch(PATCH_LIST_RUNS, return_value=[])
     @patch(PATCH_LIST_WORKFLOWS, return_value=[])
     @patch(PATCH_CONNECTIONS, return_value={})
@@ -1322,7 +1257,7 @@ class TestCatalogResourceDiscovery:
             {"formTypeItem": {"name": "amazon.datazone.ManagedForm", "owningProjectId": "proj-123"}},
             {"formTypeItem": {"name": "MyCustomForm", "owningProjectId": "proj-123"}},
         ])
-        with patch("smus_cicd.commands.destroy.boto3") as mock_boto3:
+        with patch("smus_cicd.helpers.destroy_validator.boto3") as mock_boto3:
             sts = MagicMock()
             sts.get_caller_identity.return_value = {"Account": "111122223333"}
             dz = MagicMock()
@@ -1393,3 +1328,34 @@ class TestCatalogResourceDeletion:
         _destroy_stage("test", _make_stage_config(), _simple_manifest(), vr, "us-east-1", "TEXT")
         assert call_order.index("data_product") < call_order.index("asset")
         assert call_order.index("asset") < call_order.index("glossary")
+
+# ---------------------------------------------------------------------------
+# Deploy/Destroy drift detection
+# ---------------------------------------------------------------------------
+
+class TestDeployDestroyDrift:
+    """Ensure destroy supports every resource type that deploy can create.
+
+    If a new resource type is added to DEPLOY_RESOURCE_TYPES without a
+    corresponding entry in DESTROY_SUPPORTED_RESOURCE_TYPES, this test
+    fails — preventing deploy/destroy drift from reaching production.
+    """
+
+    def test_destroy_covers_all_deploy_resource_types(self):
+        from smus_cicd.resource_types import DEPLOY_RESOURCE_TYPES
+        from smus_cicd.commands.destroy import DESTROY_SUPPORTED_RESOURCE_TYPES
+
+        missing = DEPLOY_RESOURCE_TYPES - DESTROY_SUPPORTED_RESOURCE_TYPES
+        extra = DESTROY_SUPPORTED_RESOURCE_TYPES - DEPLOY_RESOURCE_TYPES
+
+        assert not missing, (
+            f"Deploy creates resource types that destroy does not handle: {missing}. "
+            "Add these to DESTROY_SUPPORTED_RESOURCE_TYPES in "
+            "helpers/destroy_models.py and implement the corresponding "
+            "deletion logic in helpers/destroy_executor.py."
+        )
+        assert not extra, (
+            f"Destroy claims to handle resource types not in DEPLOY_RESOURCE_TYPES: {extra}. "
+            "Add these to DEPLOY_RESOURCE_TYPES in resource_types.py or remove "
+            "them from DESTROY_SUPPORTED_RESOURCE_TYPES."
+        )

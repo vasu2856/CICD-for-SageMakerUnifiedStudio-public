@@ -52,7 +52,7 @@ aws events put-rule \
 
 aws events put-targets \
   --rule smus-prod-failures \
-  --stages "Id"="1","Arn"="arn:aws:sns:us-east-1:123456789012:prod-alerts"
+  --targets "Id"="1","Arn"="arn:aws:sns:us-east-1:123456789012:prod-alerts"
 ```
 
 **Example: Lambda on Success**
@@ -71,7 +71,7 @@ aws events put-rule \
 
 aws events put-targets \
   --rule smus-prod-success \
-  --stages "Id"="1","Arn"="arn:aws:lambda:us-east-1:123456789012:function:post-deploy"
+  --targets "Id"="1","Arn"="arn:aws:lambda:us-east-1:123456789012:function:post-deploy"
 ```
 
 ---
@@ -420,7 +420,7 @@ aws events put-rule \
 # Add target
 aws events put-targets \
   --rule smus-all-events \
-  --stages "Id"="1","Arn"="arn:aws:logs:us-east-1:123456789012:log-group:/aws/events/smus-deploy"
+  --targets "Id"="1","Arn"="arn:aws:logs:us-east-1:123456789012:log-group:/aws/events/smus-deploy"
 ```
 
 ## IAM Permissions

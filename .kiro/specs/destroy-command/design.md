@@ -35,11 +35,9 @@ flowchart TD
     J -- No --> K[Exit 0]
     J -- Yes --> L[Destruction Phase]
     H -- Yes --> L
-    L --> L0[Re-query live workflow run status for all workflows]
-    L0 --> L1[Stop runs still active after re-check]
-    L1 --> L2[Delete Workflow_Created_Resources]
-    L2 --> L3[Delete Airflow_Workflows]
-    L3 --> L3b[Delete Bootstrap_Connections]
+    L --> L1[Delete Workflow_Created_Resources]
+    L1 --> L2[Delete Airflow_Workflows]
+    L2 --> L2b[Delete Bootstrap_Connections]
     L3b --> L4[Delete QuickSight dashboards → datasets → data sources]
     L4 --> L5[Delete S3 objects at targetDirectory prefixes]
     L5 --> L5b[Delete catalog resources in reverse dependency order]
@@ -50,13 +48,13 @@ flowchart TD
 ### Key Design Decisions
 
 - **Collect-all-errors validation**: The validation phase never aborts early. All stages are validated and all issues are collected before any error is reported. This gives the operator a complete picture.
-- **Single confirmation gate**: All confirmations (including active-run force-stop) happen in one prompt after the full plan is printed, not scattered through execution.
+- **Single confirmation gate**: All confirmations happen in one prompt after the full plan is printed, not scattered through execution.
 - **Operator registry pattern**: Workflow-created resources are discovered by parsing YAML files and matching operator class names against a plain dict registry. Adding support for a new operator type requires only a new dict entry.
 - **Prefix-based QuickSight enumeration**: Rather than tracking deployed resource IDs, destroy scans all QuickSight resources and filters by the `Resource_Prefix`. This is resilient to state drift but requires the prefix to be unique.
 - **S3 paths resolved from live connections**: S3 bucket/prefix is resolved via `get_project_connections` at destroy time, not inferred from the manifest alone. This matches how deploy resolves paths.
 - **Bootstrap connection deletion**: Connections created by `datazone.create_connection` bootstrap actions are deleted after Airflow workflows (which may use them) and before QuickSight/S3. Built-in `default.*` connections are never touched. When `project.create: true`, connection deletion is skipped since project deletion cascades.
 - **Catalog resource deletion**: All project-owned catalog resources (glossaries, glossary terms, form types, asset types, assets, data products) are deleted when `deployment_configuration.catalog` is present and not disabled. Since there is no way to distinguish imported resources from manually-created ones, all project-owned resources are deleted. Users are warned in the destruction plan with a note that they can set `disable: true` under `deployment_configuration.catalog` to skip catalog deletion. Managed resources (`amazon.datazone.*`) are never deleted. Deletion follows reverse dependency order.
-- **Workflow run re-check before stopping**: The validation phase records active workflow runs at discovery time, but the user may take time to review the plan before confirming. At the start of the destruction phase, the live run status is re-queried for each workflow before calling `stop_workflow_run`. Runs that completed naturally in the interim are skipped; any new runs that started after validation are also caught and stopped.
+- **No explicit run stopping needed**: MWAA Serverless automatically terminates active workflow runs when a workflow is deleted. The validation phase still detects and reports active runs for informational purposes in the destruction plan, but the destruction phase does not stop them explicitly.
 
 ---
 
@@ -71,7 +69,6 @@ The main command implementation. Exports `destroy_command(manifest, targets, for
 Internal structure:
 - `_validate_stage(stage_name, stage_config, manifest, region) -> ValidationResult` — performs all read-only discovery for one stage
 - `_destroy_stage(stage_name, stage_config, manifest, validation_result, region, output) -> List[ResourceResult]` — executes deletion for one stage
-- `_get_active_workflow_runs(workflow_arn, region) -> List[str]` — re-queries live run status at destruction time, returns list of currently active run IDs
 - `_resolve_resource_prefix(stage_name, qs_config) -> str` — applies `{stage.name}` substitution to the prefix template
 - `_parse_workflow_yaml_from_s3(bucket, key, region) -> dict` — fetches and parses a workflow YAML from S3
 - `_discover_workflow_created_resources(workflow_yaml, stage_name) -> List[ResourceToDelete]` — walks tasks and matches against operator registry
@@ -103,7 +100,7 @@ Add two new paginated list helpers following the same pattern as `list_datasets`
 
 #### `src/smus_cicd/cli.py`
 
-Register the `destroy` command following the same pattern as `delete`.
+Register the `destroy` command in the CLI module.
 
 ---
 
@@ -254,7 +251,7 @@ Given that the actual operator set in use is small (effectively one operator typ
 
 ### Property 4: Destruction ordering invariant
 
-*For any* stage with all resource types present, the sequence of deletion API calls must satisfy: `stop_workflow_run` calls precede `delete_workflow` calls, which precede QuickSight deletion calls, which precede S3 deletion calls, which precede `delete_project` calls. Glue job deletion calls must precede `delete_workflow` calls.
+*For any* stage with all resource types present, the sequence of deletion API calls must satisfy: Glue job deletion calls must precede `delete_workflow` calls, which precede QuickSight deletion calls, which precede S3 deletion calls, which precede `delete_project` calls.
 
 **Validates: Requirements 4.1**
 
@@ -268,19 +265,11 @@ Given that the actual operator set in use is small (effectively one operator typ
 
 ---
 
-### Property 6: Active runs are re-checked and stopped before workflow deletion
+### Property 6: Active runs are detected during validation
 
-*For any* workflow, at the start of the destruction phase the live run status must be re-queried via `list_workflow_runs` before any `stop_workflow_run` call is made. Only runs whose status is still active at re-check time must be stopped. Runs that completed between validation and destruction must not have `stop_workflow_run` called on them. `stop_workflow_run` must be called for every run still active at re-check time before `delete_workflow` is called for that workflow's ARN.
+*For any* workflow with active runs at validation time, the active run IDs must appear in `ValidationResult.active_workflow_runs` and be included in the destruction plan for informational purposes. MWAA Serverless automatically terminates active runs when a workflow is deleted, so no explicit `stop_workflow_run` call is made during the destruction phase.
 
-**Validates: Requirements 5.4**
-
----
-
-### Property 6a: New runs started after validation are also stopped
-
-*For any* workflow where a new run starts after the validation phase completes but before the destruction phase begins, that run must appear in the re-check result and must have `stop_workflow_run` called on it before `delete_workflow` is called.
-
-**Validates: Requirements 5.4**
+**Validates: Requirements 3.9**
 
 ---
 
@@ -393,7 +382,6 @@ Given that the actual operator set in use is small (effectively one operator typ
 | Template variable in resource name | Log warning, record `skipped`, continue |
 | Operator not in registry | Log info, record `skipped`, continue |
 | Non-recoverable API error | Log error, record `error`, continue; set exit 1 at end |
-| `stop_workflow_run` fails | Log error, record `error`, skip `delete_workflow` for that workflow — a running workflow cannot be deleted |
 
 ### Exit Codes
 
@@ -424,13 +412,10 @@ Unit tests cover both specific examples and the correctness properties defined a
 - Clean validation → destruction plan printed containing all discovered resources
 
 **Destruction phase ordering:**
-- Full stage with all resource types: verify mock call order satisfies `stop_run` → `delete_glue_job` → `delete_workflow` → QuickSight → S3 → `delete_project`
-- `stop_workflow_run` fails → `delete_workflow` not called for that workflow
-- Workflow run re-check: run active at validation time but completed before destruction → `stop_workflow_run` not called; new run started after validation → `stop_workflow_run` called
+- Full stage with all resource types: verify mock call order satisfies `delete_glue_job` → `delete_workflow` → QuickSight → S3 → `delete_project`
 
 **Scope and conditional logic:**
 - `project.create=false` → no `delete_project` call regardless of other flags
-- `--force` set with active runs → `stop_workflow_run` called without prompt
 - `--force` set with collision error → still aborts, no deletion calls
 - QuickSight prefix filter: resource list with mixed IDs → only IDs starting with prefix are deleted
 - S3 deletion: only objects under declared `targetDirectory` prefixes are deleted

@@ -73,23 +73,18 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
     - Multiple workflows match reconstructed name → validation error recorded
     - _Requirements: 3.12_
 
-- [x] 5. Implement destruction phase (`_get_active_workflow_runs` and `_destroy_stage`)
-  - Implement `_get_active_workflow_runs(workflow_arn, region) -> List[str]` — calls `list_workflow_runs`, filters using `is_workflow_run_active`, returns list of active run IDs
+- [x] 5. Implement destruction phase (`_destroy_stage`)
   - Implement `_destroy_stage(stage_name, stage_config, manifest, validation_result, region, output) -> List[ResourceResult]`:
-    - **Step a**: Re-query live run status for each workflow via `_get_active_workflow_runs`; call `stop_workflow_run` for each still-active run; if `stop_workflow_run` fails, record `error` and skip `delete_workflow` for that workflow
-    - **Step b**: Delete Workflow_Created_Resources from `validation_result.resources` where `resource_type` is a registry type (e.g. `glue_job`); call registry `delete_fn`; treat `EntityNotFoundException` as `not_found`
-    - **Step c**: Delete Airflow workflows via `delete_workflow`; treat not-found as `not_found`
+    - **Step a**: Delete Workflow_Created_Resources from `validation_result.resources` where `resource_type` is a registry type (e.g. `glue_job`); call registry `delete_fn`; treat `EntityNotFoundException` as `not_found`
+    - **Step b**: Delete Airflow workflows via `delete_workflow`; treat not-found as `not_found`. MWAA Serverless automatically terminates active runs when a workflow is deleted.
     - **Step d**: Delete QuickSight dashboards (prefix-matched), then datasets, then data sources; treat not-found as `not_found`
     - **Step e**: Delete S3 objects at each `S3Target` prefix via `list_objects` + `delete_objects`; treat empty prefix as `not_found` warning
     - **Step f**: Delete DataZone project only if `stage_config.project.create is True`; use `get_domain_from_target_config`, `get_project_id_by_name`, `delete_project`; treat not-found as `not_found`
     - For all non-recoverable errors: log, record `error`, continue processing remaining resources
   - _Requirements: 4.1, 5.3, 5.4, 6.3, 7.1, 7.2, 8.1, 8.2, 9.1, 9.3_
   - [ ]* 5.1 Write property test for destruction ordering
-    - **Property 4: Destruction ordering invariant** — mock all AWS calls and verify call order: `stop_workflow_run` → Glue delete → `delete_workflow` → QuickSight → S3 → `delete_project`
+    - **Property 4: Destruction ordering invariant** — mock all AWS calls and verify call order: Glue delete → `delete_workflow` → QuickSight → S3 → `delete_project`
     - **Validates: Requirements 4.1**
-  - [ ]* 5.2 Write property test for workflow run re-check
-    - **Property 6: Active runs re-checked before stopping** — run active at validation but completed before destruction → `stop_workflow_run` not called; new run started after validation → `stop_workflow_run` called
-    - **Validates: Requirements 5.4**
   - [ ]* 5.3 Write property test for `project.create=false`
     - **Property 10: project.create=false prevents project deletion** — no `delete_project` call regardless of `--force`
     - **Validates: Requirements 8.2**
@@ -114,13 +109,13 @@ Implement the `destroy` command as the inverse of `deploy`, following a strict t
     - Run `_validate_stage` for ALL targeted stages; collect all `ValidationResult` objects
     - If any `ValidationResult` has errors: print consolidated report, exit 1, no destructive calls
     - Print full destruction plan (all resources from all `ValidationResult.resources`, grouped by stage)
-    - If `--force` not set: prompt for single confirmation (including active-run force-stop notice if applicable); exit 0 on decline
-    - If `--force` set and active runs exist: proceed without prompt
+    - If `--force` not set: prompt for single confirmation; exit 0 on decline
+    - If `--force` set: proceed without prompt
     - Call `_destroy_stage` for each targeted stage; collect `ResourceResult` lists
     - Print summary (counts of deleted/not_found/skipped/error per stage)
     - Exit 1 if any `ResourceResult` has `status == "error"`; else exit 0
     - When `--output JSON`: write single JSON object to stdout with `application_name`, `targets`, per-stage resource results; route all progress/log messages to stderr
-  - Register `destroy` command in `src/smus_cicd/cli.py` following the same pattern as `delete` (options: `--manifest/-m`, `--targets/-t`, `--force/-f`, `--output/-o`)
+  - Register `destroy` command in `src/smus_cicd/cli.py` (options: `--manifest/-m`, `--targets/-t`, `--force/-f`, `--output/-o`)
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 9.5, 10.1, 10.2, 10.3, 10.4_
   - [ ]* 6.1 Write property test for invalid stage names
     - **Property 1: Invalid stage names abort before destruction** — any `--targets` with unknown stage name → exit 1, no deletion API calls

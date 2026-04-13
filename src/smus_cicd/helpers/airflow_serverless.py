@@ -406,6 +406,32 @@ def get_workflow_status(
         return {"success": False, "error": str(e)}
 
 
+def get_workflow_definition(
+    workflow_arn: str, connection_info: Dict[str, Any] = None, region: str = None
+) -> str:
+    """
+    Get the workflow definition YAML content from the MWAA Serverless API.
+
+    Args:
+        workflow_arn: Workflow ARN
+        connection_info: Optional connection info dict
+        region: AWS region
+
+    Returns:
+        Workflow definition string, or empty string on error
+    """
+    logger = get_logger("airflow_serverless")
+    try:
+        client = create_airflow_serverless_client(connection_info, region)
+        response = client.get_workflow(WorkflowArn=workflow_arn)
+        return response.get("WorkflowDefinition", "")
+    except Exception as e:
+        logger.warning(
+            "Could not get workflow definition for %s: %s", workflow_arn, e
+        )
+        return ""
+
+
 def list_workflows(
     connection_info: Dict[str, Any] = None, region: str = None, max_results: int = 50
 ) -> List[Dict[str, Any]]:

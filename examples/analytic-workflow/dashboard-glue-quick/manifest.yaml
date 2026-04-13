@@ -80,7 +80,7 @@ stages:
         purpose: smus-cicd-testing
       region: ${TEST_DOMAIN_REGION}
     project:
-      name: test-marketing
+      name: test-marketing-1
       owners:
       - Eng1
       - arn:aws:iam::${AWS_ACCOUNT_ID}:role/GitHubActionsRole-SMUS-CLI-Tests

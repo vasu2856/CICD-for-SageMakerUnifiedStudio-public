@@ -1,4 +1,12 @@
-"""Deploy command implementation."""
+"""Deploy command implementation.
+
+IMPORTANT: If you add support for deploying a new resource type (e.g. a new
+AWS service, a new catalog resource kind, or a new bootstrap action that
+creates infrastructure), you MUST also add that resource type to
+DEPLOY_RESOURCE_TYPES in src/smus_cicd/resource_types.py. A unit test
+(TestDeployDestroyDrift) will fail if deploy and destroy resource types
+drift apart.
+"""
 
 import json
 import os

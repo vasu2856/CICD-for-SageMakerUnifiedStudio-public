@@ -11,9 +11,9 @@ This guide explains how to recover from a bad deployment using the `destroy` and
 A "bad deployment" can mean different things:
 
 - A workflow fails after deployment (broken Glue job, bad notebook, misconfigured Airflow DAG)
-- A QuickSight dashboard is broken or shows wrong data
-- A deployment introduced a regression in a previously working stage
-- You need to revert to a known-good version of your application
+- A QuickSight dashboard is broken
+- A deployment introduced a regression in a previously working stage and you need to revert to a known-good version of your application
+- DataZone catalog entered an undesirable state
 
 The SMUS CI/CD CLI supports two recovery strategies:
 
@@ -39,10 +39,10 @@ aws s3 cp s3://your-bundle-bucket/bundles/MyApp-v1.2.0.zip ./artifacts/MyApp.zip
 
 # 3. Deploy from the local bundle
 #    (deploy picks up ./artifacts/MyApp.zip automatically)
-aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets prod --manifest manifest.yaml
 
 # 4. Verify the rollback
-aws-smus-cicd-cli monitor --manifest manifest.yaml --stages prod
+aws-smus-cicd-cli monitor --manifest manifest.yaml --targets prod
 ```
 
 ### When This Is Enough
@@ -56,7 +56,7 @@ Redeploying a previous bundle is sufficient when:
 ### When This Is NOT Enough
 
 A simple redeploy won't fully restore state if:
-- The bad deployment created new AWS resources (Glue jobs, QuickSight dashboards) that conflict with the previous version
+- The bad deployment created new AWS resources (Glue jobs, QuickSight dashboards) that will not be part of the updated bundle
 - Workflow-created resources (e.g. Glue jobs) have stale configuration from the bad deployment
 - You need a completely clean environment before redeploying
 
@@ -66,7 +66,9 @@ In those cases, use Strategy 2.
 
 ## Strategy 2: Destroy and Redeploy (Clean Slate)
 
-This is the most reliable rollback approach. It removes all resources deployed by the bad version, then redeploys the known-good version from scratch.
+This is the most complete rollback approach. It removes resources deployed by the bad version, then redeploys the known-good version from scratch. 
+
+Note: resources created by other resources (ex: Bedrock Agent created by the SageMaker notebook) will still exist, so customers should clean up such resources manually.
 
 ### Step 1: Destroy the Bad Deployment
 
@@ -97,21 +99,21 @@ The destroy command will:
 # Option A: Redeploy from a previous bundle artifact
 #   Download the specific versioned bundle, then deploy
 aws s3 cp s3://your-bundle-bucket/bundles/MyApp-v1.2.0.zip ./artifacts/MyApp.zip
-aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets prod --manifest manifest.yaml
 
 # Option B: Redeploy from a previous git commit
 git checkout v1.2.0
-aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets prod --manifest manifest.yaml
 ```
 
 ### Step 3: Verify
 
 ```bash
 # Check deployment status
-aws-smus-cicd-cli monitor --manifest manifest.yaml --stages prod
+aws-smus-cicd-cli monitor --manifest manifest.yaml --targets prod
 
 # Run validation tests
-aws-smus-cicd-cli test --manifest manifest.yaml --stages prod
+aws-smus-cicd-cli test --manifest manifest.yaml --targets prod
 ```
 
 ---
@@ -128,7 +130,7 @@ Did the bad deployment create new AWS resources
    Yes  │  No
         │   └──► Redeploy previous bundle/commit
         │         aws s3 cp s3://bucket/bundles/MyApp-prev.zip ./artifacts/MyApp.zip
-        │         aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+        │         aws-smus-cicd-cli deploy --targets prod --manifest manifest.yaml
         ▼
 Is the DataZone project still healthy
 (connections reachable, project ACTIVE)?
@@ -140,8 +142,8 @@ Is the DataZone project still healthy
 Destroy and redeploy:
   1. aws-smus-cicd-cli destroy --targets prod --force
   2. aws s3 cp s3://bucket/bundles/MyApp-prev.zip ./artifacts/MyApp.zip
-     aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
-  3. aws-smus-cicd-cli test --stages prod
+     aws-smus-cicd-cli deploy --targets prod --manifest manifest.yaml
+  3. aws-smus-cicd-cli test --targets prod
 ```
 
 ---
@@ -240,7 +242,7 @@ jobs:
             # Download the specific versioned bundle, then deploy
             aws s3 cp "$BUNDLE" ./artifacts/MyApp.zip
             aws-smus-cicd-cli deploy \
-              --stages ${{ github.event.inputs.stage }} \
+              --targets ${{ github.event.inputs.stage }} \
               --manifest manifest.yaml
           else
             # Fall back to latest git tag
@@ -248,7 +250,7 @@ jobs:
             echo "Rolling back to tag: $PREV_TAG"
             git checkout "$PREV_TAG"
             aws-smus-cicd-cli deploy \
-              --stages ${{ github.event.inputs.stage }} \
+              --targets ${{ github.event.inputs.stage }} \
               --manifest manifest.yaml
           fi
 
@@ -256,13 +258,13 @@ jobs:
         run: |
           aws-smus-cicd-cli test \
             --manifest manifest.yaml \
-            --stages ${{ github.event.inputs.stage }}
+            --targets ${{ github.event.inputs.stage }}
 
       - name: Monitor post-rollback status
         run: |
           aws-smus-cicd-cli monitor \
             --manifest manifest.yaml \
-            --stages ${{ github.event.inputs.stage }} \
+            --targets ${{ github.event.inputs.stage }} \
             --output JSON | tee monitor-output.json
 ```
 
@@ -302,7 +304,7 @@ jobs:
         id: deploy
         run: |
           aws-smus-cicd-cli deploy \
-            --stages prod \
+            --targets prod \
             --manifest manifest.yaml
           echo "deployed=true" >> $GITHUB_OUTPUT
 
@@ -311,7 +313,7 @@ jobs:
         run: |
           aws-smus-cicd-cli test \
             --manifest manifest.yaml \
-            --stages prod
+            --targets prod
 
   rollback-on-failure:
     name: "Auto-Rollback on Failure"
@@ -347,7 +349,7 @@ jobs:
       - name: Redeploy previous commit
         run: |
           aws-smus-cicd-cli deploy \
-            --stages prod \
+            --targets prod \
             --manifest manifest.yaml
 
       - name: Notify rollback
@@ -366,7 +368,7 @@ jobs:
 
 ## Bundle-Based Rollback (Recommended for Production)
 
-The most reliable rollback strategy is bundle-based deployment, where each deployment creates a versioned artifact. This gives you instant rollback to any previous version without needing to re-run the build.
+The preferred rollback strategy is bundle-based deployment, where each deployment creates a versioned artifact. This gives you instant rollback to any previous version without needing to re-run the build.
 
 ### How It Works
 
@@ -414,7 +416,7 @@ aws-smus-cicd-cli destroy --targets prod --force
 aws s3 cp s3://your-bundle-bucket/bundles/MyApp-abc1234.zip ./artifacts/MyApp.zip
 
 # Deploy — the CLI picks up ./artifacts/MyApp.zip automatically
-aws-smus-cicd-cli deploy --stages prod --manifest manifest.yaml
+aws-smus-cicd-cli deploy --targets prod --manifest manifest.yaml
 ```
 
 ---

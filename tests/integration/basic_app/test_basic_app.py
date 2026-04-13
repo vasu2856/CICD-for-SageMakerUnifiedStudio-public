@@ -22,7 +22,7 @@ class TestBasicApp(IntegrationTestBase):
             # Use CLI delete command to properly delete project
             print("🧹 Cleaning up existing test project...")
             result = self.run_cli_command(
-                ["delete", "--targets", "test", "--manifest", pipeline_file, "--force"]
+                ["destroy", "--targets", "test", "--manifest", pipeline_file, "--force"]
             )
             if result["success"]:
                 print("✅ Project cleanup successful")

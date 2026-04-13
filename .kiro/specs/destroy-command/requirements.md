@@ -4,10 +4,6 @@
 
 The `destroy` command is the inverse of the `deploy` command for the SMUS CI/CD CLI tool. It reads a manifest file, identifies the target stage(s), and deletes all resources that were directly created by `deploy` — including QuickSight dashboards/datasets/data sources, S3 objects at declared target paths, Airflow serverless workflows, DataZone connections created by bootstrap actions, and optionally the DataZone project. It respects a strict dependency ordering to ensure safe teardown, collects all user confirmations before any destructive action begins, and is idempotent: resources already absent are logged as warnings rather than errors.
 
-The `destroy` command is distinct from the existing `delete` command. The `delete` command only removes the DataZone project and its environments. The `destroy` command removes all deployed content resources (QuickSight, S3, Airflow workflows, workflow-created resources) and conditionally removes the DataZone project.
-
-The `destroy` command is always synchronous. Each deletion step must complete before the next begins, preserving the strict dependency ordering that makes teardown safe. There is no `--async` mode.
-
 For resources created by Airflow workflow runs (e.g. Glue jobs), destroy uses an operator registry approach: it parses the workflow YAML files declared in `content.workflows`, identifies tasks whose operator type is in the supported registry, extracts the resource name from a well-known static field, and deletes those resources directly via boto3. Resources created by operators not in the registry (e.g. `SageMakerNotebookOperator`, which runs notebooks but creates no persistent named resource itself) are skipped and noted in the output. Resources created dynamically inside notebook code (e.g. Bedrock Agents) remain out of scope.
 
 ## Assumptions
@@ -52,7 +48,7 @@ For resources created by Airflow workflow runs (e.g. Glue jobs), destroy uses an
 #### Acceptance Criteria
 
 1. THE Destroy_Command SHALL accept a `--manifest` / `-m` option specifying the path to the manifest file, defaulting to `manifest.yaml`.
-2. THE Destroy_Command SHALL accept a `--targets` / `-t` option specifying a comma-separated list of stage names to destroy, defaulting to all stages defined in the manifest.
+2. THE Destroy_Command SHALL accept a `--targets` / `-t` option specifying a comma-separated list of stage names to destroy. This option is required — the command SHALL print an error and exit with a non-zero exit code if `--targets` is not provided.
 3. THE Destroy_Command SHALL accept a `--force` / `-f` flag that suppresses all interactive confirmation prompts.
 4. THE Destroy_Command SHALL accept an `--output` / `-o` option accepting `TEXT` (default) or `JSON` values, controlling output format.
 5. WHEN `--targets` specifies a stage name not present in the manifest, THE Destroy_Command SHALL print an error listing the invalid stage names and the available stage names, then exit with a non-zero exit code.
@@ -82,14 +78,13 @@ For resources created by Airflow workflow runs (e.g. Glue jobs), destroy uses an
 2. DURING the validation cycle, THE Destroy_Command SHALL collect ALL validation errors and warnings encountered across all stages without aborting early. Each issue SHALL be recorded and associated with the stage and resource where it was found.
 3. WHEN the validation cycle completes and one or more validation errors were found (e.g. resource collisions), THE Destroy_Command SHALL print a consolidated report of all errors and warnings, then exit with a non-zero exit code WITHOUT performing any destructive actions.
 4. WHEN the validation cycle completes with no errors, THE Destroy_Command SHALL print a full destruction plan listing every resource that will be deleted, grouped by stage and resource type, including resource IDs and S3 prefixes.
-5. WHEN `--force` is not set, after printing the destruction plan THE Destroy_Command SHALL prompt the user for a single explicit confirmation before proceeding.
-6. WHEN the user declines the confirmation prompt, THE Destroy_Command SHALL exit without performing any destructive actions.
-7. WHEN `--force` is set, THE Destroy_Command SHALL skip the confirmation prompt and proceed directly to destruction after a clean validation cycle.
-8. WHEN one or more targeted stages contain Airflow_Workflows with active Workflow_Runs AND `--force` is not set, THE Destroy_Command SHALL include the active runs in the destruction plan and ask the user whether to force-stop them or abort, as part of the single confirmation step.
-9. WHEN the user chooses to abort due to active Workflow_Runs, THE Destroy_Command SHALL exit with a non-zero exit code without performing any destructive actions.
-10. WHEN `--force` is set and active Workflow_Runs exist, THE Destroy_Command SHALL automatically proceed with force-stopping the runs without prompting.
-11. DURING the validation cycle, WHEN the QuickSight prefix scan for a stage finds more dashboards, datasets, or data sources matching the `Resource_Prefix` than are declared in `content.quicksight`, THE Destroy_Command SHALL record this as a validation error listing all matched resource IDs and the expected count, and continue validating remaining stages.
-12. DURING the validation cycle, WHEN more than one Airflow workflow in the account and region matches the reconstructed workflow name for a given manifest entry, THE Destroy_Command SHALL record this as a validation error listing all matched workflow ARNs, and continue validating remaining stages.
+5. AFTER printing the destruction plan, THE Destroy_Command SHALL display a prominent warning stating that destroy deletes ALL resources listed in the manifest and workflow definitions, including resources that may have been created manually by users and not only those originally created by the CI/CD tool.
+6. WHEN `--force` is not set, after printing the destruction plan and warning THE Destroy_Command SHALL prompt the user for a single explicit confirmation before proceeding.
+7. WHEN the user declines the confirmation prompt, THE Destroy_Command SHALL exit without performing any destructive actions.
+8. WHEN `--force` is set, THE Destroy_Command SHALL skip the confirmation prompt and proceed directly to destruction after a clean validation cycle.
+9. WHEN one or more targeted stages contain Airflow_Workflows with active Workflow_Runs, THE Destroy_Command SHALL include the active runs in the destruction plan as informational context. MWAA Serverless automatically terminates active runs when a workflow is deleted, so no explicit user confirmation for run stopping is required.
+10. DURING the validation cycle, WHEN the QuickSight prefix scan for a stage finds more dashboards, datasets, or data sources matching the `Resource_Prefix` than are declared in `content.quicksight`, THE Destroy_Command SHALL record this as a validation error listing all matched resource IDs and the expected count, and continue validating remaining stages.
+11. DURING the validation cycle, WHEN more than one Airflow workflow in the account and region matches the reconstructed workflow name for a given manifest entry, THE Destroy_Command SHALL record this as a validation error listing all matched workflow ARNs, and continue validating remaining stages.
 
 ---
 
@@ -100,12 +95,12 @@ For resources created by Airflow workflow runs (e.g. Glue jobs), destroy uses an
 #### Acceptance Criteria
 
 1. THE Destroy_Command SHALL execute destruction in the following strict order for each targeted stage:
-   a. Stop active Workflow_Runs (if confirmed or forced)
-   b. Delete Workflow_Created_Resources identified from workflow YAML files (e.g. Glue jobs)
-   c. Delete Airflow_Workflows
-   d. Delete Bootstrap_Connections created by `datazone.create_connection` bootstrap actions (skip if `project.create: true`)
-   e. Delete QuickSight dashboards, then datasets, then data sources
-   f. Delete S3 objects at all declared S3_Target paths (storage and git)
+   a. Delete Workflow_Created_Resources identified from workflow YAML files (e.g. Glue jobs)
+   b. Delete Airflow_Workflows
+   c. Delete Bootstrap_Connections created by `datazone.create_connection` bootstrap actions (skip if `project.create: true`)
+   d. Delete QuickSight dashboards, then datasets, then data sources
+   e. Delete S3 objects at all declared S3_Target paths (storage and git)
+   f. Delete catalog resources in reverse dependency order
    g. Delete the DataZone_Project (only if `project.create: true`)
 2. THE Destroy_Command SHALL NOT delete the DataZone_Project before all content resources (QuickSight, S3, Airflow) for that stage have been processed.
 3. THE Destroy_Command SHALL NOT begin destruction of any resource until the pre-destruction validation and confirmation phase (Requirement 3) is fully complete.
@@ -120,9 +115,8 @@ For resources created by Airflow workflow runs (e.g. Glue jobs), destroy uses an
 
 1. FOR EACH workflow entry in `content.workflows`, THE Destroy_Command SHALL reconstruct the workflow ARN using `generate_workflow_name` and `find_workflow_arn` from the `airflow_serverless` helper.
 2. WHEN a workflow ARN cannot be found by its reconstructed name, THE Destroy_Command SHALL log a warning and continue without treating the absence as a fatal error.
-3. WHEN a workflow has no active Workflow_Runs, THE Destroy_Command SHALL delete it using the `delete_workflow` helper. This step occurs after all Workflow_Created_Resources for that workflow have been deleted (per Requirement 4 ordering).
-4. WHEN a workflow has active Workflow_Runs and the user has confirmed force-stop (or `--force` is set), THE Destroy_Command SHALL stop each active run using `stop_workflow_run` before deleting the workflow.
-5. THE Destroy_Command SHALL wait for each workflow deletion to complete before proceeding to the next resource type.
+3. THE Destroy_Command SHALL delete each workflow using the `delete_workflow` helper. MWAA Serverless automatically terminates any active runs when a workflow is deleted, so explicit run stopping is not required. This step occurs after all Workflow_Created_Resources for that workflow have been deleted (per Requirement 4 ordering).
+4. THE Destroy_Command SHALL wait for each workflow deletion to complete before proceeding to the next resource type.
 
 ---
 
