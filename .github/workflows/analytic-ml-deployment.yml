@@ -31,3 +31,17 @@ jobs:
       prod_target: 'prod'
       deploy_to_prod: ${{ github.ref == 'refs/heads/main' }}
       setup_mlflow: true
+
+  deploy-idc:
+    uses: ./.github/workflows/smus-bundle-deploy.yml
+    secrets:
+      AWS_ROLE_ARN_DEV: ${{ secrets.AWS_ROLE_ARN_DEV }}
+      AWS_ROLE_ARN_TEST: ${{ secrets.AWS_ROLE_ARN_TEST }}
+      AWS_ROLE_ARN_PROD: ${{ secrets.AWS_ROLE_ARN_PROD }}
+    with:
+      manifest_path: 'examples/analytic-workflow/ml/deployment/manifest-idc.yaml'
+      bundle_from_target: 'test-idc'
+      test_target: 'test-idc'
+      prod_target: 'prod-idc'
+      deploy_to_prod: ${{ github.ref == 'refs/heads/main' }}
+      setup_mlflow: true

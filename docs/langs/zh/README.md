@@ -23,7 +23,7 @@
 
 > **[预览版]** Amazon SageMaker Unified Studio CI/CD CLI 目前处于预览阶段，可能会发生变更。命令、配置格式和API可能会根据客户反馈进行调整。我们建议在预览期间在非生产环境中评估此工具。如需反馈和报告错误，请在此处提交问题 https://github.com/aws/CICD-for-SageMakerUnifiedStudio/issues
 
-> **[仅支持IAM域]** 此CLI目前仅支持使用基于IAM认证的SMUS域。即将支持基于IAM Identity Center (IdC)的域。
+> **[IAM + IdC 域]** 此CLI支持基于IAM和IAM Identity Center (IdC)认证的SMUS域。对于IdC域，可能需要额外配置（VPC网络、Lake Formation权限、内联IAM策略）— 请参阅每个示例目录中的设置脚本。
 
 **跨SageMaker Unified Studio环境自动部署数据应用程序**
 
