@@ -56,7 +56,13 @@ class BundleChecker:
     def _resolve_bundle_path(
         self, context: DryRunContext, findings: List[Finding]
     ) -> str | None:
-        """Resolve the bundle path, falling back to ./artifacts directory."""
+        """Resolve the bundle path, falling back to ./artifacts directory.
+
+        When no bundle is found and the deployment configuration does not
+        require one (no storage items with a connectionName, no git items),
+        the checker reports a WARNING instead of an ERROR so that
+        bundle-less workflows (e.g. ML Training) are not blocked.
+        """
         if context.bundle_path:
             return context.bundle_path
 
@@ -88,15 +94,22 @@ class BundleChecker:
                 )
                 return bundle_path
             else:
-                findings.append(
-                    Finding(
-                        severity=Severity.ERROR,
-                        message=(
-                            "No bundle archive found. Provide --bundle-archive-path "
-                            "or place a ZIP in ./artifacts"
-                        ),
+                # Check whether the deployment actually requires a bundle.
+                # Uses the same logic as deploy_command().
+                from smus_cicd.helpers.bundle_storage import manifest_requires_bundle
+
+                needs_bundle = manifest_requires_bundle(context.manifest)
+                if needs_bundle:
+                    findings.append(
+                        Finding(
+                            severity=Severity.ERROR,
+                            message=(
+                                "No bundle archive found. Provide "
+                                "--bundle-archive-path or place a ZIP "
+                                "in ./artifacts"
+                            ),
+                        )
                     )
-                )
                 return None
         except Exception as exc:
             findings.append(
