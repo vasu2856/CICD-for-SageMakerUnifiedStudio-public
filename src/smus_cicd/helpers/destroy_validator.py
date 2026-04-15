@@ -22,9 +22,9 @@ from ..helpers.logger import get_logger
 from ..helpers.operator_registry import OPERATOR_REGISTRY
 from ..helpers.quicksight import (
     QuickSightDeploymentError,
-    list_dashboards,
-    list_data_sources,
-    list_datasets,
+    find_resources_by_prefix,
+    resolve_resource_ids_from_overrides,
+    resolve_resource_prefix,
 )
 from .destroy_models import ResourceToDelete, S3Target, ValidationResult
 
@@ -34,21 +34,6 @@ logger = get_logger("destroy")
 # ---------------------------------------------------------------------------
 # Pure helper functions (no AWS calls)
 # ---------------------------------------------------------------------------
-
-
-def _resolve_resource_prefix(stage_name: str, qs_config: dict) -> str:
-    """
-    Resolve the QuickSight resource prefix for a stage.
-
-    Reads overrideParameters.ResourceIdOverrideConfiguration.PrefixForAllResources
-    and replaces {stage.name} with stage_name.
-    """
-    prefix = (
-        qs_config.get("overrideParameters", {})
-        .get("ResourceIdOverrideConfiguration", {})
-        .get("PrefixForAllResources", "")
-    )
-    return prefix.replace("{stage.name}", stage_name)
 
 
 def _discover_workflow_created_resources(
@@ -275,7 +260,7 @@ def _validate_stage(
     dc = stage_config.deployment_configuration
     if dc and dc.quicksight:
         qs_config = dc.quicksight
-        prefix = _resolve_resource_prefix(stage_name, qs_config)
+        prefix = resolve_resource_prefix(stage_name, qs_config)
 
         try:
             account_id = boto3.client(
@@ -288,87 +273,65 @@ def _validate_stage(
         if account_id and prefix:
             declared_count = len(manifest.content.quicksight)
 
-            # Dashboards
-            try:
-                all_dashboards = list_dashboards(account_id, effective_region)
-                matched_dashboards = [
-                    d
-                    for d in all_dashboards
-                    if d.get("DashboardId", "").startswith(prefix)
-                ]
-                if len(matched_dashboards) > declared_count:
-                    ids = [d["DashboardId"] for d in matched_dashboards]
-                    errors.append(
-                        f"[{stage_name}] QuickSight dashboard collision: found "
-                        f"{len(matched_dashboards)} dashboards with prefix '{prefix}' "
-                        f"but manifest declares {declared_count}. IDs: {ids}"
-                    )
-                else:
-                    for d in matched_dashboards:
-                        resources.append(
-                            ResourceToDelete(
-                                resource_type="quicksight_dashboard",
-                                resource_id=d["DashboardId"],
-                                stage=stage_name,
-                                metadata={"name": d.get("Name", "")},
-                            )
-                        )
-            except QuickSightDeploymentError as e:
-                errors.append(f"[{stage_name}] QuickSight dashboard list failed: {e}")
+            # Try exact ID resolution from manifest overrideParameters first.
+            TYPE_MAP = {
+                "dashboards": ("DashboardId", "quicksight_dashboard"),
+                "datasets": ("DataSetId", "quicksight_dataset"),
+                "data_sources": ("DataSourceId", "quicksight_data_source"),
+            }
 
-            # Datasets
-            try:
-                all_datasets = list_datasets(account_id, effective_region)
-                matched_datasets = [
-                    d for d in all_datasets if d.get("DataSetId", "").startswith(prefix)
-                ]
-                if len(matched_datasets) > declared_count:
-                    ids = [d["DataSetId"] for d in matched_datasets]
-                    errors.append(
-                        f"[{stage_name}] QuickSight dataset collision: found "
-                        f"{len(matched_datasets)} datasets with prefix '{prefix}' "
-                        f"but manifest declares {declared_count}. IDs: {ids}"
-                    )
-                else:
-                    for d in matched_datasets:
-                        resources.append(
-                            ResourceToDelete(
-                                resource_type="quicksight_dataset",
-                                resource_id=d["DataSetId"],
-                                stage=stage_name,
-                                metadata={"name": d.get("Name", "")},
-                            )
+            exact_ids = resolve_resource_ids_from_overrides(stage_name, qs_config)
+            exact_types_resolved = set()
+            for result_key, items in exact_ids.items():
+                _, resource_type = TYPE_MAP[result_key]
+                for item in items:
+                    resources.append(
+                        ResourceToDelete(
+                            resource_type=resource_type,
+                            resource_id=item["id"],
+                            stage=stage_name,
+                            metadata={"name": item["name"]},
                         )
-            except QuickSightDeploymentError as e:
-                errors.append(f"[{stage_name}] QuickSight dataset list failed: {e}")
+                    )
+                exact_types_resolved.add(resource_type)
 
-            # Data sources
-            try:
-                all_sources = list_data_sources(account_id, effective_region)
-                matched_sources = [
-                    d
-                    for d in all_sources
-                    if d.get("DataSourceId", "").startswith(prefix)
-                ]
-                if len(matched_sources) > declared_count:
-                    ids = [d["DataSourceId"] for d in matched_sources]
-                    errors.append(
-                        f"[{stage_name}] QuickSight data source collision: found "
-                        f"{len(matched_sources)} data sources with prefix '{prefix}' "
-                        f"but manifest declares {declared_count}. IDs: {ids}"
+            # Fall back to prefix scan for resource types not in overrides
+            types_to_scan = [
+                (k, id_f, rt)
+                for k, (id_f, rt) in TYPE_MAP.items()
+                if rt not in exact_types_resolved
+            ]
+
+            if types_to_scan:
+                try:
+                    qs_resources = find_resources_by_prefix(
+                        account_id, effective_region, prefix
                     )
-                else:
-                    for d in matched_sources:
-                        resources.append(
-                            ResourceToDelete(
-                                resource_type="quicksight_data_source",
-                                resource_id=d["DataSourceId"],
-                                stage=stage_name,
-                                metadata={"name": d.get("Name", "")},
+
+                    for qs_type, id_field, resource_type in types_to_scan:
+                        matched = qs_resources[qs_type]
+                        if len(matched) > declared_count:
+                            ids = [d[id_field] for d in matched]
+                            errors.append(
+                                f"[{stage_name}] QuickSight {qs_type} collision: "
+                                f"found {len(matched)} with prefix '{prefix}' "
+                                f"but manifest declares {declared_count}. "
+                                f"IDs: {ids}"
                             )
-                        )
-            except QuickSightDeploymentError as e:
-                errors.append(f"[{stage_name}] QuickSight data source list failed: {e}")
+                        else:
+                            for d in matched:
+                                resources.append(
+                                    ResourceToDelete(
+                                        resource_type=resource_type,
+                                        resource_id=d[id_field],
+                                        stage=stage_name,
+                                        metadata={"name": d.get("Name", "")},
+                                    )
+                                )
+                except QuickSightDeploymentError as e:
+                    errors.append(
+                        f"[{stage_name}] QuickSight resource listing failed: {e}"
+                    )
 
     # --- Airflow workflows ---
     for workflow_entry in manifest.content.workflows or []:

@@ -2202,58 +2202,36 @@ def _deploy_quicksight_dashboards(
                 typer.echo("    ✓ Dashboard deployed successfully")
 
                 # Get the actual imported dashboard ID from override parameters
-                # The imported ID is: prefix + dashboard_id_from_overrides
-                prefix = ""
-                if (
-                    override_params
-                    and "ResourceIdOverrideConfiguration" in override_params
-                ):
-                    prefix = override_params["ResourceIdOverrideConfiguration"].get(
-                        "PrefixForAllResources", ""
-                    )
-                    # Find the dashboard ID in the override parameters
-                    if "Dashboards" in override_params:
-                        for dash_override in override_params["Dashboards"]:
-                            # The imported ID is prefix + original dashboard ID from overrides
-                            imported_dashboard_id = (
-                                f"{prefix}{dash_override['DashboardId']}"
-                            )
-                            typer.echo(f"      Dashboard: {imported_dashboard_id}")
-                            break
+                from ..helpers.quicksight import (
+                    resolve_resource_ids_from_overrides,
+                    resolve_resource_prefix,
+                )
+
+                prefix = resolve_resource_prefix(stage_name, qs_config)
+                exact_ids = resolve_resource_ids_from_overrides(stage_name, qs_config)
+                if "dashboards" in exact_ids and exact_ids["dashboards"]:
+                    imported_dashboard_id = exact_ids["dashboards"][0]["id"]
+                    typer.echo(f"      Dashboard: {imported_dashboard_id}")
 
                 # List imported datasets and data sources
                 import boto3
 
-                qs_client = boto3.client("quicksight", region_name=region)
+                # Find all resources with this prefix using shared helper
+                from ..helpers.quicksight import find_resources_by_prefix
 
-                # List datasets with prefix
                 try:
-                    datasets_response = qs_client.list_data_sets(
-                        AwsAccountId=aws_account_id
+                    qs_resources = find_resources_by_prefix(
+                        aws_account_id, region, prefix
                     )
-                    datasets = [
-                        ds
-                        for ds in datasets_response.get("DataSetSummaries", [])
-                        if prefix and prefix in ds["DataSetId"]
-                    ]
+                    datasets = qs_resources["datasets"]
+                    sources = qs_resources["data_sources"]
+
                     if datasets:
                         typer.echo(f"      Datasets ({len(datasets)}):")
                         for ds in datasets:
                             typer.echo(f"        - {ds['DataSetId']}")
                             imported_dataset_ids.append(ds["DataSetId"])
-                except Exception as e:
-                    typer.echo(f"      ⚠️  Could not list datasets: {e}")
 
-                # List data sources with prefix
-                try:
-                    sources_response = qs_client.list_data_sources(
-                        AwsAccountId=aws_account_id
-                    )
-                    sources = [
-                        src
-                        for src in sources_response.get("DataSources", [])
-                        if prefix and prefix in src["DataSourceId"]
-                    ]
                     if sources:
                         typer.echo(f"      Data Sources ({len(sources)}):")
                         for src in sources:
@@ -2261,7 +2239,7 @@ def _deploy_quicksight_dashboards(
                                 f"        - {src['DataSourceId']} ({src['Type']})"
                             )
                 except Exception as e:
-                    typer.echo(f"      ⚠️  Could not list data sources: {e}")
+                    typer.echo(f"      ⚠️  Could not list QuickSight resources: {e}")
 
                 # Permissions already collected and applied during import
                 # Now grant additional dataset and data source permissions

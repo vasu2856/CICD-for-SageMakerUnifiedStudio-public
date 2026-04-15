@@ -33,7 +33,6 @@ from smus_cicd.helpers.destroy_models import (
 )
 from smus_cicd.helpers.destroy_validator import (
     _discover_workflow_created_resources,
-    _resolve_resource_prefix,
     _resolve_s3_targets,
     _validate_stage,
 )
@@ -70,9 +69,7 @@ PATCH_PROJECT_ID = "smus_cicd.helpers.destroy_validator.get_project_id_by_name"
 PATCH_DELETE_PROJECT = "smus_cicd.helpers.destroy_executor.delete_project"
 PATCH_BOTO3 = "smus_cicd.helpers.destroy_executor.boto3"
 PATCH_CONNECTIONS = "smus_cicd.helpers.destroy_validator.get_project_connections"
-PATCH_DASHBOARDS = "smus_cicd.helpers.destroy_validator.list_dashboards"
-PATCH_DATASETS = "smus_cicd.helpers.destroy_validator.list_datasets"
-PATCH_DATASOURCES = "smus_cicd.helpers.destroy_validator.list_data_sources"
+PATCH_FIND_QS = "smus_cicd.helpers.destroy_validator.find_resources_by_prefix"
 PATCH_LIST_WORKFLOWS = "smus_cicd.helpers.destroy_validator.list_workflows"
 PATCH_LIST_RUNS = "smus_cicd.helpers.destroy_validator.list_workflow_runs"
 PATCH_IS_ACTIVE = "smus_cicd.helpers.destroy_validator.is_workflow_run_active"
@@ -98,6 +95,7 @@ def _make_stage_config(
     create=False,
     has_quicksight=False,
     qs_prefix="deployed-{stage.name}-covid-",
+    qs_overrides=None,
     storage=None,
     git=None,
 ):
@@ -105,7 +103,8 @@ def _make_stage_config(
     if has_quicksight:
         qs_config = {
             "overrideParameters": {
-                "ResourceIdOverrideConfiguration": {"PrefixForAllResources": qs_prefix}
+                "ResourceIdOverrideConfiguration": {"PrefixForAllResources": qs_prefix},
+                **(qs_overrides or {}),
             }
         }
     dc = DeploymentConfiguration(
@@ -293,22 +292,6 @@ class TestListDataSources:
 # Level 3: Pure helper functions (U15–U26)
 # ---------------------------------------------------------------------------
 
-class TestResolveResourcePrefix:
-    def test_u15_replaces_stage_name(self):
-        qs_config = {"overrideParameters": {"ResourceIdOverrideConfiguration": {"PrefixForAllResources": "deployed-{stage.name}-covid-"}}}
-        assert _resolve_resource_prefix("dev", qs_config) == "deployed-dev-covid-"
-
-    def test_u15b_test_stage(self):
-        qs_config = {"overrideParameters": {"ResourceIdOverrideConfiguration": {"PrefixForAllResources": "deployed-{stage.name}-covid-"}}}
-        assert _resolve_resource_prefix("test", qs_config) == "deployed-test-covid-"
-
-    def test_u16_no_variable_unchanged(self):
-        qs_config = {"overrideParameters": {"ResourceIdOverrideConfiguration": {"PrefixForAllResources": "static-prefix-"}}}
-        assert _resolve_resource_prefix("dev", qs_config) == "static-prefix-"
-
-    def test_u17_empty_config_returns_empty(self):
-        assert _resolve_resource_prefix("dev", {}) == ""
-
 
 class TestDiscoverWorkflowCreatedResources:
     def _yaml(self, tasks):
@@ -407,53 +390,149 @@ class TestValidateStageQuickSightCollisions:
         sts.get_caller_identity.return_value = {"Account": "111122223333"}
         mock_boto3.client.return_value = sts
 
-    @patch(PATCH_DATASOURCES, return_value=[])
-    @patch(PATCH_DATASETS, return_value=[])
-    @patch(PATCH_DASHBOARDS)
+    @patch(PATCH_FIND_QS)
     @patch(PATCH_CONNECTIONS, return_value={})
     @patch(PATCH_PROJECT_ID, return_value="proj-123")
     @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
     @patch(PATCH_STS)
-    def test_u28_dashboard_collision(self, mock_boto3, mock_domain, mock_project, mock_conns,
-                                     mock_dashboards, mock_datasets, mock_sources):
+    def test_u28_dashboard_collision(self, mock_boto3, mock_domain, mock_project, mock_conns, mock_find_qs):
         self._sts_mock(mock_boto3)
-        mock_dashboards.return_value = [
-            {"DashboardId": "deployed-dev-covid-d1"},
-            {"DashboardId": "deployed-dev-covid-d2"},
-        ]
+        mock_find_qs.return_value = {
+            "dashboards": [{"DashboardId": "deployed-dev-covid-d1"}, {"DashboardId": "deployed-dev-covid-d2"}],
+            "datasets": [],
+            "data_sources": [],
+        }
         result = _validate_stage("dev", _make_stage_config(has_quicksight=True),
                                  _make_manifest(quicksight_assets=["TotalDeathByCountry"]), "us-east-1")
         assert any("dashboard" in e.lower() or "collision" in e.lower() for e in result.errors)
 
-    @patch(PATCH_DATASOURCES, return_value=[])
-    @patch(PATCH_DATASETS)
-    @patch(PATCH_DASHBOARDS, return_value=[])
+    @patch(PATCH_FIND_QS)
     @patch(PATCH_CONNECTIONS, return_value={})
     @patch(PATCH_PROJECT_ID, return_value="proj-123")
     @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
     @patch(PATCH_STS)
-    def test_u29_dataset_collision(self, mock_boto3, mock_domain, mock_project, mock_conns,
-                                   mock_dashboards, mock_datasets, mock_sources):
+    def test_u29_dataset_collision(self, mock_boto3, mock_domain, mock_project, mock_conns, mock_find_qs):
         self._sts_mock(mock_boto3)
-        mock_datasets.return_value = [{"DataSetId": "deployed-dev-covid-ds1"}, {"DataSetId": "deployed-dev-covid-ds2"}]
+        mock_find_qs.return_value = {
+            "dashboards": [],
+            "datasets": [{"DataSetId": "deployed-dev-covid-ds1"}, {"DataSetId": "deployed-dev-covid-ds2"}],
+            "data_sources": [],
+        }
         result = _validate_stage("dev", _make_stage_config(has_quicksight=True),
                                  _make_manifest(quicksight_assets=["TotalDeathByCountry"]), "us-east-1")
         assert any("dataset" in e.lower() or "collision" in e.lower() for e in result.errors)
 
-    @patch(PATCH_DATASOURCES)
-    @patch(PATCH_DATASETS, return_value=[])
-    @patch(PATCH_DASHBOARDS, return_value=[])
+    @patch(PATCH_FIND_QS)
     @patch(PATCH_CONNECTIONS, return_value={})
     @patch(PATCH_PROJECT_ID, return_value="proj-123")
     @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
     @patch(PATCH_STS)
-    def test_u30_data_source_collision(self, mock_boto3, mock_domain, mock_project, mock_conns,
-                                       mock_dashboards, mock_datasets, mock_sources):
+    def test_u30_data_source_collision(self, mock_boto3, mock_domain, mock_project, mock_conns, mock_find_qs):
         self._sts_mock(mock_boto3)
-        mock_sources.return_value = [{"DataSourceId": "deployed-dev-covid-s1"}, {"DataSourceId": "deployed-dev-covid-s2"}]
+        mock_find_qs.return_value = {
+            "dashboards": [],
+            "datasets": [],
+            "data_sources": [{"DataSourceId": "deployed-dev-covid-s1"}, {"DataSourceId": "deployed-dev-covid-s2"}],
+        }
         result = _validate_stage("dev", _make_stage_config(has_quicksight=True),
                                  _make_manifest(quicksight_assets=["TotalDeathByCountry"]), "us-east-1")
-        assert any("data source" in e.lower() or "collision" in e.lower() for e in result.errors)
+        assert any("data_source" in e.lower() or "collision" in e.lower() for e in result.errors)
+
+
+class TestQuickSightExactIdResolution:
+    """Tests for exact QuickSight ID resolution from manifest overrideParameters."""
+
+    def _sts_mock(self, mock_boto3):
+        sts = MagicMock()
+        sts.get_caller_identity.return_value = {"Account": "111122223333"}
+        mock_boto3.client.return_value = sts
+
+    @patch(PATCH_FIND_QS, return_value={"dashboards": [], "datasets": [], "data_sources": []})
+    @patch(PATCH_CONNECTIONS, return_value={})
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    @patch(PATCH_STS)
+    def test_exact_dashboard_id_from_overrides(self, mock_boto3, *_args):
+        """When Dashboards override is present, exact IDs are used without scanning."""
+        self._sts_mock(mock_boto3)
+        sc = _make_stage_config(
+            has_quicksight=True,
+            qs_overrides={"Dashboards": [{"DashboardId": "TotalDeathByCountry", "Name": "Deaths"}]},
+        )
+        result = _validate_stage("dev", sc,
+                                 _make_manifest(quicksight_assets=["TotalDeathByCountry"]), "us-east-1")
+        dashboard_resources = [r for r in result.resources if r.resource_type == "quicksight_dashboard"]
+        assert len(dashboard_resources) == 1
+        assert dashboard_resources[0].resource_id == "deployed-dev-covid-TotalDeathByCountry"
+
+    @patch(PATCH_FIND_QS, return_value={"dashboards": [], "datasets": [], "data_sources": []})
+    @patch(PATCH_CONNECTIONS, return_value={})
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    @patch(PATCH_STS)
+    def test_exact_ids_skip_prefix_scan_for_covered_types(
+        self, mock_boto3, mock_domain, mock_project, mock_conns, mock_find_qs
+    ):
+        """When all three types have overrides, prefix scan is not called."""
+        self._sts_mock(mock_boto3)
+        sc = _make_stage_config(
+            has_quicksight=True,
+            qs_overrides={
+                "Dashboards": [{"DashboardId": "d1", "Name": "D1"}],
+                "DataSets": [{"DataSetId": "ds1", "Name": "DS1"}],
+                "DataSources": [{"DataSourceId": "src1", "Name": "S1"}],
+            },
+        )
+        result = _validate_stage("dev", sc,
+                                 _make_manifest(quicksight_assets=["TotalDeathByCountry"]), "us-east-1")
+        mock_find_qs.assert_not_called()
+        assert len([r for r in result.resources if r.resource_type == "quicksight_dashboard"]) == 1
+        assert len([r for r in result.resources if r.resource_type == "quicksight_dataset"]) == 1
+        assert len([r for r in result.resources if r.resource_type == "quicksight_data_source"]) == 1
+
+    @patch(PATCH_FIND_QS)
+    @patch(PATCH_CONNECTIONS, return_value={})
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    @patch(PATCH_STS)
+    def test_partial_overrides_scan_remaining_types(
+        self, mock_boto3, mock_domain, mock_project, mock_conns, mock_find_qs
+    ):
+        """When only Dashboards has overrides, datasets and data_sources are scanned."""
+        self._sts_mock(mock_boto3)
+        mock_find_qs.return_value = {
+            "dashboards": [],
+            "datasets": [{"DataSetId": "deployed-dev-covid-ds1", "Name": "DS1"}],
+            "data_sources": [],
+        }
+        sc = _make_stage_config(
+            has_quicksight=True,
+            qs_overrides={"Dashboards": [{"DashboardId": "d1", "Name": "D1"}]},
+        )
+        result = _validate_stage("dev", sc,
+                                 _make_manifest(quicksight_assets=["TotalDeathByCountry"]), "us-east-1")
+        mock_find_qs.assert_called_once()
+        assert len([r for r in result.resources if r.resource_type == "quicksight_dashboard"]) == 1
+        assert len([r for r in result.resources if r.resource_type == "quicksight_dataset"]) == 1
+
+    @patch(PATCH_FIND_QS, return_value={"dashboards": [], "datasets": [], "data_sources": []})
+    @patch(PATCH_CONNECTIONS, return_value={})
+    @patch(PATCH_PROJECT_ID, return_value="proj-123")
+    @patch(PATCH_DOMAIN, return_value=("dom-123", "my-domain"))
+    @patch(PATCH_STS)
+    def test_stage_name_resolved_in_override_ids(
+        self, mock_boto3, mock_domain, mock_project, mock_conns, mock_find_qs
+    ):
+        """Template variables in override IDs are resolved."""
+        self._sts_mock(mock_boto3)
+        sc = _make_stage_config(
+            has_quicksight=True,
+            qs_overrides={"Dashboards": [{"DashboardId": "dash-{stage.name}", "Name": "D"}]},
+        )
+        result = _validate_stage("test", sc,
+                                 _make_manifest(quicksight_assets=["TotalDeathByCountry"]), "us-east-1")
+        dashboard_resources = [r for r in result.resources if r.resource_type == "quicksight_dashboard"]
+        assert dashboard_resources[0].resource_id == "deployed-test-covid-dash-test"
 
 
 class TestValidateStageWorkflows:
