@@ -36,7 +36,12 @@ def create_airflow_serverless_client(
 ):
     """Create Airflow Serverless boto3 client."""
     if not region:
-        region = boto3.Session().region_name or "us-east-1"
+        region = boto3.Session().region_name
+    if not region:
+        raise ValueError(
+            "AWS region must be provided or configured in the boto session. "
+            "Define it in your manifest or set AWS_DEFAULT_REGION environment variable."
+        )
 
     endpoint_url = AIRFLOW_SERVERLESS_ENDPOINT or (
         f"https://airflow-serverless.{region}.api.aws/"
