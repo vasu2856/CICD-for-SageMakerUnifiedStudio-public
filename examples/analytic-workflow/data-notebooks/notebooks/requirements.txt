@@ -210,7 +210,7 @@ pyasn1-modules==0.4.2
 pyathena==3.30.0
 pycodestyle==2.14.0
 pycparser==3.0
-pydantic==2.12.4
+pydantic==2.13.0
 pydantic-core==2.41.5
 pydantic-settings==2.11.0
 pydynamodb==0.7.5
