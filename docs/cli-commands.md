@@ -255,7 +255,7 @@ Bundle creation complete for target: dev
 
 Deploys bundle files to target environments (auto-initializes if needed). The deploy command performs the following operations:
 
-0. **Pre-Deployment Validation (automatic)**: Runs a dry-run validation before deployment to catch errors early. If any blocking errors are found, the deployment is aborted before any resources are created or modified. This prevents partial deployments that leave resources in an inconsistent state. Skip with `--skip-validation`.
+0. **Pre-Deployment Validation (automatic)**: Runs a best-effort dry-run validation before deployment to catch errors early. If any blocking errors are found, the deployment is aborted before any resources are created or modified. This prevents partial deployments that leave resources in an inconsistent state. Note that a passing validation does not guarantee deployment success — transient errors or state changes may still occur. Skip with `--skip-validation`.
 1. **Bundle Deployment**: Uploads workflow and storage files to target project connections
 2. **Catalog Asset Access**: Processes catalog assets defined in the bundle manifest:
    - Searches for assets in the DataZone catalog
@@ -275,7 +275,7 @@ aws-smus-cicd-cli deploy [OPTIONS] [TARGET_POSITIONAL]
 - **`-m, --manifest`**: Path to bundle manifest file (default: `manifest.yaml`)
 - **`-t, --targets`**: Target name(s) - single target or comma-separated list (uses default target if not specified)
 - **`-b, --bundle-archive-path`**: Path to pre-created bundle file (optional)
-- **`--dry-run`**: Preview the deployment without making any changes. Validates the manifest, bundle, IAM permissions, resource reachability, catalog dependencies, and workflow definitions, then produces a structured report of what would happen and any issues detected. No resources are created, modified, or deleted.
+- **`--dry-run`**: Preview the deployment without making any changes. Validates the manifest, bundle, IAM permissions, resource reachability, catalog dependencies, and workflow definitions, then produces a structured report of what would happen and any issues detected. No resources are created, modified, or deleted. This is a best-effort check — a passing dry run does not guarantee deployment success.
 - **`--output`**: Output format for the dry-run report: `text` (default, human-readable) or `json` (machine-readable). Only applies when `--dry-run` is used.
 - **`--skip-validation`**: Skip the automatic pre-deployment dry-run validation step and proceed directly to deployment. Useful when you have already validated with `--dry-run` or need to bypass validation for speed.
 - **`--emit-events`**: Enable EventBridge event emission for deployment tracking
@@ -314,6 +314,8 @@ aws-smus-cicd-cli deploy --targets test --skip-validation
 #### Dry Run Mode
 
 Use `--dry-run` to preview a deployment without creating, modifying, or deleting any resources. The dry run walks through every deployment phase in read-only mode:
+
+> **Note:** The dry run is a best-effort validation. A passing dry run significantly reduces the risk of deployment failure but does not guarantee success. Conditions such as transient AWS service errors, IAM policy changes between validation and deployment, concurrent resource modifications, eventual consistency delays, and service quota limits may cause a deployment to fail even after a clean dry-run report.
 
 1. **Manifest Validation** — Loads and validates the manifest YAML, resolves the target stage, builds domain configuration, checks environment variable references
 2. **Bundle Exploration** — Opens the bundle archive, enumerates files, validates catalog export data if present
@@ -415,7 +417,7 @@ Exit codes for dry run:
 
 #### Pre-Deployment Validation
 
-By default, every `deploy` invocation (without `--dry-run`) automatically runs a dry-run validation step before beginning the actual deployment. This catches errors early and prevents partial deployments.
+By default, every `deploy` invocation (without `--dry-run`) automatically runs a dry-run validation step before beginning the actual deployment. This catches errors early and prevents partial deployments. Note that this validation is best-effort — it cannot detect transient failures or state changes that occur after validation completes.
 
 - If the validation finds errors, the deployment is aborted and the report is displayed.
 - If the validation finds only warnings or passes cleanly, the deployment proceeds normally.
