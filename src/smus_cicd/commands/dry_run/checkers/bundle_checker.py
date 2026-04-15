@@ -58,10 +58,8 @@ class BundleChecker:
     ) -> str | None:
         """Resolve the bundle path, falling back to ./artifacts directory.
 
-        When no bundle is found and the deployment configuration does not
-        require one (no storage items with a connectionName, no git items),
-        the checker reports a WARNING instead of an ERROR so that
-        bundle-less workflows (e.g. ML Training) are not blocked.
+        When no bundle is found and the manifest does not require one,
+        the checker silently returns None without adding any findings.
         """
         if context.bundle_path:
             return context.bundle_path
