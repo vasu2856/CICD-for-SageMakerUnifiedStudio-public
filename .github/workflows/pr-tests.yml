@@ -115,12 +115,6 @@ jobs:
         role-session-name: test-${{ steps.test-name.outputs.name }}
         role-duration-seconds: 43200
     
-    - name: Register AWS CLI models
-      run: |
-        aws configure add-model \
-          --service-model file://src/smus_cicd/resources/mwaaserverless-2024-07-26.normal-edited-2.json \
-          --service-name mwaaserverless-internal
-    
     - name: Get AWS Account ID
       id: aws-account
       run: |

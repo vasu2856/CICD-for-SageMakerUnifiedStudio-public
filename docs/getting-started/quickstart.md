@@ -173,6 +173,9 @@ ml_training_pipeline:
   tasks:
     prepare_data:
       operator: "airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator"
+      domain_id: "{domain.id}"
+      project_id: "{proj.id}"
+      domain_region: "{domain.region}"
       input_config:
         input_path: "notebooks/prepare_features.ipynb"
         input_params:
@@ -184,6 +187,9 @@ ml_training_pipeline:
     
     train_model:
       operator: "airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator"
+      domain_id: "{domain.id}"
+      project_id: "{proj.id}"
+      domain_region: "{domain.region}"
       input_config:
         input_path: "notebooks/train_model.ipynb"
         input_params:
@@ -209,6 +215,9 @@ bedrock_inference_pipeline:
   tasks:
     prepare_prompts:
       operator: "airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator"
+      domain_id: "{domain.id}"
+      project_id: "{proj.id}"
+      domain_region: "{domain.region}"
       input_config:
         input_path: "notebooks/prepare_prompts.ipynb"
         input_params:
