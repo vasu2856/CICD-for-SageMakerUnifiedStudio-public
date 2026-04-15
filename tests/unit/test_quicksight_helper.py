@@ -128,3 +128,117 @@ class TestQuickSightHelper(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestResolveResourcePrefix(unittest.TestCase):
+    """Test resolve_resource_prefix."""
+
+    def test_replaces_stage_name(self):
+        from smus_cicd.helpers.quicksight import resolve_resource_prefix
+
+        qs = {"overrideParameters": {"ResourceIdOverrideConfiguration": {
+            "PrefixForAllResources": "deployed-{stage.name}-covid-"
+        }}}
+        assert resolve_resource_prefix("dev", qs) == "deployed-dev-covid-"
+
+    def test_empty_config(self):
+        from smus_cicd.helpers.quicksight import resolve_resource_prefix
+
+        assert resolve_resource_prefix("dev", {}) == ""
+
+    def test_no_variable(self):
+        from smus_cicd.helpers.quicksight import resolve_resource_prefix
+
+        qs = {"overrideParameters": {"ResourceIdOverrideConfiguration": {
+            "PrefixForAllResources": "static-"
+        }}}
+        assert resolve_resource_prefix("dev", qs) == "static-"
+
+
+class TestResolveResourceIdsFromOverrides(unittest.TestCase):
+    """Test resolve_resource_ids_from_overrides."""
+
+    def test_dashboards_only(self):
+        from smus_cicd.helpers.quicksight import resolve_resource_ids_from_overrides
+
+        qs = {"overrideParameters": {
+            "ResourceIdOverrideConfiguration": {"PrefixForAllResources": "pfx-"},
+            "Dashboards": [{"DashboardId": "d1", "Name": "Dash1"}],
+        }}
+        result = resolve_resource_ids_from_overrides("dev", qs)
+        assert "dashboards" in result
+        assert result["dashboards"][0]["id"] == "pfx-d1"
+        assert result["dashboards"][0]["name"] == "Dash1"
+        assert "datasets" not in result
+        assert "data_sources" not in result
+
+    def test_all_three_types(self):
+        from smus_cicd.helpers.quicksight import resolve_resource_ids_from_overrides
+
+        qs = {"overrideParameters": {
+            "ResourceIdOverrideConfiguration": {"PrefixForAllResources": "p-"},
+            "Dashboards": [{"DashboardId": "d1", "Name": "D"}],
+            "DataSets": [{"DataSetId": "ds1", "Name": "DS"}],
+            "DataSources": [{"DataSourceId": "src1", "Name": "S"}],
+        }}
+        result = resolve_resource_ids_from_overrides("test", qs)
+        assert result["dashboards"][0]["id"] == "p-d1"
+        assert result["datasets"][0]["id"] == "p-ds1"
+        assert result["data_sources"][0]["id"] == "p-src1"
+
+    def test_stage_name_resolved_in_ids(self):
+        from smus_cicd.helpers.quicksight import resolve_resource_ids_from_overrides
+
+        qs = {"overrideParameters": {
+            "ResourceIdOverrideConfiguration": {"PrefixForAllResources": "pfx-{stage.name}-"},
+            "Dashboards": [{"DashboardId": "dash-{stage.name}", "Name": "D"}],
+        }}
+        result = resolve_resource_ids_from_overrides("prod", qs)
+        assert result["dashboards"][0]["id"] == "pfx-prod-dash-prod"
+
+    def test_no_overrides_returns_empty(self):
+        from smus_cicd.helpers.quicksight import resolve_resource_ids_from_overrides
+
+        qs = {"overrideParameters": {
+            "ResourceIdOverrideConfiguration": {"PrefixForAllResources": "pfx-"},
+        }}
+        result = resolve_resource_ids_from_overrides("dev", qs)
+        assert result == {}
+
+    def test_empty_id_skipped(self):
+        from smus_cicd.helpers.quicksight import resolve_resource_ids_from_overrides
+
+        qs = {"overrideParameters": {
+            "ResourceIdOverrideConfiguration": {"PrefixForAllResources": "pfx-"},
+            "Dashboards": [{"DashboardId": "", "Name": "Empty"}],
+        }}
+        result = resolve_resource_ids_from_overrides("dev", qs)
+        assert result["dashboards"] == []
+
+
+class TestFindResourcesByPrefix(unittest.TestCase):
+    """Test find_resources_by_prefix."""
+
+    @patch("smus_cicd.helpers.quicksight.list_data_sources", return_value=[])
+    @patch("smus_cicd.helpers.quicksight.list_datasets", return_value=[])
+    @patch("smus_cicd.helpers.quicksight.list_dashboards")
+    def test_filters_by_prefix(self, mock_dash, mock_ds, mock_src):
+        from smus_cicd.helpers.quicksight import find_resources_by_prefix
+
+        mock_dash.return_value = [
+            {"DashboardId": "pfx-d1"},
+            {"DashboardId": "other-d2"},
+            {"DashboardId": "pfx-d3"},
+        ]
+        result = find_resources_by_prefix("123", "us-east-1", "pfx-")
+        assert len(result["dashboards"]) == 2
+        assert all(d["DashboardId"].startswith("pfx-") for d in result["dashboards"])
+
+    @patch("smus_cicd.helpers.quicksight.list_data_sources", return_value=[])
+    @patch("smus_cicd.helpers.quicksight.list_datasets", return_value=[])
+    @patch("smus_cicd.helpers.quicksight.list_dashboards", return_value=[])
+    def test_empty_prefix_returns_empty(self, *_):
+        from smus_cicd.helpers.quicksight import find_resources_by_prefix
+
+        result = find_resources_by_prefix("123", "us-east-1", "")
+        assert result == {"dashboards": [], "datasets": [], "data_sources": []}

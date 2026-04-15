@@ -12,11 +12,11 @@ from rich.console import Console
 from . import __version__
 from .commands.bundle import bundle_command
 from .commands.create import create_command_with_output
-from .commands.delete import delete_command
 from .commands.deploy import deploy_command
 
 # Import command functions
 from .commands.describe import describe_command
+from .commands.destroy import destroy_command
 from .commands.dry_run.engine import DryRunEngine
 from .commands.integrate import integrate_qcli
 from .commands.logs import logs_command
@@ -123,7 +123,7 @@ def version():
 # Register commands with proper ordering
 @app.command(
     "describe",
-    help="1. Describe and validate pipeline manifest file. Example: aws-smus-cicd-cli describe --manifest pipeline.yaml --targets dev",
+    help="Describe and validate pipeline manifest file. Example: aws-smus-cicd-cli describe --manifest pipeline.yaml --targets dev",
     rich_help_panel="Pipeline Commands",
 )
 def describe(
@@ -160,7 +160,7 @@ def describe(
 
 @app.command(
     "bundle",
-    help="2. Create bundle zip files. Bundles from dev target by default. Example: aws-smus-cicd-cli bundle --targets test",
+    help="Create bundle zip files. Bundles from dev target by default. Example: aws-smus-cicd-cli bundle --targets test",
     rich_help_panel="Pipeline Commands",
 )
 def bundle(
@@ -209,7 +209,7 @@ def bundle(
 
 @app.command(
     "deploy",
-    help="3. Deploy bundle files to target (auto-initializes if needed). Example: aws-smus-cicd-cli deploy --manifest pipeline.yaml --targets prod",
+    help="Deploy bundle files to target (auto-initializes if needed). Example: aws-smus-cicd-cli deploy --manifest pipeline.yaml --targets prod",
     rich_help_panel="Pipeline Commands",
 )
 def deploy(
@@ -293,7 +293,7 @@ def deploy(
 
 @app.command(
     "monitor",
-    help="4. Monitor workflow status. Example: aws-smus-cicd-cli monitor --manifest pipeline.yaml --targets dev",
+    help="Monitor workflow status. Example: aws-smus-cicd-cli monitor --manifest pipeline.yaml --targets dev",
     rich_help_panel="Pipeline Commands",
 )
 def monitor(
@@ -323,7 +323,7 @@ def monitor(
 
 @app.command(
     "create",
-    help="0. Create new pipeline manifest. Example: aws-smus-cicd-cli create --output pipeline.yaml --name 'MyPipeline'",
+    help="Create new pipeline manifest. Example: aws-smus-cicd-cli create --output pipeline.yaml --name 'MyPipeline'",
     rich_help_panel="Pipeline Commands",
 )
 def create(
@@ -347,8 +347,8 @@ def create(
     ),
     stages: str = typer.Option(
         "dev,test,prod",
-        "--stages",
-        help="Comma-separated list of stages to create targets for",
+        "--targets",
+        help="Comma-separated list of target stages to create in the manifest",
     ),
     region: str = typer.Option("us-east-1", "--region", help="AWS region"),
 ):
@@ -370,7 +370,7 @@ def create(
 
 @app.command(
     "logs",
-    help="5. Fetch workflow logs from CloudWatch. Example: aws-smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/my-workflow",
+    help="Fetch workflow logs from CloudWatch. Example: aws-smus-cicd-cli logs --workflow arn:aws:airflow-serverless:us-east-2:123456789012:workflow/my-workflow",
     rich_help_panel="Pipeline Commands",
 )
 def logs(
@@ -394,7 +394,7 @@ def logs(
 
 @app.command(
     "run",
-    help="6. Run Airflow CLI commands in target environment. Example: aws-smus-cicd-cli run --workflow my_dag --manifest pipeline.yaml",
+    help="Run Airflow CLI commands in target environment. Example: aws-smus-cicd-cli run --workflow my_dag --manifest pipeline.yaml",
     rich_help_panel="Pipeline Commands",
 )
 def run(
@@ -424,7 +424,7 @@ def run(
 
 @app.command(
     "test",
-    help="6. Run tests for pipeline targets. Example: aws-smus-cicd-cli test --targets marketing-test-stage",
+    help="Run tests for pipeline targets. Example: aws-smus-cicd-cli test --targets marketing-test-stage",
     rich_help_panel="Pipeline Commands",
 )
 def test(
@@ -455,31 +455,28 @@ def test(
 
 
 @app.command(
-    "delete",
-    help="7. Delete projects and environments. Example: aws-smus-cicd-cli delete --targets marketing-test-stage --force",
+    "destroy",
+    help="Destroy all resources deployed by the manifest. Example: aws-smus-cicd-cli destroy --manifest manifest.yaml --targets dev --force",
     rich_help_panel="Pipeline Commands",
 )
-def delete(
-    pipeline: str = typer.Option(
+def destroy(
+    manifest: str = typer.Option(
         "manifest.yaml", "--manifest", "-m", help="Path to application manifest file"
     ),
     targets: str = typer.Option(
-        None,
+        ...,
         "--targets",
         "-t",
-        help="Target name(s) - single target or comma-separated list",
+        help="Target name(s) - single target or comma-separated list (required)",
     ),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
-    async_mode: bool = typer.Option(
-        False, "--async", help="Don't wait for deletion to complete"
-    ),
     output: str = typer.Option(
         "TEXT", "--output", "-o", help="Output format: TEXT (default) or JSON"
     ),
 ):
-    """Delete projects and environments that were deployed during initialize."""
+    """Destroy all resources deployed by the manifest."""
     configure_logging(output, LOG_LEVEL)
-    delete_command(pipeline, targets, force, async_mode, output)
+    destroy_command(manifest, targets, force, output)
 
 
 @app.command(
@@ -516,38 +513,6 @@ def integrate(
         typer.echo(f"❌ Unknown tool: {tool}")
         typer.echo("Available: qcli")
         raise typer.Exit(1)
-
-
-@app.command(
-    "chat",
-    help="8. Start interactive AI chat agent. Example: aws-smus-cicd-cli chat",
-    rich_help_panel="Pipeline Commands",
-)
-def chat(
-    model: str = typer.Option(
-        None,
-        "--model",
-        help="Bedrock model ID (default from config)",
-    ),
-    kb_id: str = typer.Option(
-        None,
-        "--kb-id",
-        help="Knowledge Base ID (default from config)",
-    ),
-):
-    """
-    Start interactive chat with SMUS CI/CD CLI AI agent.
-
-    The agent can:
-    - Answer questions about SMUS CI/CD CLI
-    - Help build new pipelines
-    - Troubleshoot issues
-    - Provide examples and guidance
-    """
-    configure_logging("TEXT", LOG_LEVEL)
-    from .agent.chat_agent import start_chat
-
-    start_chat(model_id=model, kb_id=kb_id)
 
 
 def cli_error_handler():

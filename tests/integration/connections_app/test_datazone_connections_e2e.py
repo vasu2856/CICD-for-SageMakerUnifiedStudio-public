@@ -18,7 +18,7 @@ class TestDataZoneConnectionsE2E(IntegrationTestBase):
         
         print("🧹 Cleaning up existing test project...")
         result = self.run_cli_command(
-            ["delete", "--targets", "test", "--manifest", manifest_file, "--force"]
+            ["destroy", "--targets", "test", "--manifest", manifest_file, "--force"]
         )
         if result["success"]:
             print("✅ Delete command completed")

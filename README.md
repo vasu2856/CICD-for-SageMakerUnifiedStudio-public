@@ -55,6 +55,9 @@ aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run validation tests
 aws-smus-cicd-cli test --manifest manifest.yaml --targets test
+
+# Clean up when done
+aws-smus-cicd-cli destroy -manifest manifest.yaml --targets test --force
 ```
 
 **See it in action:** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
@@ -1146,6 +1149,7 @@ All setup scripts are idempotent and safe to run multiple times. Use `--dry-run`
 ### Guides
 - **[Application Manifest](docs/manifest.md)** - Complete YAML configuration reference
 - **[CLI Commands](docs/cli-commands.md)** - All available commands and options
+- **[Rollback Guide](docs/rollback-guide.md)** - Recover from bad deployments and automate rollback
 - **[Bootstrap Actions](docs/bootstrap-actions.md)** - Automated deployment actions and event-driven workflows
 - **[Substitutions & Variables](docs/substitutions-and-variables.md)** - Dynamic configuration
 - **[Connections Guide](docs/connections.md)** - Configure AWS service integrations

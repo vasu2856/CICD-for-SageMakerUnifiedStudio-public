@@ -707,6 +707,94 @@ def trigger_dataset_ingestion(
         )
 
 
+def list_dashboards(
+    aws_account_id: str,
+    region: str,
+) -> List[Dict[str, Any]]:
+    """
+    List all QuickSight dashboards in the account.
+
+    Args:
+        aws_account_id: AWS account ID
+        region: AWS region
+
+    Returns:
+        List of dashboard summaries
+
+    Raises:
+        QuickSightDeploymentError: If listing fails
+    """
+    try:
+        client = boto3.client("quicksight", region_name=region)
+        dashboards = []
+        next_token = None
+
+        while True:
+            params = {"AwsAccountId": aws_account_id}
+            if next_token:
+                params["NextToken"] = next_token
+
+            response = client.list_dashboards(**params)
+            dashboards.extend(response.get("DashboardSummaryList", []))
+
+            next_token = response.get("NextToken")
+            if not next_token:
+                break
+
+        return dashboards
+
+    except ClientError as e:
+        error_code = e.response["Error"]["Code"]
+        error_msg = e.response["Error"]["Message"]
+        raise QuickSightDeploymentError(
+            f"Failed to list dashboards: {error_code} - {error_msg}"
+        )
+
+
+def list_data_sources(
+    aws_account_id: str,
+    region: str,
+) -> List[Dict[str, Any]]:
+    """
+    List all QuickSight data sources in the account.
+
+    Args:
+        aws_account_id: AWS account ID
+        region: AWS region
+
+    Returns:
+        List of data sources
+
+    Raises:
+        QuickSightDeploymentError: If listing fails
+    """
+    try:
+        client = boto3.client("quicksight", region_name=region)
+        data_sources = []
+        next_token = None
+
+        while True:
+            params = {"AwsAccountId": aws_account_id}
+            if next_token:
+                params["NextToken"] = next_token
+
+            response = client.list_data_sources(**params)
+            data_sources.extend(response.get("DataSources", []))
+
+            next_token = response.get("NextToken")
+            if not next_token:
+                break
+
+        return data_sources
+
+    except ClientError as e:
+        error_code = e.response["Error"]["Code"]
+        error_msg = e.response["Error"]["Message"]
+        raise QuickSightDeploymentError(
+            f"Failed to list data sources: {error_code} - {error_msg}"
+        )
+
+
 def list_datasets(
     aws_account_id: str,
     region: str,
@@ -749,3 +837,130 @@ def list_datasets(
         raise QuickSightDeploymentError(
             f"Failed to trigger ingestion: {error_code} - {error_msg}"
         )
+
+
+def resolve_resource_prefix(stage_name: str, qs_config: dict) -> str:
+    """
+    Resolve the QuickSight resource ID prefix for a stage.
+
+    Reads overrideParameters.ResourceIdOverrideConfiguration.PrefixForAllResources
+    and replaces {stage.name} with the actual stage name.
+
+    Used by both deploy (to identify imported resources) and destroy (to find
+    resources to delete).
+
+    Args:
+        stage_name: The stage key (e.g. "dev", "test")
+        qs_config: The deployment_configuration.quicksight dict
+
+    Returns:
+        Resolved prefix string (may be empty)
+    """
+    prefix = (
+        qs_config.get("overrideParameters", {})
+        .get("ResourceIdOverrideConfiguration", {})
+        .get("PrefixForAllResources", "")
+    )
+    return prefix.replace("{stage.name}", stage_name)
+
+
+def find_resources_by_prefix(
+    aws_account_id: str,
+    region: str,
+    prefix: str,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Find all QuickSight dashboards, datasets, and data sources whose IDs
+    start with the given prefix.
+
+    Used by both deploy (to identify imported resources) and destroy (to find
+    resources to delete).
+
+    Args:
+        aws_account_id: AWS account ID
+        region: AWS region
+        prefix: Resource ID prefix to match (e.g. "deployed-test-covid-")
+
+    Returns:
+        Dict with keys "dashboards", "datasets", "data_sources", each
+        containing a list of matching resource summaries.
+    """
+    result: Dict[str, List[Dict[str, Any]]] = {
+        "dashboards": [],
+        "datasets": [],
+        "data_sources": [],
+    }
+
+    if not prefix:
+        return result
+
+    result["dashboards"] = [
+        d
+        for d in list_dashboards(aws_account_id, region)
+        if d.get("DashboardId", "").startswith(prefix)
+    ]
+    result["datasets"] = [
+        d
+        for d in list_datasets(aws_account_id, region)
+        if d.get("DataSetId", "").startswith(prefix)
+    ]
+    result["data_sources"] = [
+        d
+        for d in list_data_sources(aws_account_id, region)
+        if d.get("DataSourceId", "").startswith(prefix)
+    ]
+
+    return result
+
+
+def resolve_resource_ids_from_overrides(
+    stage_name: str,
+    qs_config: dict,
+) -> Dict[str, List[Dict[str, str]]]:
+    """
+    Resolve exact QuickSight resource IDs from manifest overrideParameters.
+
+    When the manifest declares explicit Dashboards/DataSets/DataSources
+    overrides, the full resource ID can be constructed as prefix + original ID
+    without scanning the QuickSight API.
+
+    Args:
+        stage_name: The stage key (e.g. "dev", "test")
+        qs_config: The deployment_configuration.quicksight dict
+
+    Returns:
+        Dict with keys "dashboards", "datasets", "data_sources", each
+        containing a list of dicts with "id" and "name" keys.
+        Only includes types that have explicit overrides.
+    """
+    prefix = resolve_resource_prefix(stage_name, qs_config)
+    override_params = (
+        qs_config.get("overrideParameters", {})
+        if isinstance(qs_config, dict)
+        else getattr(qs_config, "overrideParameters", {}) or {}
+    )
+
+    OVERRIDE_KEYS = {
+        "Dashboards": ("DashboardId", "dashboards"),
+        "DataSets": ("DataSetId", "datasets"),
+        "DataSources": ("DataSourceId", "data_sources"),
+    }
+
+    result: Dict[str, List[Dict[str, str]]] = {}
+    for override_key, (id_field, result_key) in OVERRIDE_KEYS.items():
+        if override_key not in override_params:
+            continue
+        items = []
+        for item in override_params[override_key]:
+            original_id = item.get(id_field, "")
+            if original_id:
+                resolved_id = original_id.replace("{stage.name}", stage_name)
+                items.append(
+                    {
+                        "id": f"{prefix}{resolved_id}",
+                        "name": item.get("Name", ""),
+                    }
+                )
+        result[result_key] = items
+
+    return result

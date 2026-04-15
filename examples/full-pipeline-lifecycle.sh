@@ -157,7 +157,7 @@ run_command "aws-smus-cicd-cli run --bundle \"$PIPELINE_FILE\" --targets dev --w
 pause_if_needed
 
 # Step 8: Cleanup
-run_command "aws-smus-cicd-cli delete --targets test --bundle \"$PIPELINE_FILE\" --force"
+run_command "aws-smus-cicd-cli destroy --targets test --bundle \"$PIPELINE_FILE\" --force"
 
 if [ "$PAUSE_MODE" = true ]; then
     echo ""

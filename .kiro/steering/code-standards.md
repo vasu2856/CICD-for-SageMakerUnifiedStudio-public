@@ -72,3 +72,13 @@ endpoint = "https://airflow-serverless.us-east-1.api.aws/"
 endpoint = os.environ.get('AIRFLOW_SERVERLESS_ENDPOINT', 
                          f'https://airflow-serverless.{region}.api.aws/')
 ```
+
+## Deploy/Destroy Resource Type Registry
+
+When adding a new resource type to the deploy command (e.g. a new AWS service, catalog resource kind, or bootstrap action that creates infrastructure):
+
+1. Add the resource type string to `DEPLOY_RESOURCE_TYPES` in `src/smus_cicd/resource_types.py`
+2. Add the same string to `DESTROY_SUPPORTED_RESOURCE_TYPES` in `src/smus_cicd/commands/destroy.py`
+3. Implement the corresponding deletion logic in `destroy.py`
+
+A unit test (`TestDeployDestroyDrift`) asserts these two sets are identical. If they drift apart, CI will fail.

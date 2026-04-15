@@ -81,6 +81,9 @@ aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 
 # Run validation tests
 aws-smus-cicd-cli test --manifest manifest.yaml --targets test
+
+# Clean up when done
+aws-smus-cicd-cli destroy --targets test --force
 ```
 
 </div>

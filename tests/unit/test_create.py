@@ -71,7 +71,7 @@ class TestCreateCommand:
             output_file = "custom-stages.yaml"
 
             result = runner.invoke(
-                app, ["create", "--output", output_file, "--stages", "dev,staging,prod"]
+                app, ["create", "--output", output_file, "--targets", "dev,staging,prod"]
             )
 
             assert result.exit_code == 0
@@ -374,7 +374,7 @@ class TestCreateCommand:
 
             result = runner.invoke(
                 app,
-                ["create", "--output", output_file, "--stages", "dev,qa,production"],
+                ["create", "--output", output_file, "--targets", "dev,qa,production"],
             )
 
             assert result.exit_code == 0
@@ -399,7 +399,7 @@ class TestCreateCommand:
         assert "--name" in clean_output
         assert "--domain-id" in clean_output
         assert "--dev-project-id" in clean_output
-        assert "--stages" in clean_output
+        assert "--targets" in clean_output
         assert "--region" in clean_output
 
     def test_create_default_stages(self):
