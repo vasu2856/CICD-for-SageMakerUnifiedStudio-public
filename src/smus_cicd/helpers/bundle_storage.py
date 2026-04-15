@@ -155,3 +155,31 @@ def find_bundle_file(
                 return os.path.join(bundles_directory, file)
 
     return None
+
+
+def manifest_requires_bundle(manifest) -> bool:
+    """Return True if the manifest's content requires a bundle archive.
+
+    A bundle is needed when any content storage item has a ``connectionName``
+    (meaning it was downloaded from a remote source during bundling) or when
+    there are git content items.  Manifests that only use local storage items
+    (no ``connectionName``) or have no content at all do not need a bundle.
+
+    This function is intentionally duck-typed so it works with both the real
+    ``ApplicationManifest`` and lightweight test stubs.
+    """
+    content = getattr(manifest, "content", None)
+    if content is None:
+        return False
+
+    # Storage items with a connectionName come from the bundle
+    storage_items = getattr(content, "storage", None) or []
+    if any(getattr(item, "connectionName", None) for item in storage_items):
+        return True
+
+    # Git items always come from the bundle
+    git_items = getattr(content, "git", None) or []
+    if git_items:
+        return True
+
+    return False

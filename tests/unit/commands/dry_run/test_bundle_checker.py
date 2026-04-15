@@ -486,6 +486,54 @@ class TestBundleResolution:
         assert len(errors) == 1
         assert "manifest not loaded" in errors[0].message.lower()
 
+    def test_no_bundle_no_bundle_items_returns_ok(self, checker, monkeypatch):
+        """When no bundle is found but deployment doesn't need one, no findings added."""
+        # Manifest with only local storage (no connectionName) and no git items
+        manifest, target_config = _make_manifest_stub(
+            local_storage_names=["local_data"]
+        )
+
+        # Patch find_bundle_file to return None (no bundle found)
+        import smus_cicd.helpers.bundle_storage as bs
+
+        monkeypatch.setattr(bs, "find_bundle_file", lambda *a, **kw: None)
+
+        context = DryRunContext(
+            manifest_file="manifest.yaml",
+            manifest=manifest,
+            target_config=target_config,
+            config={"region": "us-east-1"},
+            bundle_path=None,
+        )
+
+        findings = checker.check(context)
+
+        errors = [f for f in findings if f.severity == Severity.ERROR]
+        assert len(errors) == 0
+
+    def test_no_bundle_with_bundle_items_returns_error(self, checker, monkeypatch):
+        """When no bundle is found and deployment needs one, report ERROR."""
+        # Manifest with storage items that have connectionName (need bundle)
+        manifest, target_config = _make_manifest_stub(storage_names=["my_data"])
+
+        import smus_cicd.helpers.bundle_storage as bs
+
+        monkeypatch.setattr(bs, "find_bundle_file", lambda *a, **kw: None)
+
+        context = DryRunContext(
+            manifest_file="manifest.yaml",
+            manifest=manifest,
+            target_config=target_config,
+            config={"region": "us-east-1"},
+            bundle_path=None,
+        )
+
+        findings = checker.check(context)
+
+        errors = [f for f in findings if f.severity == Severity.ERROR]
+        assert len(errors) == 1
+        assert "No bundle archive found" in errors[0].message
+
 
 # ---------------------------------------------------------------------------
 # Tests: Combined scenarios

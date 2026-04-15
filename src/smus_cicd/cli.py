@@ -240,7 +240,7 @@ def deploy(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Run deployment validation without making any changes",
+        help="Run deployment validation without making any changes (best-effort check)",
     ),
     output_format: str = typer.Option(
         "text",

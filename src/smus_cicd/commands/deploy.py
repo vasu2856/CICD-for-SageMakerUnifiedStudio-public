@@ -447,14 +447,9 @@ def _deploy_bundle_to_target(
     target_info = build_target_info(stage_name, target_config)
 
     # Determine if we need a bundle (check storage items with connectionName or git repos)
-    has_bundle_items = any(
-        s.connectionName
-        for s in (
-            manifest.content.storage
-            if manifest.content and manifest.content.storage
-            else []
-        )
-    ) or bool(manifest.content and manifest.content.git)
+    from ..helpers.bundle_storage import manifest_requires_bundle
+
+    has_bundle_items = manifest_requires_bundle(manifest)
 
     bundle_path = None
     if has_bundle_items:

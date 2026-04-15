@@ -56,7 +56,11 @@ class BundleChecker:
     def _resolve_bundle_path(
         self, context: DryRunContext, findings: List[Finding]
     ) -> str | None:
-        """Resolve the bundle path, falling back to ./artifacts directory."""
+        """Resolve the bundle path, falling back to ./artifacts directory.
+
+        When no bundle is found and the manifest does not require one,
+        the checker silently returns None without adding any findings.
+        """
         if context.bundle_path:
             return context.bundle_path
 
@@ -76,7 +80,7 @@ class BundleChecker:
             bundle_path = find_bundle_file(
                 "./artifacts",
                 context.manifest.application_name,
-                str(context.config.get("region", "")) if context.config else "",
+                context.config.get("region") if context.config else None,
             )
             if bundle_path:
                 findings.append(
@@ -88,15 +92,22 @@ class BundleChecker:
                 )
                 return bundle_path
             else:
-                findings.append(
-                    Finding(
-                        severity=Severity.ERROR,
-                        message=(
-                            "No bundle archive found. Provide --bundle-archive-path "
-                            "or place a ZIP in ./artifacts"
-                        ),
+                # Check whether the deployment actually requires a bundle.
+                # Uses the same logic as deploy_command().
+                from smus_cicd.helpers.bundle_storage import manifest_requires_bundle
+
+                needs_bundle = manifest_requires_bundle(context.manifest)
+                if needs_bundle:
+                    findings.append(
+                        Finding(
+                            severity=Severity.ERROR,
+                            message=(
+                                "No bundle archive found. Provide "
+                                "--bundle-archive-path or place a ZIP "
+                                "in ./artifacts"
+                            ),
+                        )
                     )
-                )
                 return None
         except Exception as exc:
             findings.append(

@@ -156,6 +156,10 @@ class ReportFormatter:
             f"{report.warning_count} warning(s), "
             f"{report.error_count} error(s)"
         )
+        lines.append(
+            "Note: Dry run is best-effort. A passing result does not guarantee "
+            "deployment success."
+        )
         return "\n".join(lines)
 
     @staticmethod

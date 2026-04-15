@@ -119,7 +119,12 @@ class DryRunEngine:
     def _resolve_target_identifiers(self, context: DryRunContext) -> None:
         """Resolve target_domain_id and target_region from the manifest config."""
         config = context.config or {}
-        region = config.get("region", "us-east-1")
+        region = config.get("region")
+        if not region:
+            raise ValueError(
+                "Region not found in manifest config. "
+                "Ensure domain.region is set in the target stage."
+            )
         context.target_region = region
 
         domain_id = config.get("domain_id")
