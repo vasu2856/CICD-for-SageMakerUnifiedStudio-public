@@ -16,8 +16,9 @@ import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-import boto3
 from botocore.exceptions import ClientError
+
+from .boto3_client import create_client
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +79,8 @@ def _get_datazone_client(region: str):
     """
     endpoint_url = os.environ.get("DATAZONE_ENDPOINT_URL")
     if endpoint_url:
-        return boto3.client("datazone", region_name=region, endpoint_url=endpoint_url)
-    return boto3.client("datazone", region_name=region)
+        return create_client("datazone", region=region, endpoint_url=endpoint_url)
+    return create_client("datazone", region=region)
 
 
 def _validate_catalog_json(catalog_data: Dict[str, Any]) -> None:

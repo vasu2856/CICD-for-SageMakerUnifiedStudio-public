@@ -1,11 +1,12 @@
 """Unit tests for create command."""
 
 import os
-import tempfile
-import pytest
 import re
-from unittest.mock import patch, MagicMock
+import tempfile
+from unittest.mock import MagicMock, patch
+
 from typer.testing import CliRunner
+
 from smus_cicd.cli import app
 
 
@@ -71,7 +72,8 @@ class TestCreateCommand:
             output_file = "custom-stages.yaml"
 
             result = runner.invoke(
-                app, ["create", "--output", output_file, "--targets", "dev,staging,prod"]
+                app,
+                ["create", "--output", output_file, "--targets", "dev,staging,prod"],
             )
 
             assert result.exit_code == 0
@@ -105,12 +107,12 @@ class TestCreateCommand:
                 content = f.read()
                 assert "region: ${DEV_DOMAIN_REGION:us-west-2}" in content
 
-    @patch("smus_cicd.commands.create.boto3.client")
-    def test_create_with_aws_resources(self, mock_boto3_client):
+    @patch("smus_cicd.commands.create.create_client")
+    def test_create_with_aws_resources(self, mock_create_client):
         """Test creating manifest with AWS domain and project validation."""
         # Mock DataZone client responses
         mock_client = MagicMock()
-        mock_boto3_client.return_value = mock_client
+        mock_create_client.return_value = mock_client
 
         mock_client.get_domain.return_value = {"name": "test-domain"}
         mock_client.get_project.return_value = {"name": "dev-test-project"}
@@ -154,12 +156,12 @@ class TestCreateCommand:
                     "name: dev-test-project-prod" in content
                 )  # synthesized prod project
 
-    @patch("smus_cicd.commands.create.boto3.client")
-    def test_create_with_domain_and_project_no_warnings(self, mock_boto3_client):
+    @patch("smus_cicd.commands.create.create_client")
+    def test_create_with_domain_and_project_no_warnings(self, mock_create_client):
         """Test creating manifest with domain and project IDs produces no warnings."""
         # Mock DataZone client
         mock_client = MagicMock()
-        mock_boto3_client.return_value = mock_client
+        mock_create_client.return_value = mock_client
 
         # Mock domain response
         mock_client.get_domain.return_value = {
@@ -212,21 +214,25 @@ class TestCreateCommand:
                     stripped = line.strip()
                     if stripped == "stages:":
                         in_targets = True
-                    elif not line.startswith(" ") and stripped and stripped != "---":  # New top-level key
+                    elif (
+                        not line.startswith(" ") and stripped and stripped != "---"
+                    ):  # New top-level key
                         in_targets = False
-                    if not in_targets and stripped == "domain:":  # Only check outside targets section
+                    if (
+                        not in_targets and stripped == "domain:"
+                    ):  # Only check outside targets section
                         assert False, "Found top-level domain configuration"
                 # Check domain configuration exists under each target
                 for stage in ["dev", "test", "prod"]:
                     assert f"{stage}:" in content
                     assert f"  {stage}:\n    domain:" in content  # Domain under target
 
-    @patch("smus_cicd.commands.create.boto3.client")
-    def test_create_with_aws_domain_error(self, mock_boto3_client):
+    @patch("smus_cicd.commands.create.create_client")
+    def test_create_with_aws_domain_error(self, mock_create_client):
         """Test creating manifest with invalid AWS domain."""
         # Mock DataZone client to raise error
         mock_client = MagicMock()
-        mock_boto3_client.return_value = mock_client
+        mock_create_client.return_value = mock_client
 
         from botocore.exceptions import ClientError
 
@@ -264,12 +270,12 @@ class TestCreateCommand:
             assert "AWS Error:" in error_output or "Domain not found" in error_output
             assert os.path.exists(output_file)  # File is still created
 
-    @patch("smus_cicd.commands.create.boto3.client")
-    def test_create_with_aws_project_error(self, mock_boto3_client):
+    @patch("smus_cicd.commands.create.create_client")
+    def test_create_with_aws_project_error(self, mock_create_client):
         """Test creating manifest with invalid AWS project."""
         # Mock DataZone client responses
         mock_client = MagicMock()
-        mock_boto3_client.return_value = mock_client
+        mock_create_client.return_value = mock_client
 
         mock_client.get_domain.return_value = {"name": "test-domain"}
 

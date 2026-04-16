@@ -2,10 +2,10 @@
 
 from typing import Any, Dict
 
-import boto3
 import typer
 
 from ...helpers import connections, datazone
+from ...helpers.boto3_client import create_client
 from ...helpers.connection_creator import ConnectionCreator
 from ...helpers.logger import get_logger
 from ..models import BootstrapAction
@@ -87,7 +87,7 @@ def create_connection(
 
     # Use first environment for creation
     environment_id = environments[0].get("id")
-    datazone_client = boto3.client("datazone", region_name=region)
+    datazone_client = create_client("datazone", region=region)
 
     # Check if connection already exists using the connections helper
     # This properly checks both project-level and all environment-level connections

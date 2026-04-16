@@ -2,7 +2,7 @@
 
 from typing import Any, Dict
 
-import boto3
+from .boto3_client import create_client
 
 
 def generate_test_config(
@@ -30,7 +30,7 @@ def generate_test_config(
         Dictionary with test configuration
     """
     # Get AWS account ID
-    sts = boto3.client("sts", region_name=region)
+    sts = create_client("sts", region=region)
     account_id = sts.get_caller_identity()["Account"]
 
     config = {

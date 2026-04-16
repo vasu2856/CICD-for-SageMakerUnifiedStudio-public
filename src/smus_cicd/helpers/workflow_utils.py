@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-import boto3
+from .boto3_client import create_client
 
 
 def get_connection_type(
@@ -21,7 +21,7 @@ def get_connection_type(
         Connection type (e.g., 'WORKFLOWS_SERVERLESS', 'WORKFLOWS_MWAA') or None
     """
     try:
-        client = boto3.client("datazone", region_name=region)
+        client = create_client("datazone", region=region)
         response = client.list_connections(
             domainIdentifier=domain_id, projectIdentifier=project_id
         )

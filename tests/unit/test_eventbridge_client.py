@@ -16,25 +16,25 @@ class TestEventBridgeEmitter(unittest.TestCase):
             enabled=True, event_bus_name="test-bus", region="us-east-1"
         )
 
-    @patch("smus_cicd.helpers.eventbridge_client.boto3.client")
-    def test_client_lazy_load(self, mock_boto_client):
+    @patch("smus_cicd.helpers.eventbridge_client.create_client")
+    def test_client_lazy_load(self, mock_create_client):
         """Test EventBridge client is lazy-loaded."""
         emitter = EventBridgeEmitter(enabled=True)
         self.assertIsNone(emitter._client)
         _ = emitter.client
-        mock_boto_client.assert_called_once_with("events", region_name=None)
+        mock_create_client.assert_called_once_with("events", region=None)
 
     def test_client_not_created_when_disabled(self):
         """Test client is not created when disabled."""
         emitter = EventBridgeEmitter(enabled=False)
         self.assertIsNone(emitter.client)
 
-    @patch("smus_cicd.helpers.eventbridge_client.boto3.client")
-    def test_emit_event_success(self, mock_boto_client):
+    @patch("smus_cicd.helpers.eventbridge_client.create_client")
+    def test_emit_event_success(self, mock_create_client):
         """Test successful event emission."""
         mock_events = MagicMock()
         mock_events.put_events.return_value = {"FailedEntryCount": 0}
-        mock_boto_client.return_value = mock_events
+        mock_create_client.return_value = mock_events
 
         result = self.emitter.emit_event(
             source="test.source",
@@ -51,12 +51,12 @@ class TestEventBridgeEmitter(unittest.TestCase):
         self.assertEqual(json.loads(entry["Detail"]), {"key": "value"})
         self.assertEqual(entry["EventBusName"], "test-bus")
 
-    @patch("smus_cicd.helpers.eventbridge_client.boto3.client")
-    def test_emit_event_with_resources(self, mock_boto_client):
+    @patch("smus_cicd.helpers.eventbridge_client.create_client")
+    def test_emit_event_with_resources(self, mock_create_client):
         """Test event emission with resources."""
         mock_events = MagicMock()
         mock_events.put_events.return_value = {"FailedEntryCount": 0}
-        mock_boto_client.return_value = mock_events
+        mock_create_client.return_value = mock_events
 
         resources = ["arn:aws:s3:::bucket"]
         result = self.emitter.emit_event(
@@ -71,12 +71,12 @@ class TestEventBridgeEmitter(unittest.TestCase):
         entry = call_args["Entries"][0]
         self.assertEqual(entry["Resources"], resources)
 
-    @patch("smus_cicd.helpers.eventbridge_client.boto3.client")
-    def test_emit_event_failure(self, mock_boto_client):
+    @patch("smus_cicd.helpers.eventbridge_client.create_client")
+    def test_emit_event_failure(self, mock_create_client):
         """Test event emission failure."""
         mock_events = MagicMock()
         mock_events.put_events.return_value = {"FailedEntryCount": 1}
-        mock_boto_client.return_value = mock_events
+        mock_create_client.return_value = mock_events
 
         result = self.emitter.emit_event(
             source="test.source",
@@ -86,12 +86,12 @@ class TestEventBridgeEmitter(unittest.TestCase):
 
         self.assertFalse(result)
 
-    @patch("smus_cicd.helpers.eventbridge_client.boto3.client")
-    def test_emit_event_exception(self, mock_boto_client):
+    @patch("smus_cicd.helpers.eventbridge_client.create_client")
+    def test_emit_event_exception(self, mock_create_client):
         """Test event emission with exception."""
         mock_events = MagicMock()
         mock_events.put_events.side_effect = Exception("API error")
-        mock_boto_client.return_value = mock_events
+        mock_create_client.return_value = mock_events
 
         result = self.emitter.emit_event(
             source="test.source",

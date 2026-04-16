@@ -16,11 +16,11 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import boto3
 import typer
 
 from ..application import ApplicationManifest
 from ..helpers import datazone, deployment
+from ..helpers.boto3_client import create_client
 from ..helpers.error_handler import handle_error, handle_success
 from ..helpers.project_manager import ProjectManager
 from ..helpers.utils import (  # noqa: F401
@@ -33,7 +33,7 @@ from ..helpers.utils import (  # noqa: F401
 def _fix_airflow_role_cloudwatch_policy(role_arn: str, region: str) -> bool:
     """Fix IAM role by adding CloudWatch logs policy for airflow-serverless."""
     try:
-        iam = boto3.client("iam", region_name=region)
+        iam = create_client("iam", region=region)
 
         # Extract role name from ARN
         role_name = role_arn.split("/")[-1]
@@ -633,13 +633,12 @@ def _resolve_and_upload_workflows(
     """Resolve variables in workflow YAML files and re-upload to S3."""
     import tempfile
 
-    import boto3
     import yaml
 
     from ..helpers.context_resolver import ContextResolver
 
     region = config.get("region", "us-east-1")
-    s3_client = boto3.client("s3", region_name=region)
+    s3_client = create_client("s3", region=region)
     project_name = target_config.project.name
 
     # Get domain_id from project_info
@@ -1823,8 +1822,6 @@ def _upload_dag_to_s3(
         S3 location dictionary or None if failed
     """
     try:
-        import boto3
-
         region = config.get("region", "us-east-1")
 
         # Get S3 bucket from project's default.s3_shared connection
@@ -1843,7 +1840,7 @@ def _upload_dag_to_s3(
         if not bucket_name:
             account_id = config.get("aws", {}).get("account_id")
             if not account_id:
-                sts = boto3.client("sts")
+                sts = create_client("sts")
                 identity = sts.get_caller_identity()
                 account_id = identity["Account"]
             bucket_name = f"smus-airflow-serverless-{account_id}-{region}"
@@ -1851,7 +1848,7 @@ def _upload_dag_to_s3(
         object_key = f"workflows/{workflow_name}.yaml"
 
         # Create S3 client
-        s3_client = boto3.client("s3", region_name=region)
+        s3_client = create_client("s3", region=region)
 
         # Try to create bucket if it doesn't exist
         try:
@@ -2032,9 +2029,7 @@ def _deploy_quicksight_dashboards(
     if not aws_account_id:
         # Try to get from STS
         try:
-            import boto3
-
-            sts = boto3.client("sts", region_name=region)
+            sts = create_client("sts", region=region)
             aws_account_id = sts.get_caller_identity()["Account"]
         except Exception:
             typer.echo(
@@ -2214,7 +2209,6 @@ def _deploy_quicksight_dashboards(
                     typer.echo(f"      Dashboard: {imported_dashboard_id}")
 
                 # List imported datasets and data sources
-                import boto3
 
                 # Find all resources with this prefix using shared helper
                 from ..helpers.quicksight import find_resources_by_prefix

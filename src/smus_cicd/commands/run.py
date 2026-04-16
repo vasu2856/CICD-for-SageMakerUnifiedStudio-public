@@ -663,8 +663,7 @@ def _execute_airflow_serverless_workflows(
 
 def _get_connection_type(connection_name: str, targets: dict, manifest) -> str:
     """Get connection type from DataZone by looking it up in the first target."""
-    import boto3
-
+    from ..helpers.boto3_client import create_client
     from ..helpers.datazone import get_domain_from_target_config, get_project_id_by_name
 
     # Get first target to lookup connection
@@ -684,7 +683,7 @@ def _get_connection_type(connection_name: str, targets: dict, manifest) -> str:
             return "UNKNOWN"
 
         # List connections and find the one matching the name
-        client = boto3.client("datazone", region_name=region)
+        client = create_client("datazone", region=region)
         response = client.list_connections(
             domainIdentifier=domain_id, projectIdentifier=project_id
         )

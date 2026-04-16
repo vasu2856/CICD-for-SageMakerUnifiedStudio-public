@@ -6,7 +6,6 @@ detects collisions, and collects errors/warnings without aborting early.
 
 from typing import Dict, List
 
-import boto3
 import yaml
 
 from ..helpers.airflow_serverless import (
@@ -16,6 +15,7 @@ from ..helpers.airflow_serverless import (
     list_workflow_runs,
     list_workflows,
 )
+from ..helpers.boto3_client import create_client
 from ..helpers.connections import get_project_connections
 from ..helpers.datazone import get_domain_from_target_config, get_project_id_by_name
 from ..helpers.logger import get_logger
@@ -263,8 +263,8 @@ def _validate_stage(
         prefix = resolve_resource_prefix(stage_name, qs_config)
 
         try:
-            account_id = boto3.client(
-                "sts", region_name=effective_region
+            account_id = create_client(
+                "sts", region=effective_region
             ).get_caller_identity()["Account"]
         except Exception as e:
             errors.append(f"[{stage_name}] Could not get AWS account ID: {e}")
@@ -450,7 +450,7 @@ def _validate_stage(
                     _search_target_type_resources,
                 )
 
-                dz_client = boto3.client("datazone", region_name=effective_region)
+                dz_client = create_client("datazone", region=effective_region)
 
                 for item in _search_target_resources(
                     dz_client, domain_id, project_id, "GLOSSARY"

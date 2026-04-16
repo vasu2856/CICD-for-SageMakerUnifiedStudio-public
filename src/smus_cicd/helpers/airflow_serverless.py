@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 import boto3
 
 from . import boto3_client
+from .boto3_client import create_client
 from .logger import get_logger
 
 # Airflow Serverless (MWAA Serverless) configuration - configurable via environment variables
@@ -47,9 +48,7 @@ def create_airflow_serverless_client(
         f"https://airflow-serverless.{region}.api.aws/"
     )
 
-    return boto3.client(
-        "mwaa-serverless", region_name=region, endpoint_url=endpoint_url
-    )
+    return create_client("mwaa-serverless", region=region, endpoint_url=endpoint_url)
 
 
 def create_workflow(

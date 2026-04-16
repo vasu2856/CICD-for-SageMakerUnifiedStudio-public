@@ -168,11 +168,11 @@ def test_command(
             # Get domain name from domain_id if not provided
             domain_name = target_config.domain.name
             if not domain_name and project_info.get("domainId"):
-                import boto3
+                from ..helpers.boto3_client import create_client
 
                 try:
-                    datazone_client = boto3.client(
-                        "datazone", region_name=target_config.domain.region
+                    datazone_client = create_client(
+                        "datazone", region=target_config.domain.region
                     )
                     domain_response = datazone_client.get_domain(
                         identifier=project_info["domainId"]

@@ -3,9 +3,10 @@
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-import boto3
 import typer
 from botocore.exceptions import ClientError
+
+from ..helpers.boto3_client import create_client
 
 
 def create_command(
@@ -163,7 +164,7 @@ def _fetch_aws_resource_names(
     Raises:
         ClientError: If AWS API calls fail
     """
-    datazone_client = boto3.client("datazone", region_name=region)
+    datazone_client = create_client("datazone", region=region)
 
     # Get domain info
     domain_response = datazone_client.get_domain(identifier=domain_id)

@@ -3,8 +3,7 @@
 import json
 from typing import Any, Dict, List, Optional
 
-import boto3
-
+from .boto3_client import create_client
 from .logger import get_logger
 
 logger = get_logger("eventbridge_emitter")
@@ -36,7 +35,7 @@ class EventBridgeEmitter:
     def client(self):
         """Lazy-load EventBridge client."""
         if self._client is None and self.enabled:
-            self._client = boto3.client("events", region_name=self.region)
+            self._client = create_client("events", region=self.region)
         return self._client
 
     def emit_event(

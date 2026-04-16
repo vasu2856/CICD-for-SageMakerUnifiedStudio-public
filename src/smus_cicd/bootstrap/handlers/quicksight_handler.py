@@ -38,9 +38,9 @@ def refresh_dataset(action: BootstrapAction, context: Dict[str, Any]) -> Dict[st
         raise ValueError("Missing target_config in context")
 
     # Get AWS account ID from current session
-    import boto3
+    from ...helpers.boto3_client import create_client
 
-    aws_account_id = boto3.client("sts").get_caller_identity()["Account"]
+    aws_account_id = create_client("sts").get_caller_identity()["Account"]
 
     # Get parameters
     refresh_scope = action.parameters.get("refreshScope", "IMPORTED")

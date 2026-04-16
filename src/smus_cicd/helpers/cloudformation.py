@@ -5,17 +5,17 @@ CloudFormation utility functions for SMUS CI/CD CLI.
 import json
 import time
 
-import boto3
 import typer
 
 from . import datazone
+from .boto3_client import create_client
 from .logger import get_logger
 
 
 def get_project_id_from_stack(stack_name, region):
     """Get DataZone project ID from CloudFormation stack outputs."""
     try:
-        cf_client = boto3.client("cloudformation", region_name=region)
+        cf_client = create_client("cloudformation", region=region)
         response = cf_client.describe_stacks(StackName=stack_name)
 
         if not response.get("Stacks"):
@@ -58,8 +58,8 @@ def create_project_via_cloudformation(
         logger.debug(f"profile_name={profile_name}")
         logger.debug(f"user_parameters={user_parameters}")
 
-        cf_client = boto3.client("cloudformation", region_name=region)
-        datazone_client = boto3.client("datazone", region_name=region)
+        cf_client = create_client("cloudformation", region=region)
+        datazone_client = create_client("datazone", region=region)
 
         # Convert userParameters to CloudFormation format
         user_parameters_cf = []
@@ -389,7 +389,7 @@ def create_project_via_cloudformation(
 def wait_for_project_deployment(project_name, project_id, domain_id, region):
     """Wait for project deployment to complete using DataZone API."""
     try:
-        datazone_client = boto3.client("datazone", region_name=region)
+        datazone_client = create_client("datazone", region=region)
 
         # Poll project status until it's active
         max_attempts = 60  # 30 minutes with 30-second intervals
@@ -441,7 +441,7 @@ def delete_project_stack(
         clean_project = project_name.replace("_", "-").replace(" ", "-").lower()
         stack_name = f"SMUS-{clean_pipeline}-{clean_target}-{clean_project}-project"
 
-        cf_client = boto3.client("cloudformation", region_name=region)
+        cf_client = create_client("cloudformation", region=region)
 
         if output.upper() != "JSON":
             typer.echo(f"Deleting CloudFormation stack: {stack_name}")
@@ -478,7 +478,7 @@ def delete_project_stack(
 def update_project_stack_tags(stack_name, region, tags):
     """Update CloudFormation stack tags if stack exists."""
     try:
-        cf_client = boto3.client("cloudformation", region_name=region)
+        cf_client = create_client("cloudformation", region=region)
 
         # Check if stack exists first
         try:

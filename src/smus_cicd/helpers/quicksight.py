@@ -5,9 +5,9 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
-import boto3
 from botocore.exceptions import ClientError
 
+from .boto3_client import create_client
 from .logger import get_logger
 
 logger = get_logger("quicksight")
@@ -62,7 +62,7 @@ def lookup_dashboard_by_name(
         QuickSightDeploymentError: If dashboard not found
     """
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
         response = client.list_dashboards(AwsAccountId=aws_account_id)
 
         for dashboard in response.get("DashboardSummaryList", []):
@@ -99,7 +99,7 @@ def export_dashboard(
         QuickSightDeploymentError: If export fails
     """
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
 
         response = client.start_asset_bundle_export_job(
             AwsAccountId=aws_account_id,
@@ -140,7 +140,7 @@ def poll_export_job(
     Raises:
         QuickSightDeploymentError: If export fails or times out
     """
-    client = boto3.client("quicksight", region_name=region)
+    client = create_client("quicksight", region=region)
     start_time = time.time()
 
     while time.time() - start_time < timeout:
@@ -198,7 +198,7 @@ def import_dashboard(
         QuickSightDeploymentError: If import fails
     """
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
 
         # Build job ID with application name if provided
         timestamp = int(time.time())
@@ -316,7 +316,7 @@ def poll_import_job(
     Raises:
         QuickSightDeploymentError: If import fails or times out
     """
-    client = boto3.client("quicksight", region_name=region)
+    client = create_client("quicksight", region=region)
     start_time = time.time()
 
     while time.time() - start_time < timeout:
@@ -375,7 +375,7 @@ def grant_dashboard_permissions(
         return True
 
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
 
         grant_permissions = []
         for perm in permissions:
@@ -426,7 +426,7 @@ def grant_dataset_permissions(
 ) -> bool:
     """Grant permissions to QuickSight dataset."""
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
 
         expanded_perms = []
         for perm in permissions:
@@ -457,7 +457,7 @@ def grant_data_source_permissions(
 ) -> bool:
     """Grant permissions to QuickSight data source."""
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
 
         expanded_perms = []
         for perm in permissions:
@@ -495,7 +495,7 @@ def grant_asset_bundle_permissions(
         region: AWS region
         principal: Principal ARN to grant permissions to
     """
-    client = boto3.client("quicksight", region_name=region)
+    client = create_client("quicksight", region=region)
 
     created_arns = import_result.get("CreatedArns", [])
 
@@ -569,8 +569,6 @@ def expand_principal_wildcards(
     Example: arn:aws:quicksight:us-east-2:*:user/default/Admin/*
     Returns: List of actual user ARNs matching the pattern
     """
-    import boto3
-
     if "*" not in principal:
         return [principal]
 
@@ -585,7 +583,7 @@ def expand_principal_wildcards(
     prefix = principal.split("user/default/")[-1].rstrip("/*")
 
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
         response = client.list_users(AwsAccountId=account_id, Namespace="default")
 
         expanded = []
@@ -644,7 +642,7 @@ def trigger_dataset_ingestion(
         QuickSightDeploymentError: If ingestion fails
     """
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
 
         # Create ingestion
         ingestion_id = f"ingestion-{int(time.time())}"
@@ -725,7 +723,7 @@ def list_dashboards(
         QuickSightDeploymentError: If listing fails
     """
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
         dashboards = []
         next_token = None
 
@@ -769,7 +767,7 @@ def list_data_sources(
         QuickSightDeploymentError: If listing fails
     """
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
         data_sources = []
         next_token = None
 
@@ -813,7 +811,7 @@ def list_datasets(
         QuickSightDeploymentError: If listing fails
     """
     try:
-        client = boto3.client("quicksight", region_name=region)
+        client = create_client("quicksight", region=region)
         datasets = []
         next_token = None
 
