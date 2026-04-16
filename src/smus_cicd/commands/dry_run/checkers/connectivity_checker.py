@@ -14,10 +14,9 @@ from __future__ import annotations
 import logging
 from typing import List, Set
 
-import boto3
-
 from smus_cicd.commands.dry_run.checkers import get_project_connections
 from smus_cicd.commands.dry_run.models import DryRunContext, Finding, Severity
+from smus_cicd.helpers.boto3_client import create_client
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +83,7 @@ class ConnectivityChecker:
             return
 
         try:
-            dz = boto3.client("datazone", region_name=region)
+            dz = create_client("datazone", region=region)
             dz.get_domain(identifier=domain_id)
             findings.append(
                 Finding(
@@ -203,7 +202,7 @@ class ConnectivityChecker:
         if not resolved:
             return
 
-        s3 = boto3.client("s3", region_name=region)
+        s3 = create_client("s3", region=region)
 
         for bucket in sorted(resolved):
             try:

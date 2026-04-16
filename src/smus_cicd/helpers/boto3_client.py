@@ -3,6 +3,13 @@
 from typing import Any, Dict, Optional
 
 import boto3
+import botocore.config
+
+from smus_cicd import __version__
+
+_USER_AGENT_CONFIG = botocore.config.Config(
+    user_agent_extra=f"smuscicd/{__version__}",
+)
 
 
 def create_client(
@@ -28,7 +35,9 @@ def create_client(
             "Region must be provided either explicitly or through connection info"
         )
 
-    return boto3.client(service_name, region_name=client_region)
+    return boto3.client(
+        service_name, region_name=client_region, config=_USER_AGENT_CONFIG
+    )
 
 
 def get_region_from_connection(connection_info: Dict[str, Any]) -> Optional[str]:

@@ -18,13 +18,12 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-import boto3
-
 from smus_cicd.commands.dry_run.checkers import (
     get_project_connections,
     is_catalog_disabled,
 )
 from smus_cicd.commands.dry_run.models import DryRunContext, Finding, Severity
+from smus_cicd.helpers.boto3_client import create_client
 from smus_cicd.helpers.catalog_import import has_glue_references
 
 logger = logging.getLogger(__name__)
@@ -133,7 +132,7 @@ class PermissionChecker:
         corresponding IAM role ARN (``arn:aws:iam::ACCT:role/ROLE``).
         """
         try:
-            sts = boto3.client("sts", region_name=region)
+            sts = create_client("sts", region=region)
             identity = sts.get_caller_identity()
             caller_arn = identity["Arn"]
             findings.append(
@@ -449,7 +448,7 @@ class PermissionChecker:
         findings: List[Finding],
     ) -> None:
         """Call ``iam:SimulatePrincipalPolicy`` and record findings."""
-        iam = boto3.client("iam", region_name=region)
+        iam = create_client("iam", region=region)
 
         for resource_arn, actions in permissions_map.items():
             # De-duplicate actions for the same resource
@@ -628,7 +627,7 @@ class PermissionChecker:
 
         # --- Resolve domain_unit_id ---
         try:
-            dz = boto3.client("datazone", region_name=region)
+            dz = create_client("datazone", region=region)
             project_resp = dz.get_project(
                 domainIdentifier=domain_id, identifier=project_id
             )

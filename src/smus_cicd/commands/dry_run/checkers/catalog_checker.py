@@ -17,10 +17,9 @@ import logging
 from collections import Counter
 from typing import Any, List, Set
 
-import boto3
-
 from smus_cicd.commands.dry_run.checkers import is_catalog_disabled
 from smus_cicd.commands.dry_run.models import DryRunContext, Finding, Severity
+from smus_cicd.helpers.boto3_client import create_client
 from smus_cicd.helpers.catalog_import import (
     CREATION_ORDER,
     CROSS_REFERENCE_FIELDS,
@@ -261,7 +260,7 @@ class CatalogChecker:
         if not bundle_form_types:
             return
 
-        client = boto3.client("datazone", region_name=context.target_region)
+        client = create_client("datazone", region=context.target_region)
         for ft_name in bundle_form_types:
             try:
                 resp = client.get_form_type(

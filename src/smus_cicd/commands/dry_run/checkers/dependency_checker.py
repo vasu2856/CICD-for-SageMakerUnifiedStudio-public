@@ -22,10 +22,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-import boto3
-
 from smus_cicd.commands.dry_run.checkers import is_catalog_disabled
 from smus_cicd.commands.dry_run.models import DryRunContext, Finding, Severity
+from smus_cicd.helpers.boto3_client import create_client
 from smus_cicd.helpers.catalog_import import (
     DATA_SOURCE_REF_FORM_TYPE,
     DATA_SOURCE_VALID_STATUSES,
@@ -114,7 +113,7 @@ class DependencyChecker:
         findings: List[Finding],
     ) -> None:
         """Validate Glue tables, views, and databases referenced by assets."""
-        glue = boto3.client("glue", region_name=region)
+        glue = create_client("glue", region=region)
 
         for asset in assets:
             asset_name = asset.get("name", "unknown")
@@ -375,7 +374,7 @@ class DependencyChecker:
         if not domain_id or not project_id:
             return
 
-        dz = boto3.client("datazone", region_name=region)
+        dz = create_client("datazone", region=region)
 
         for asset in assets:
             asset_name = asset.get("name", "unknown")
@@ -507,7 +506,7 @@ class DependencyChecker:
         if not domain_id:
             return
 
-        dz = boto3.client("datazone", region_name=region)
+        dz = create_client("datazone", region=region)
 
         for asset_type in asset_types:
             at_name = asset_type.get("name", "unknown")
@@ -583,7 +582,7 @@ class DependencyChecker:
         if not domain_id:
             return
 
-        dz = boto3.client("datazone", region_name=region)
+        dz = create_client("datazone", region=region)
 
         for asset in assets:
             asset_name = asset.get("name", "unknown")
@@ -652,7 +651,7 @@ class DependencyChecker:
         if not domain_id:
             return
 
-        dz = boto3.client("datazone", region_name=region)
+        dz = create_client("datazone", region=region)
 
         for asset in assets:
             asset_name = asset.get("name", "unknown")

@@ -206,11 +206,11 @@ def checker():
 class TestPermissionCheckerCallerIdentity:
     """Tests for STS get_caller_identity."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_sts_failure_returns_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_sts_failure_returns_error(self, mock_create_client, checker):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.side_effect = Exception("STS unavailable")
-        mock_boto3.client.return_value = mock_sts
+        mock_create_client.return_value = mock_sts
 
         context = _make_context(storage_names=["data"])
         findings = checker.check(context)
@@ -223,8 +223,10 @@ class TestPermissionCheckerCallerIdentity:
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
         return_value={},
     )
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_sts_success_records_caller_arn(self, mock_boto3, mock_conns, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_sts_success_records_caller_arn(
+        self, mock_create_client, mock_conns, checker
+    ):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -237,7 +239,7 @@ class TestPermissionCheckerCallerIdentity:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -250,12 +252,12 @@ class TestPermissionCheckerCallerIdentity:
         ]
         assert len(caller_findings) == 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
     )
     def test_assumed_role_arn_converted_to_iam_role(
-        self, mock_conns, mock_boto3, checker
+        self, mock_conns, mock_create_client, checker
     ):
         """STS assumed-role ARN should be converted to IAM role ARN for
         SimulatePrincipalPolicy."""
@@ -274,7 +276,7 @@ class TestPermissionCheckerCallerIdentity:
             )
 
         mock_iam.simulate_principal_policy.side_effect = capture_simulate
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -296,11 +298,11 @@ class TestPermissionCheckerCallerIdentity:
 class TestPermissionCheckerS3:
     """Tests for S3 storage permission verification."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
     )
-    def test_s3_permissions_checked(self, mock_conns, mock_boto3, checker):
+    def test_s3_permissions_checked(self, mock_conns, mock_create_client, checker):
         mock_conns.return_value = {
             "default.s3_shared": {"s3Uri": "s3://real-bucket-123"}
         }
@@ -316,7 +318,7 @@ class TestPermissionCheckerS3:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -328,11 +330,11 @@ class TestPermissionCheckerS3:
         assert any("s3:PutObject" in m for m in ok_msgs)
         assert any("s3:GetObject" in m for m in ok_msgs)
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
     )
-    def test_s3_denied_produces_error(self, mock_conns, mock_boto3, checker):
+    def test_s3_denied_produces_error(self, mock_conns, mock_create_client, checker):
         mock_conns.return_value = {
             "default.s3_shared": {"s3Uri": "s3://real-bucket-123"}
         }
@@ -348,7 +350,7 @@ class TestPermissionCheckerS3:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -358,11 +360,11 @@ class TestPermissionCheckerS3:
         error_findings = [f for f in findings if f.severity == Severity.ERROR]
         assert len(error_findings) >= 2  # s3:PutObject + s3:GetObject denied
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
     )
-    def test_s3_uses_real_bucket_arn(self, mock_conns, mock_boto3, checker):
+    def test_s3_uses_real_bucket_arn(self, mock_conns, mock_create_client, checker):
         """Verify the S3 ARN uses the resolved bucket name, not the connection suffix."""
         mock_conns.return_value = {
             "default.s3_shared": {"s3Uri": "s3://my-actual-bucket"}
@@ -381,7 +383,7 @@ class TestPermissionCheckerS3:
             )
 
         mock_iam.simulate_principal_policy.side_effect = capture_simulate
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -393,12 +395,12 @@ class TestPermissionCheckerS3:
         # Should NOT contain the old naive split result
         assert not any("s3_shared" in a for a in s3_arns)
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
     )
     def test_s3_unresolved_falls_back_to_wildcard(
-        self, mock_conns, mock_boto3, checker
+        self, mock_conns, mock_create_client, checker
     ):
         """When connection can't be resolved, fall back to wildcard S3 ARN."""
         mock_conns.return_value = None
@@ -416,7 +418,7 @@ class TestPermissionCheckerS3:
             )
 
         mock_iam.simulate_principal_policy.side_effect = capture_simulate
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -435,8 +437,8 @@ class TestPermissionCheckerS3:
 class TestPermissionCheckerDataZone:
     """Tests for DataZone permission verification."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_datazone_permissions_checked(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_datazone_permissions_checked(self, mock_create_client, checker):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -449,7 +451,7 @@ class TestPermissionCheckerDataZone:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -470,8 +472,8 @@ class TestPermissionCheckerDataZone:
 class TestPermissionCheckerCatalog:
     """Tests for catalog import and grant permission verification."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_catalog_permissions_checked(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_catalog_permissions_checked(self, mock_create_client, checker):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -484,7 +486,7 @@ class TestPermissionCheckerCatalog:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -512,8 +514,10 @@ class TestPermissionCheckerCatalog:
 class TestPermissionCheckerIAM:
     """Tests for IAM role creation permission verification."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_iam_permissions_checked_when_role_configured(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_iam_permissions_checked_when_role_configured(
+        self, mock_create_client, checker
+    ):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -526,7 +530,7 @@ class TestPermissionCheckerIAM:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -538,8 +542,8 @@ class TestPermissionCheckerIAM:
         assert any("iam:AttachRolePolicy" in m for m in ok_msgs)
         assert any("iam:PutRolePolicy" in m for m in ok_msgs)
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_no_iam_permissions_when_no_role(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_no_iam_permissions_when_no_role(self, mock_create_client, checker):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -552,7 +556,7 @@ class TestPermissionCheckerIAM:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -571,8 +575,8 @@ class TestPermissionCheckerIAM:
 class TestPermissionCheckerQuickSight:
     """Tests for QuickSight permission verification."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_quicksight_permissions_checked(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_quicksight_permissions_checked(self, mock_create_client, checker):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -585,7 +589,7 @@ class TestPermissionCheckerQuickSight:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -606,8 +610,8 @@ class TestPermissionCheckerQuickSight:
 class TestPermissionCheckerBootstrap:
     """Tests for bootstrap action permission verification."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_workflow_create_permissions(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_workflow_create_permissions(self, mock_create_client, checker):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -620,7 +624,7 @@ class TestPermissionCheckerBootstrap:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -631,8 +635,8 @@ class TestPermissionCheckerBootstrap:
         assert any("airflow-serverless:CreateWorkflow" in m for m in ok_msgs)
         assert any("airflow-serverless:GetWorkflow" in m for m in ok_msgs)
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_all_bootstrap_action_types(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_all_bootstrap_action_types(self, mock_create_client, checker):
         """Verify all bootstrap action types from BOOTSTRAP_PERMISSION_MAP are checked."""
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
@@ -646,7 +650,7 @@ class TestPermissionCheckerBootstrap:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -675,9 +679,9 @@ class TestPermissionCheckerGlue:
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
         return_value={},
     )
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     def test_glue_permissions_added_for_glue_refs(
-        self, mock_boto3, mock_conns, checker
+        self, mock_create_client, mock_conns, checker
     ):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
@@ -691,7 +695,7 @@ class TestPermissionCheckerGlue:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -703,8 +707,8 @@ class TestPermissionCheckerGlue:
         assert any("glue:GetDatabase" in m for m in ok_msgs)
         assert any("glue:GetPartitions" in m for m in ok_msgs)
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_no_glue_permissions_without_glue_refs(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_no_glue_permissions_without_glue_refs(self, mock_create_client, checker):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -717,7 +721,7 @@ class TestPermissionCheckerGlue:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -750,9 +754,9 @@ class TestPermissionCheckerAccessDeniedFallback:
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
         return_value={},
     )
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     def test_access_denied_produces_warning_not_error(
-        self, mock_boto3, mock_conns, checker
+        self, mock_create_client, mock_conns, checker
     ):
         from botocore.exceptions import ClientError
 
@@ -765,7 +769,7 @@ class TestPermissionCheckerAccessDeniedFallback:
             {"Error": {"Code": "AccessDenied", "Message": "Not authorized"}},
             "SimulatePrincipalPolicy",
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -789,9 +793,9 @@ class TestPermissionCheckerAccessDeniedFallback:
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
         return_value={},
     )
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     def test_access_denied_exception_also_produces_warning(
-        self, mock_boto3, mock_conns, checker
+        self, mock_create_client, mock_conns, checker
     ):
         from botocore.exceptions import ClientError
 
@@ -809,7 +813,7 @@ class TestPermissionCheckerAccessDeniedFallback:
             },
             "SimulatePrincipalPolicy",
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -828,8 +832,8 @@ class TestPermissionCheckerAccessDeniedFallback:
 class TestPermissionCheckerEmptyConfig:
     """Tests for empty deployment configuration."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_empty_config_still_checks_datazone(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_empty_config_still_checks_datazone(self, mock_create_client, checker):
         """Even with no storage/catalog/etc, DataZone base permissions are checked."""
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
@@ -843,7 +847,7 @@ class TestPermissionCheckerEmptyConfig:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -866,8 +870,10 @@ class TestPermissionCheckerMixedResults:
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
         return_value={},
     )
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_mixed_results_report_each_action(self, mock_boto3, mock_conns, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_mixed_results_report_each_action(
+        self, mock_create_client, mock_conns, checker
+    ):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
             "Arn": "arn:aws:iam::123456789012:user/testuser"
@@ -888,7 +894,7 @@ class TestPermissionCheckerMixedResults:
             return {"EvaluationResults": results}
 
         mock_iam.simulate_principal_policy.side_effect = mixed_simulate
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -910,9 +916,9 @@ class TestPermissionCheckerMixedResults:
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
         return_value={},
     )
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     def test_denied_finding_contains_action_and_resource(
-        self, mock_boto3, mock_conns, checker
+        self, mock_create_client, mock_conns, checker
     ):
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
@@ -926,7 +932,7 @@ class TestPermissionCheckerMixedResults:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -983,12 +989,12 @@ class TestBootstrapPermissionMap:
 class TestPermissionCheckerDataZoneGrants:
     """Tests for DataZone policy grant verification on domain units."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.PermissionChecker._check_datazone_policy_grants"
     )
     def test_grant_check_called_when_catalog_data_present(
-        self, mock_grant_check, mock_boto3, checker
+        self, mock_grant_check, mock_create_client, checker
     ):
         """Verify _check_datazone_policy_grants is called during check()."""
         mock_sts = MagicMock()
@@ -1003,7 +1009,7 @@ class TestPermissionCheckerDataZoneGrants:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -1013,8 +1019,8 @@ class TestPermissionCheckerDataZoneGrants:
 
         mock_grant_check.assert_called_once()
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_no_grant_check_without_catalog_data(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_no_grant_check_without_catalog_data(self, mock_create_client, checker):
         """Grant check should be skipped when catalog_data is None."""
         mock_sts = MagicMock()
         mock_sts.get_caller_identity.return_value = {
@@ -1028,7 +1034,7 @@ class TestPermissionCheckerDataZoneGrants:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -1039,11 +1045,11 @@ class TestPermissionCheckerDataZoneGrants:
         grant_findings = [f for f in findings if "policy grant" in f.message.lower()]
         assert len(grant_findings) == 0
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch("smus_cicd.helpers.utils._resolve_domain_id")
     @patch("smus_cicd.helpers.datazone.get_project_id_by_name")
     def test_missing_grant_produces_error(
-        self, mock_get_project_id, mock_resolve_domain, mock_boto3, checker
+        self, mock_get_project_id, mock_resolve_domain, mock_create_client, checker
     ):
         """Missing policy grant should produce an ERROR finding."""
         mock_resolve_domain.return_value = "dzd-test123"
@@ -1066,7 +1072,7 @@ class TestPermissionCheckerDataZoneGrants:
         # All grants missing (empty grantList)
         mock_dz.list_policy_grants.return_value = {"grantList": []}
 
-        mock_boto3.client.side_effect = lambda svc, **kw: {
+        mock_create_client.side_effect = lambda svc, **kw: {
             "sts": mock_sts,
             "iam": mock_iam,
             "datazone": mock_dz,
@@ -1096,11 +1102,11 @@ class TestPermissionCheckerDataZoneGrants:
             "CREATE_ASSET_TYPE",
         }
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch("smus_cicd.helpers.utils._resolve_domain_id")
     @patch("smus_cicd.helpers.datazone.get_project_id_by_name")
     def test_present_grant_produces_ok(
-        self, mock_get_project_id, mock_resolve_domain, mock_boto3, checker
+        self, mock_get_project_id, mock_resolve_domain, mock_create_client, checker
     ):
         """Existing policy grant should produce an OK finding."""
         mock_resolve_domain.return_value = "dzd-test123"
@@ -1123,7 +1129,7 @@ class TestPermissionCheckerDataZoneGrants:
         # All grants present
         mock_dz.list_policy_grants.return_value = {"grantList": [{"detail": {}}]}
 
-        mock_boto3.client.side_effect = lambda svc, **kw: {
+        mock_create_client.side_effect = lambda svc, **kw: {
             "sts": mock_sts,
             "iam": mock_iam,
             "datazone": mock_dz,
@@ -1145,11 +1151,11 @@ class TestPermissionCheckerDataZoneGrants:
         ]
         assert len(grant_ok) == 3
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch("smus_cicd.helpers.utils._resolve_domain_id")
     @patch("smus_cicd.helpers.datazone.get_project_id_by_name")
     def test_grant_only_checked_for_present_resource_types(
-        self, mock_get_project_id, mock_resolve_domain, mock_boto3, checker
+        self, mock_get_project_id, mock_resolve_domain, mock_create_client, checker
     ):
         """Grants should only be checked for resource types present in catalog."""
         mock_resolve_domain.return_value = "dzd-test123"
@@ -1171,7 +1177,7 @@ class TestPermissionCheckerDataZoneGrants:
         mock_dz.get_project.return_value = {"domainUnitId": "du-xyz"}
         mock_dz.list_policy_grants.return_value = {"grantList": []}
 
-        mock_boto3.client.side_effect = lambda svc, **kw: {
+        mock_create_client.side_effect = lambda svc, **kw: {
             "sts": mock_sts,
             "iam": mock_iam,
             "datazone": mock_dz,
@@ -1194,10 +1200,10 @@ class TestPermissionCheckerDataZoneGrants:
         assert len(error_findings) == 1
         assert error_findings[0].resource == "CREATE_GLOSSARY"
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch("smus_cicd.helpers.utils._resolve_domain_id")
     def test_domain_resolution_failure_produces_warning(
-        self, mock_resolve_domain, mock_boto3, checker
+        self, mock_resolve_domain, mock_create_client, checker
     ):
         """Failed domain resolution should produce WARNING, not crash."""
         mock_resolve_domain.side_effect = Exception("Cannot resolve domain")
@@ -1214,7 +1220,7 @@ class TestPermissionCheckerDataZoneGrants:
                 kw["ResourceArns"],
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -1234,11 +1240,11 @@ class TestPermissionCheckerDataZoneGrants:
         ]
         assert len(warn_findings) == 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch("smus_cicd.helpers.utils._resolve_domain_id")
     @patch("smus_cicd.helpers.datazone.get_project_id_by_name")
     def test_access_denied_on_list_grants_produces_warning(
-        self, mock_get_project_id, mock_resolve_domain, mock_boto3, checker
+        self, mock_get_project_id, mock_resolve_domain, mock_create_client, checker
     ):
         """AccessDenied on list_policy_grants should produce WARNING."""
         from botocore.exceptions import ClientError
@@ -1265,7 +1271,7 @@ class TestPermissionCheckerDataZoneGrants:
             "ListPolicyGrants",
         )
 
-        mock_boto3.client.side_effect = lambda svc, **kw: {
+        mock_create_client.side_effect = lambda svc, **kw: {
             "sts": mock_sts,
             "iam": mock_iam,
             "datazone": mock_dz,
@@ -1302,12 +1308,12 @@ class TestPermissionCheckerSkipMissingResources:
     """Tests that permission checks are skipped when the bundle doesn't
     contain files for the declared resource type."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
     )
     def test_s3_permissions_skipped_when_bundle_has_no_storage_files(
-        self, mock_conns, mock_boto3, checker
+        self, mock_conns, mock_create_client, checker
     ):
         """S3 permissions should be skipped when bundle_files is populated
         but contains no files matching any storage item."""
@@ -1326,7 +1332,7 @@ class TestPermissionCheckerSkipMissingResources:
             )
 
         mock_iam.simulate_principal_policy.side_effect = capture_simulate
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -1343,12 +1349,12 @@ class TestPermissionCheckerSkipMissingResources:
         assert not any("s3:PutObject" in m for m in all_msgs)
         assert not any("s3:GetObject" in m for m in all_msgs)
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
     )
     def test_s3_permissions_checked_when_bundle_has_storage_files(
-        self, mock_conns, mock_boto3, checker
+        self, mock_conns, mock_create_client, checker
     ):
         """S3 permissions should still be checked when bundle has matching
         storage files."""
@@ -1363,7 +1369,7 @@ class TestPermissionCheckerSkipMissingResources:
                 kw["PolicySourceArn"], kw["ActionNames"], kw["ResourceArns"]
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -1376,9 +1382,9 @@ class TestPermissionCheckerSkipMissingResources:
         assert any("s3:PutObject" in m for m in ok_msgs)
         assert any("s3:GetObject" in m for m in ok_msgs)
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     def test_quicksight_permissions_skipped_when_bundle_has_no_qs_files(
-        self, mock_boto3, checker
+        self, mock_create_client, checker
     ):
         """QuickSight permissions should be skipped when bundle_files is
         populated but contains no quicksight/ files."""
@@ -1392,7 +1398,7 @@ class TestPermissionCheckerSkipMissingResources:
                 kw["PolicySourceArn"], kw["ActionNames"], kw["ResourceArns"]
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -1406,9 +1412,9 @@ class TestPermissionCheckerSkipMissingResources:
         assert not any("quicksight:CreateDashboard" in m for m in all_msgs)
         assert not any("quicksight:UpdateDashboard" in m for m in all_msgs)
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     def test_quicksight_permissions_checked_when_bundle_has_qs_files(
-        self, mock_boto3, checker
+        self, mock_create_client, checker
     ):
         """QuickSight permissions should be checked when bundle has
         quicksight/ files."""
@@ -1422,7 +1428,7 @@ class TestPermissionCheckerSkipMissingResources:
                 kw["PolicySourceArn"], kw["ActionNames"], kw["ResourceArns"]
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -1434,12 +1440,12 @@ class TestPermissionCheckerSkipMissingResources:
         ok_msgs = [f.message for f in findings if f.severity == Severity.OK]
         assert any("quicksight:DescribeDashboard" in m for m in ok_msgs)
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
     @patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections"
     )
     def test_s3_permissions_still_checked_when_bundle_not_explored(
-        self, mock_conns, mock_boto3, checker
+        self, mock_conns, mock_create_client, checker
     ):
         """When bundle_files is empty (bundle not yet explored), S3
         permissions should still be checked — we don't know what's in
@@ -1455,7 +1461,7 @@ class TestPermissionCheckerSkipMissingResources:
                 kw["PolicySourceArn"], kw["ActionNames"], kw["ResourceArns"]
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -1479,8 +1485,8 @@ class TestDataZoneArnWildcardFallback:
     ``arn:aws:datazone:…:*:domain/*`` which causes ``SimulatePrincipalPolicy``
     to return ``implicitDeny`` even for admin roles."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_wildcard_domain_uses_star_arn(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_wildcard_domain_uses_star_arn(self, mock_create_client, checker):
         """When domain_id defaults to '*', the resource ARN passed to
         SimulatePrincipalPolicy should be '*' (not a constructed ARN)."""
         mock_sts = MagicMock()
@@ -1493,7 +1499,7 @@ class TestDataZoneArnWildcardFallback:
                 kw["PolicySourceArn"], kw["ActionNames"], kw["ResourceArns"]
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
@@ -1522,8 +1528,8 @@ class TestDataZoneArnWildcardFallback:
             "arn:aws:datazone" in a and ":*:" in a for a in resource_arns
         ), "Should not construct partial-wildcard DataZone ARNs"
 
-    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.boto3")
-    def test_real_domain_uses_full_arn(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.permission_checker.create_client")
+    def test_real_domain_uses_full_arn(self, mock_create_client, checker):
         """When domain_id and account_id are real values, a fully-qualified
         DataZone ARN should be used."""
         mock_sts = MagicMock()
@@ -1536,7 +1542,7 @@ class TestDataZoneArnWildcardFallback:
                 kw["PolicySourceArn"], kw["ActionNames"], kw["ResourceArns"]
             )
         )
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
 
