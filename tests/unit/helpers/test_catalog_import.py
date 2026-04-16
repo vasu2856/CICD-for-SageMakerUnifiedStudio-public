@@ -883,22 +883,22 @@ class TestGetDatazoneClient(unittest.TestCase):
     """Test _get_datazone_client with custom endpoint."""
 
     @patch.dict("os.environ", {"DATAZONE_ENDPOINT_URL": "https://custom.endpoint"})
-    @patch("smus_cicd.helpers.catalog_import.boto3.client")
-    def test_custom_endpoint(self, mock_boto_client):
+    @patch("smus_cicd.helpers.catalog_import.create_client")
+    def test_custom_endpoint(self, mock_create_client):
         from smus_cicd.helpers.catalog_import import _get_datazone_client
 
         _get_datazone_client("us-east-1")
-        mock_boto_client.assert_called_once_with(
-            "datazone", region_name="us-east-1", endpoint_url="https://custom.endpoint"
+        mock_create_client.assert_called_once_with(
+            "datazone", region="us-east-1", endpoint_url="https://custom.endpoint"
         )
 
     @patch.dict("os.environ", {}, clear=True)
-    @patch("smus_cicd.helpers.catalog_import.boto3.client")
-    def test_default_endpoint(self, mock_boto_client):
+    @patch("smus_cicd.helpers.catalog_import.create_client")
+    def test_default_endpoint(self, mock_create_client):
         from smus_cicd.helpers.catalog_import import _get_datazone_client
 
         _get_datazone_client("us-west-2")
-        mock_boto_client.assert_called_once_with("datazone", region_name="us-west-2")
+        mock_create_client.assert_called_once_with("datazone", region="us-west-2")
 
 
 class TestSearchTargetResources(unittest.TestCase):
