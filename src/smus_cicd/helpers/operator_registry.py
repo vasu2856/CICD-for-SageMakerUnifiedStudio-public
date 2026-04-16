@@ -9,8 +9,9 @@ Adding support for a new operator type requires only a new dict entry —
 no changes to the parser logic in the destroy command.
 """
 
-import boto3
 from botocore.exceptions import ClientError
+
+from .boto3_client import create_client
 
 
 class ResourceNotFoundError(Exception):
@@ -35,7 +36,7 @@ def _delete_glue_job(resource_name: str, region: str) -> None:
         ClientError: For any other AWS API error.
     """
     try:
-        boto3.client("glue", region_name=region).delete_job(JobName=resource_name)
+        create_client("glue", region=region).delete_job(JobName=resource_name)
     except ClientError as e:
         if e.response["Error"]["Code"] == "EntityNotFoundException":
             raise ResourceNotFoundError(f"Glue job '{resource_name}' not found")

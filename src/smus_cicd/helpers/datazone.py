@@ -10,8 +10,9 @@ This module provides helper functions for interacting with AWS DataZone using th
 public boto3 DataZone client. All operations use the standard DataZone API.
 """
 
-import boto3
 import typer
+
+from .boto3_client import create_client
 
 
 def _get_datazone_client(region: str):
@@ -33,8 +34,8 @@ def _get_datazone_client(region: str):
     """
     endpoint_url = os.environ.get("DATAZONE_ENDPOINT_URL")
     if endpoint_url:
-        return boto3.client("datazone", region_name=region, endpoint_url=endpoint_url)
-    return boto3.client("datazone", region_name=region)
+        return create_client("datazone", region=region, endpoint_url=endpoint_url)
+    return create_client("datazone", region=region)
 
 
 def resolve_domain_id(
@@ -936,7 +937,7 @@ def get_user_id_by_username(username, domain_id, region):
             return None
 
         # Use SSO Admin to get the Identity Store ID from the instance ARN
-        sso_admin_client = boto3.client("sso-admin", region_name=region)
+        sso_admin_client = create_client("sso-admin", region=region)
         instances_response = sso_admin_client.list_instances()
 
         identity_store_id = None
@@ -950,7 +951,7 @@ def get_user_id_by_username(username, domain_id, region):
             return None
 
         # Use Identity Center APIs to find user
-        identitystore_client = boto3.client("identitystore", region_name=region)
+        identitystore_client = create_client("identitystore", region=region)
 
         # Search for user by username
         response = identitystore_client.list_users(

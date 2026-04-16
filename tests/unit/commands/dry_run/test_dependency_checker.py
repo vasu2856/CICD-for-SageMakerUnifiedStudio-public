@@ -154,13 +154,13 @@ class TestDependencyCheckerSkipPaths:
 
 
 class TestGlueDatabaseValidation:
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_existing_database_no_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_existing_database_no_error(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
         glue.get_partitions.return_value = {}
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -170,11 +170,11 @@ class TestGlueDatabaseValidation:
         assert len(errors) == 0
         glue.get_database.assert_called_once_with(Name="mydb")
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_missing_database_produces_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_missing_database_produces_error(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.side_effect = _client_error("EntityNotFoundException")
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("missing_db", "mytable")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -188,11 +188,11 @@ class TestGlueDatabaseValidation:
         assert len(db_errors) >= 1
         assert "missing_db" in db_errors[0].message
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_database_access_denied_produces_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_database_access_denied_produces_error(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.side_effect = _client_error("AccessDeniedException")
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("secret_db", "mytable")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -205,11 +205,13 @@ class TestGlueDatabaseValidation:
         ]
         assert len(errors) >= 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_database_generic_exception_produces_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_database_generic_exception_produces_error(
+        self, mock_create_client, checker
+    ):
         glue = MagicMock()
         glue.get_database.side_effect = RuntimeError("boom")
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("bad_db", "mytable")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -229,12 +231,12 @@ class TestGlueDatabaseValidation:
 
 
 class TestGlueTableValidation:
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_missing_table_produces_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_missing_table_produces_error(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.side_effect = _client_error("EntityNotFoundException")
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "missing_tbl")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -248,12 +250,12 @@ class TestGlueTableValidation:
         assert len(tbl_errors) >= 1
         assert "missing_tbl" in tbl_errors[0].message
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_missing_view_produces_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_missing_view_produces_error(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.side_effect = _client_error("EntityNotFoundException")
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "missing_view", table_type="VIRTUAL_VIEW")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -266,13 +268,13 @@ class TestGlueTableValidation:
         ]
         assert len(view_errors) >= 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_existing_table_no_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_existing_table_no_error(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
         glue.get_partitions.return_value = {}
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "good_tbl")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -281,12 +283,12 @@ class TestGlueTableValidation:
         errors = [f for f in findings if f.severity == Severity.ERROR]
         assert len(errors) == 0
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_table_access_denied_produces_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_table_access_denied_produces_error(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.side_effect = _client_error("AccessDeniedException")
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "secret_tbl")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -299,12 +301,12 @@ class TestGlueTableValidation:
         ]
         assert len(errors) >= 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_view_skips_partition_check(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_view_skips_partition_check(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "my_view", table_type="VIEW")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -319,13 +321,13 @@ class TestGlueTableValidation:
 
 
 class TestPartitionAccessibility:
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_accessible_partitions_no_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_accessible_partitions_no_warning(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
         glue.get_partitions.return_value = {}
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -338,13 +340,13 @@ class TestPartitionAccessibility:
         ]
         assert len(warnings) == 0
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_inaccessible_partitions_produce_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_inaccessible_partitions_produce_warning(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
         glue.get_partitions.side_effect = _client_error("AccessDeniedException")
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -358,13 +360,15 @@ class TestPartitionAccessibility:
         assert len(warnings) == 1
         assert "inaccessible" in warnings[0].message.lower()
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_partition_generic_exception_produces_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_partition_generic_exception_produces_warning(
+        self, mock_create_client, checker
+    ):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
         glue.get_partitions.side_effect = RuntimeError("timeout")
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -384,8 +388,8 @@ class TestPartitionAccessibility:
 
 
 class TestDataSourceValidation:
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_matching_data_source_no_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_matching_data_source_no_warning(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
@@ -399,7 +403,7 @@ class TestDataSourceValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = _glue_asset("mydb", "mytable", ds_form=True)
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -412,8 +416,8 @@ class TestDataSourceValidation:
         ]
         assert len(ds_warnings) == 0
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_missing_data_source_produces_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_missing_data_source_produces_warning(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
@@ -425,7 +429,7 @@ class TestDataSourceValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = _glue_asset("mydb", "mytable", ds_form=True)
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -438,8 +442,10 @@ class TestDataSourceValidation:
         ]
         assert len(ds_warnings) >= 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_data_source_api_failure_produces_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_data_source_api_failure_produces_warning(
+        self, mock_create_client, checker
+    ):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
@@ -451,7 +457,7 @@ class TestDataSourceValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = _glue_asset("mydb", "mytable", ds_form=True)
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -464,13 +470,13 @@ class TestDataSourceValidation:
         ]
         assert len(ds_warnings) >= 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_no_domain_id_skips_data_source_check(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_no_domain_id_skips_data_source_check(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
         glue.get_partitions.return_value = {}
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable", ds_form=True)
         ctx = _make_context(catalog_data={"assets": [asset]}, domain_id="")
@@ -486,8 +492,8 @@ class TestDataSourceValidation:
 
 
 class TestCustomFormTypeValidation:
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_existing_form_type_no_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_existing_form_type_no_error(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         dz.get_form_type.return_value = {"name": "MyForm", "revision": "1"}
@@ -495,7 +501,7 @@ class TestCustomFormTypeValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         at = _asset_type_resource(
             forms_input={"myForm": {"typeIdentifier": "custom.MyFormType"}}
@@ -510,8 +516,8 @@ class TestCustomFormTypeValidation:
         ]
         assert len(ft_errors) == 0
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_missing_form_type_produces_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_missing_form_type_produces_error(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         dz.get_form_type.side_effect = _client_error("ResourceNotFoundException")
@@ -519,7 +525,7 @@ class TestCustomFormTypeValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         at = _asset_type_resource(
             forms_input={"myForm": {"typeIdentifier": "custom.MissingForm"}}
@@ -534,15 +540,15 @@ class TestCustomFormTypeValidation:
         ]
         assert len(ft_errors) >= 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_managed_form_type_skipped(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_managed_form_type_skipped(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
 
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         at = _asset_type_resource(
             forms_input={"managed": {"typeIdentifier": "amazon.datazone.SomeFormType"}}
@@ -558,8 +564,8 @@ class TestCustomFormTypeValidation:
         assert len(ft_errors) == 0
         dz.get_form_type.assert_not_called()
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_typeName_fallback(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_typeName_fallback(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         dz.get_form_type.return_value = {"name": "FallbackForm", "revision": "1"}
@@ -567,7 +573,7 @@ class TestCustomFormTypeValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         at = _asset_type_resource(
             forms_input={"myForm": {"typeName": "custom.FallbackForm"}}
@@ -589,8 +595,8 @@ class TestCustomFormTypeValidation:
 
 
 class TestCustomAssetTypeValidation:
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_existing_asset_type_no_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_existing_asset_type_no_error(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         dz.search_types.return_value = {"items": [{"name": "CustomAsset"}]}
@@ -598,7 +604,7 @@ class TestCustomAssetTypeValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = {
             "type": "assets",
@@ -617,8 +623,8 @@ class TestCustomAssetTypeValidation:
         ]
         assert len(at_errors) == 0
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_missing_asset_type_produces_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_missing_asset_type_produces_error(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         dz.search_types.return_value = {"items": []}
@@ -626,7 +632,7 @@ class TestCustomAssetTypeValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = {
             "type": "assets",
@@ -645,15 +651,15 @@ class TestCustomAssetTypeValidation:
         ]
         assert len(at_errors) >= 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_managed_asset_type_skipped(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_managed_asset_type_skipped(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
 
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = {
             "type": "assets",
@@ -673,8 +679,8 @@ class TestCustomAssetTypeValidation:
         assert len(at_errors) == 0
         dz.search_types.assert_not_called()
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_search_types_api_failure_produces_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_search_types_api_failure_produces_error(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         dz.search_types.side_effect = RuntimeError("api error")
@@ -682,7 +688,7 @@ class TestCustomAssetTypeValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = {
             "type": "assets",
@@ -708,8 +714,8 @@ class TestCustomAssetTypeValidation:
 
 
 class TestFormTypeRevisionValidation:
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_matching_revision_no_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_matching_revision_no_warning(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         dz.get_form_type.return_value = {"name": "MyForm", "revision": "3"}
@@ -717,7 +723,7 @@ class TestFormTypeRevisionValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = {
             "type": "assets",
@@ -741,8 +747,8 @@ class TestFormTypeRevisionValidation:
         ]
         assert len(rev_warnings) == 0
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_mismatched_revision_produces_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_mismatched_revision_produces_warning(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         dz.get_form_type.return_value = {"name": "MyForm", "revision": "5"}
@@ -750,7 +756,7 @@ class TestFormTypeRevisionValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = {
             "type": "assets",
@@ -775,8 +781,8 @@ class TestFormTypeRevisionValidation:
         assert len(rev_warnings) >= 1
         assert "does not match" in rev_warnings[0].message.lower()
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_unresolvable_revision_produces_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_unresolvable_revision_produces_warning(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         # Form type exists but has no revision field
@@ -785,7 +791,7 @@ class TestFormTypeRevisionValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = {
             "type": "assets",
@@ -810,8 +816,8 @@ class TestFormTypeRevisionValidation:
         assert len(rev_warnings) >= 1
         assert "cannot be resolved" in rev_warnings[0].message.lower()
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_missing_form_type_skips_revision_check(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_missing_form_type_skips_revision_check(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         dz.get_form_type.side_effect = _client_error("ResourceNotFoundException")
@@ -819,7 +825,7 @@ class TestFormTypeRevisionValidation:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = {
             "type": "assets",
@@ -844,15 +850,15 @@ class TestFormTypeRevisionValidation:
         ]
         assert len(rev_warnings) == 0
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_managed_form_type_revision_skipped(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_managed_form_type_revision_skipped(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
 
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset = {
             "type": "assets",
@@ -884,13 +890,15 @@ class TestFormTypeRevisionValidation:
 
 
 class TestCachingBehaviour:
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_database_cache_prevents_duplicate_api_calls(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_database_cache_prevents_duplicate_api_calls(
+        self, mock_create_client, checker
+    ):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
         glue.get_partitions.return_value = {}
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         # Two assets referencing the same database
         asset1 = _glue_asset("shared_db", "tbl1", asset_name="asset1")
@@ -901,13 +909,15 @@ class TestCachingBehaviour:
         # get_database should be called only once for "shared_db"
         assert glue.get_database.call_count == 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_table_cache_prevents_duplicate_api_calls(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_table_cache_prevents_duplicate_api_calls(
+        self, mock_create_client, checker
+    ):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
         glue.get_partitions.return_value = {}
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         # Two assets referencing the same table
         asset1 = _glue_asset("mydb", "shared_tbl", asset_name="asset1")
@@ -918,13 +928,15 @@ class TestCachingBehaviour:
         # get_table should be called only once for ("mydb", "shared_tbl")
         assert glue.get_table.call_count == 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_partition_cache_prevents_duplicate_api_calls(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_partition_cache_prevents_duplicate_api_calls(
+        self, mock_create_client, checker
+    ):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
         glue.get_partitions.return_value = {}
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset1 = _glue_asset("mydb", "tbl", asset_name="asset1")
         asset2 = _glue_asset("mydb", "tbl", asset_name="asset2")
@@ -933,13 +945,13 @@ class TestCachingBehaviour:
 
         assert glue.get_partitions.call_count == 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
     def test_missing_database_cache_still_reports_for_second_asset(
-        self, mock_boto3, checker
+        self, mock_create_client, checker
     ):
         glue = MagicMock()
         glue.get_database.side_effect = _client_error("EntityNotFoundException")
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset1 = _glue_asset("gone_db", "tbl1", asset_name="asset1")
         asset2 = _glue_asset("gone_db", "tbl2", asset_name="asset2")
@@ -958,8 +970,10 @@ class TestCachingBehaviour:
         # But only one API call
         assert glue.get_database.call_count == 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_form_type_cache_prevents_duplicate_api_calls(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_form_type_cache_prevents_duplicate_api_calls(
+        self, mock_create_client, checker
+    ):
         glue = MagicMock()
         dz = MagicMock()
         dz.get_form_type.return_value = {"name": "MyForm", "revision": "1"}
@@ -967,7 +981,7 @@ class TestCachingBehaviour:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         # Two asset types referencing the same form type
         at1 = _asset_type_resource(
@@ -983,8 +997,10 @@ class TestCachingBehaviour:
 
         assert dz.get_form_type.call_count == 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_asset_type_cache_prevents_duplicate_api_calls(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_asset_type_cache_prevents_duplicate_api_calls(
+        self, mock_create_client, checker
+    ):
         glue = MagicMock()
         dz = MagicMock()
         dz.search_types.return_value = {"items": [{"name": "CustomAsset"}]}
@@ -992,7 +1008,7 @@ class TestCachingBehaviour:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset1 = {
             "type": "assets",
@@ -1013,8 +1029,10 @@ class TestCachingBehaviour:
 
         assert dz.search_types.call_count == 1
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_data_source_cache_prevents_duplicate_api_calls(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_data_source_cache_prevents_duplicate_api_calls(
+        self, mock_create_client, checker
+    ):
         glue = MagicMock()
         glue.get_database.return_value = {}
         glue.get_table.return_value = {}
@@ -1028,7 +1046,7 @@ class TestCachingBehaviour:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         asset1 = _glue_asset("mydb", "tbl1", asset_name="a1", ds_form=True)
         asset2 = _glue_asset("mydb", "tbl2", asset_name="a2", ds_form=True)
@@ -1075,11 +1093,11 @@ class TestParseFormContent:
 
 
 class TestFindingMetadata:
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_glue_error_has_service_and_resource(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_glue_error_has_service_and_resource(self, mock_create_client, checker):
         glue = MagicMock()
         glue.get_database.side_effect = _client_error("EntityNotFoundException")
-        mock_boto3.client.return_value = glue
+        mock_create_client.return_value = glue
 
         asset = _glue_asset("mydb", "mytable")
         ctx = _make_context(catalog_data={"assets": [asset]})
@@ -1095,8 +1113,8 @@ class TestFindingMetadata:
         assert db_errors[0].details is not None
         assert db_errors[0].details["resource_type"] == "database"
 
-    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.boto3")
-    def test_form_type_error_has_service_and_details(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.dependency_checker.create_client")
+    def test_form_type_error_has_service_and_details(self, mock_create_client, checker):
         glue = MagicMock()
         dz = MagicMock()
         dz.get_form_type.side_effect = _client_error("ResourceNotFoundException")
@@ -1104,7 +1122,7 @@ class TestFindingMetadata:
         def _client_factory(service, **kw):
             return glue if service == "glue" else dz
 
-        mock_boto3.client.side_effect = _client_factory
+        mock_create_client.side_effect = _client_factory
 
         at = _asset_type_resource(
             forms_input={"f": {"typeIdentifier": "custom.MissingForm"}}

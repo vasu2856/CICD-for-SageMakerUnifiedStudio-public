@@ -4,10 +4,10 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Union
 
-import boto3
 import yaml
 
 from . import datazone
+from .boto3_client import create_client
 
 
 def build_domain_config(target_config) -> Dict[str, Any]:
@@ -118,9 +118,7 @@ def substitute_env_vars(
             # Handle pseudo environment variables
             if var_name in ("STS_ACCOUNT_ID", "AWS_ACCOUNT_ID"):
                 if resolve_aws_pseudo_vars:
-                    import boto3
-
-                    return boto3.client("sts").get_caller_identity()["Account"]
+                    return create_client("sts").get_caller_identity()["Account"]
                 # Fall back to env var, then leave placeholder as-is
                 return os.getenv(var_name) or match.group(0)
 
@@ -239,7 +237,7 @@ def get_domain_id(config: Dict[str, Any]) -> Optional[str]:
     region = _get_region_from_config(config)
     domain_stack_name = config.get("stacks", {}).get("domain", "cicd-test-domain-stack")
 
-    cf_client = boto3.client("cloudformation", region_name=region)
+    cf_client = create_client("cloudformation", region=region)
 
     try:
         # Get stack outputs

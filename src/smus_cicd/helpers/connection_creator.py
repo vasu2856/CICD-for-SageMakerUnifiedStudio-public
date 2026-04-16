@@ -3,7 +3,7 @@
 import time
 from typing import Any, Dict
 
-import boto3
+from .boto3_client import create_client
 
 
 class ConnectionCreator:
@@ -12,7 +12,7 @@ class ConnectionCreator:
     def __init__(self, domain_id: str, region: str = "us-east-1"):
         self.domain_id = domain_id
         self.region = region
-        self.client = boto3.client("datazone", region_name=region)
+        self.client = create_client("datazone", region=region)
 
     def create_from_config(
         self,

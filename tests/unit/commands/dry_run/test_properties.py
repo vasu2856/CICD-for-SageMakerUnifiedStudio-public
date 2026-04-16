@@ -811,12 +811,12 @@ def test_property_9_permission_set_correctness(
     mock_iam.simulate_principal_policy.side_effect = capture_simulate
 
     with patch(
-        "smus_cicd.commands.dry_run.checkers.permission_checker.boto3"
-    ) as mock_boto3, patch(
+        "smus_cicd.commands.dry_run.checkers.permission_checker.create_client"
+    ) as mock_create_client, patch(
         "smus_cicd.commands.dry_run.checkers.permission_checker.get_project_connections",
         return_value={},
     ):
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_sts if svc == "sts" else mock_iam
         )
         checker = PermissionChecker()
@@ -992,15 +992,15 @@ def test_property_14_s3_bucket_reachability(bucket_names, fail_flags):
 
     # Mock get_project_by_name and _get_project_connections
     with patch(
-        "smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3"
-    ) as mock_boto3, patch(
+        "smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client"
+    ) as mock_create_client, patch(
         "smus_cicd.helpers.datazone.get_project_by_name",
         return_value={"name": "test-project"},
     ), patch(
         "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections",
         return_value=mock_connections,
     ):
-        mock_boto3.client.side_effect = lambda svc, **kw: {
+        mock_create_client.side_effect = lambda svc, **kw: {
             "datazone": mock_dz,
             "s3": mock_s3,
         }.get(svc, MagicMock())

@@ -8,11 +8,11 @@ import tempfile
 import zipfile
 from typing import Optional
 
-import boto3
 import typer
 
 from ..application import ApplicationManifest
 from ..helpers import deployment
+from ..helpers.boto3_client import create_client
 from ..helpers.utils import get_datazone_project_info, load_config
 
 
@@ -177,7 +177,7 @@ def bundle_command(
         with tempfile.TemporaryDirectory(prefix="smus_bundle_") as temp_bundle_dir:
             total_files_added = 0
 
-            s3_client = boto3.client("s3", region_name=region)
+            s3_client = create_client("s3", region=region)
 
             # Process storage bundles (unified - includes workflows)
             storage_bundles = (
@@ -297,7 +297,7 @@ def bundle_command(
                 if not aws_account_id:
                     # Try to get from STS
                     try:
-                        sts = boto3.client("sts", region_name=region)
+                        sts = create_client("sts", region=region)
                         aws_account_id = sts.get_caller_identity()["Account"]
                     except Exception:
                         typer.echo(

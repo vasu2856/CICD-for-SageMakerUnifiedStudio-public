@@ -5,8 +5,9 @@ import os
 from datetime import datetime
 from typing import List, Optional
 
-import boto3
 import typer
+
+from .boto3_client import create_client
 
 logger = logging.getLogger("smus_cicd.iam")
 
@@ -52,7 +53,7 @@ def create_or_update_project_role(
     Returns:
         Role ARN (created or provided)
     """
-    iam = boto3.client("iam", region_name=region)
+    iam = create_client("iam", region=region)
 
     if role_arn:
         # Update existing role - attach additional policies

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 import typer
 
 from . import datazone
+from .boto3_client import create_client
 from .error_handler import handle_error, handle_success
 from .utils import get_datazone_project_info
 
@@ -170,11 +171,9 @@ class ProjectManager:
 
         # Handle role creation or policy attachment
         if policy_arns:
-            import boto3
-
             from . import iam
 
-            sts = boto3.client("sts")
+            sts = create_client("sts")
             account_id = sts.get_caller_identity()["Account"]
 
             if not role_arn:
@@ -321,11 +320,9 @@ class ProjectManager:
             policy_arns = self._get_policy_arns(target_config)
 
             if policy_arns or not role_arn:
-                import boto3
-
                 from . import iam
 
-                sts = boto3.client("sts")
+                sts = create_client("sts")
                 account_id = sts.get_caller_identity()["Account"]
 
                 if not role_arn:
@@ -379,9 +376,7 @@ class ProjectManager:
                     handle_error(str(e))
 
             # List project profiles
-            import boto3
-
-            dz_client = boto3.client("datazone", region_name=region)
+            dz_client = create_client("datazone", region=region)
             response = dz_client.list_project_profiles(domainIdentifier=domain_id)
             profiles = response.get("items", [])
 
@@ -619,9 +614,7 @@ class ProjectManager:
 
         # Replace wildcard account ID with current account
         if role_arn and ":*:" in role_arn:
-            import boto3
-
-            sts = boto3.client("sts")
+            sts = create_client("sts")
             account_id = sts.get_caller_identity()["Account"]
             role_arn = role_arn.replace(":*:", f":{account_id}:")
 
@@ -701,9 +694,7 @@ class ProjectManager:
         import json
         import time
 
-        import boto3
-
-        dz_client = boto3.client("datazone", region_name=region)
+        dz_client = create_client("datazone", region=region)
         start_time = time.time()
 
         while time.time() - start_time < max_wait_seconds:
@@ -913,9 +904,7 @@ class ProjectManager:
 
         # Get existing environments in the project
         try:
-            import boto3
-
-            datazone_client = boto3.client("datazone", region_name=region)
+            datazone_client = create_client("datazone", region=region)
 
             existing_envs_response = datazone_client.list_environments(
                 domainIdentifier=domain_id, projectIdentifier=project_id
@@ -965,9 +954,7 @@ class ProjectManager:
     ) -> bool:
         """Create a DataZone environment."""
         try:
-            import boto3
-
-            datazone_client = boto3.client("datazone", region_name=region)
+            datazone_client = create_client("datazone", region=region)
 
             # Get project details to find the project profile ID
             print(f"🔍 DEBUG: Getting project details for project: {project_id}")
@@ -1075,12 +1062,10 @@ class ProjectManager:
         try:
             import time
 
-            import boto3
-
             # Wait a bit for environment to be ready
             time.sleep(5)
 
-            datazone_client = boto3.client("datazone", region_name=region)
+            datazone_client = create_client("datazone", region=region)
 
             # Get project connections to find MWAA connection
             connections_response = datazone_client.list_project_data_sources(
@@ -1112,12 +1097,10 @@ class ProjectManager:
         ):
             return
 
-        import boto3
-
         from .connection_creator import ConnectionCreator
 
         # Get existing connections
-        datazone_client = boto3.client("datazone", region_name=region)
+        datazone_client = create_client("datazone", region=region)
         existing_conns = {}
         try:
             response = datazone_client.list_connections(
@@ -1182,9 +1165,7 @@ class ProjectManager:
             contributors = target_config.project.contributors or []
 
         # Replace wildcard account ID in IAM ARNs
-        import boto3
-
-        sts = boto3.client("sts")
+        sts = create_client("sts")
         account_id = sts.get_caller_identity()["Account"]
 
         owners = [

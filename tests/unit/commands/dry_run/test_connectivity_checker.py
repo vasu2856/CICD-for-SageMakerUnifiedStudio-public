@@ -110,11 +110,11 @@ def checker():
 class TestDomainReachability:
     """Tests for DataZone domain reachability via GetDomain."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_domain_reachable(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_domain_reachable(self, mock_create_client, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test", "name": "TestDomain"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         context = _make_context(domain_id="dzd_test")
         findings = checker.check(context)
@@ -126,14 +126,14 @@ class TestDomainReachability:
         assert len(ok_findings) >= 1
         assert "reachable" in ok_findings[0].message.lower()
 
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_domain_unreachable_client_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_domain_unreachable_client_error(self, mock_create_client, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.side_effect = ClientError(
             {"Error": {"Code": "ResourceNotFoundException", "Message": "Not found"}},
             "GetDomain",
         )
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         context = _make_context(domain_id="dzd_missing")
         findings = checker.check(context)
@@ -149,11 +149,11 @@ class TestDomainReachability:
         assert "unreachable" in error_findings[0].message.lower()
         assert error_findings[0].details["error_code"] == "ResourceNotFoundException"
 
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_domain_unreachable_generic_error(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_domain_unreachable_generic_error(self, mock_create_client, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.side_effect = Exception("Network timeout")
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         context = _make_context(domain_id="dzd_timeout")
         findings = checker.check(context)
@@ -166,8 +166,8 @@ class TestDomainReachability:
         assert len(error_findings) >= 1
         assert "unreachable" in error_findings[0].message.lower()
 
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_no_domain_id_produces_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_no_domain_id_produces_warning(self, mock_create_client, checker):
         context = _make_context(domain_id=None)
         findings = checker.check(context)
 
@@ -187,22 +187,22 @@ class TestDomainReachability:
 class TestProjectExistence:
     """Tests for DataZone project existence check."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
     @patch(
         "smus_cicd.commands.dry_run.checkers.connectivity_checker"
         ".ConnectivityChecker._check_project"
     )
-    def test_project_exists(self, mock_check_project, mock_boto3, checker):
+    def test_project_exists(self, mock_check_project, mock_create_client, checker):
         """Use a direct mock to test project found path."""
         # We'll test _check_project directly instead
         pass
 
     @patch("smus_cicd.helpers.datazone.get_project_by_name")
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_project_found(self, mock_boto3, mock_get_project, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_project_found(self, mock_create_client, mock_get_project, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         mock_get_project.return_value = {"id": "proj-123", "name": "test-project"}
 
@@ -220,11 +220,11 @@ class TestProjectExistence:
         assert "exists" in project_ok[0].message.lower()
 
     @patch("smus_cicd.helpers.datazone.get_project_by_name")
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_project_not_found(self, mock_boto3, mock_get_project, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_project_not_found(self, mock_create_client, mock_get_project, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         mock_get_project.return_value = None
 
@@ -242,11 +242,11 @@ class TestProjectExistence:
         assert "not found" in project_warnings[0].message.lower()
 
     @patch("smus_cicd.helpers.datazone.get_project_by_name")
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_project_check_error(self, mock_boto3, mock_get_project, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_project_check_error(self, mock_create_client, mock_get_project, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         mock_get_project.side_effect = Exception("API error")
 
@@ -261,11 +261,11 @@ class TestProjectExistence:
         assert len(project_errors) >= 1
         assert "failed" in project_errors[0].message.lower()
 
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_no_project_name_produces_warning(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_no_project_name_produces_warning(self, mock_create_client, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         context = _make_context(project_name=None, domain_id="dzd_test")
         findings = checker.check(context)
@@ -295,14 +295,14 @@ class TestS3BucketAccessibility:
     @patch(
         "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_bucket_accessible(self, mock_boto3, mock_get_conns, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_bucket_accessible(self, mock_create_client, mock_get_conns, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
         mock_s3 = MagicMock()
         mock_s3.head_bucket.return_value = {}
 
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_dz if svc == "datazone" else mock_s3
         )
         mock_get_conns.return_value = {
@@ -320,8 +320,8 @@ class TestS3BucketAccessibility:
     @patch(
         "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_bucket_not_accessible(self, mock_boto3, mock_get_conns, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_bucket_not_accessible(self, mock_create_client, mock_get_conns, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
         mock_s3 = MagicMock()
@@ -330,7 +330,7 @@ class TestS3BucketAccessibility:
             "HeadBucket",
         )
 
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_dz if svc == "datazone" else mock_s3
         )
         mock_get_conns.return_value = {
@@ -350,14 +350,14 @@ class TestS3BucketAccessibility:
     @patch(
         "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_bucket_generic_error(self, mock_boto3, mock_get_conns, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_bucket_generic_error(self, mock_create_client, mock_get_conns, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
         mock_s3 = MagicMock()
         mock_s3.head_bucket.side_effect = Exception("Connection refused")
 
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_dz if svc == "datazone" else mock_s3
         )
         mock_get_conns.return_value = {
@@ -376,15 +376,17 @@ class TestS3BucketAccessibility:
     @patch(
         "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_multiple_buckets_deduplicated(self, mock_boto3, mock_get_conns, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_multiple_buckets_deduplicated(
+        self, mock_create_client, mock_get_conns, checker
+    ):
         """Two storage items with the same connection resolve to the same bucket."""
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
         mock_s3 = MagicMock()
         mock_s3.head_bucket.return_value = {}
 
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_dz if svc == "datazone" else mock_s3
         )
         # Both storage items have connectionName "default.s3_shared"
@@ -403,11 +405,13 @@ class TestS3BucketAccessibility:
     @patch(
         "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_no_storage_items_no_s3_findings(self, mock_boto3, mock_get_conns, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_no_storage_items_no_s3_findings(
+        self, mock_create_client, mock_get_conns, checker
+    ):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         context = _make_context(storage_names=[])
         findings = checker.check(context)
@@ -418,14 +422,14 @@ class TestS3BucketAccessibility:
     @patch(
         "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
     def test_unresolved_connection_produces_warning(
-        self, mock_boto3, mock_get_conns, checker
+        self, mock_create_client, mock_get_conns, checker
     ):
         """When _get_project_connections returns None, connections are unresolved."""
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
         mock_get_conns.return_value = None
 
         context = _make_context(storage_names=["data"])
@@ -441,14 +445,14 @@ class TestS3BucketAccessibility:
     @patch(
         "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
     def test_connection_without_s3uri_is_unresolved(
-        self, mock_boto3, mock_get_conns, checker
+        self, mock_create_client, mock_get_conns, checker
     ):
         """Connection exists but has no s3Uri → treated as unresolved."""
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
         mock_get_conns.return_value = {
             "default.s3_shared": {"type": "S3"},  # no s3Uri
         }
@@ -472,11 +476,11 @@ class TestAirflowReachability:
     """Tests for Airflow environment reachability."""
 
     @patch("smus_cicd.helpers.airflow_serverless.list_workflows")
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_airflow_reachable(self, mock_boto3, mock_list_workflows, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_airflow_reachable(self, mock_create_client, mock_list_workflows, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         mock_list_workflows.return_value = []
 
@@ -492,11 +496,13 @@ class TestAirflowReachability:
         assert "reachable" in airflow_ok[0].message.lower()
 
     @patch("smus_cicd.helpers.airflow_serverless.list_workflows")
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_airflow_unreachable(self, mock_boto3, mock_list_workflows, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_airflow_unreachable(
+        self, mock_create_client, mock_list_workflows, checker
+    ):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         mock_list_workflows.side_effect = Exception("Service unavailable")
 
@@ -511,11 +517,11 @@ class TestAirflowReachability:
         assert len(airflow_errors) >= 1
         assert "unreachable" in airflow_errors[0].message.lower()
 
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_no_workflow_actions_skips_airflow(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_no_workflow_actions_skips_airflow(self, mock_create_client, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         context = _make_context(bootstrap_actions=["quicksight.refresh_dataset"])
         findings = checker.check(context)
@@ -523,11 +529,11 @@ class TestAirflowReachability:
         airflow_findings = [f for f in findings if f.service == "airflow-serverless"]
         assert len(airflow_findings) == 0
 
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_no_bootstrap_skips_airflow(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_no_bootstrap_skips_airflow(self, mock_create_client, checker):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         context = _make_context(bootstrap_actions=None)
         findings = checker.check(context)
@@ -536,13 +542,13 @@ class TestAirflowReachability:
         assert len(airflow_findings) == 0
 
     @patch("smus_cicd.helpers.airflow_serverless.list_workflows")
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
     def test_workflow_monitor_triggers_airflow_check(
-        self, mock_boto3, mock_list_workflows, checker
+        self, mock_create_client, mock_list_workflows, checker
     ):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         mock_list_workflows.return_value = []
 
@@ -565,14 +571,16 @@ class TestAirflowReachability:
 class TestErrorReporting:
     """Tests that error findings include resource identifier and service."""
 
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
-    def test_domain_error_includes_resource_and_service(self, mock_boto3, checker):
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
+    def test_domain_error_includes_resource_and_service(
+        self, mock_create_client, checker
+    ):
         mock_dz = MagicMock()
         mock_dz.get_domain.side_effect = ClientError(
             {"Error": {"Code": "AccessDeniedException", "Message": "Denied"}},
             "GetDomain",
         )
-        mock_boto3.client.return_value = mock_dz
+        mock_create_client.return_value = mock_dz
 
         context = _make_context(domain_id="dzd_denied")
         findings = checker.check(context)
@@ -588,9 +596,9 @@ class TestErrorReporting:
     @patch(
         "smus_cicd.commands.dry_run.checkers.connectivity_checker.get_project_connections"
     )
-    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.boto3")
+    @patch("smus_cicd.commands.dry_run.checkers.connectivity_checker.create_client")
     def test_s3_error_includes_bucket_name_and_service(
-        self, mock_boto3, mock_get_conns, checker
+        self, mock_create_client, mock_get_conns, checker
     ):
         mock_dz = MagicMock()
         mock_dz.get_domain.return_value = {"id": "dzd_test"}
@@ -600,7 +608,7 @@ class TestErrorReporting:
             "HeadBucket",
         )
 
-        mock_boto3.client.side_effect = lambda svc, **kw: (
+        mock_create_client.side_effect = lambda svc, **kw: (
             mock_dz if svc == "datazone" else mock_s3
         )
         mock_get_conns.return_value = {

@@ -4,9 +4,9 @@ Airflow/MWAA integration functions for SMUS CI/CD CLI.
 
 import time
 
-import boto3
 import typer
 
+from .boto3_client import create_client
 from .logger import get_logger
 
 
@@ -272,7 +272,7 @@ def wait_for_dags_available(mwaa_env_name, workflows_config, region, max_wait=90
         typer.echo("⚠️  No workflows configured")
         return False
 
-    mwaa_client = boto3.client("mwaa", region_name=region)
+    mwaa_client = create_client("mwaa", region=region)
 
     start_time = time.time()
     while time.time() - start_time < max_wait:

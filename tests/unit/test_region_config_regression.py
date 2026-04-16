@@ -1,12 +1,13 @@
 """Regression tests for the specific region configuration bug."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from smus_cicd.helpers.utils import (
     _get_region_from_config,
-    load_config,
     get_datazone_project_info,
+    load_config,
 )
 
 
@@ -69,12 +70,16 @@ class TestRegionConfigurationRegression:
         assert config["region"] == "us-east-1"
         assert config["domain_name"] == "cicd-test-domain"
 
-    @patch("smus_cicd.helpers.utils.boto3")
-    def test_boto3_client_uses_correct_region_not_credentials_region(self, mock_boto3):
+    @patch("smus_cicd.helpers.datazone.create_client")
+    @patch("smus_cicd.helpers.utils.create_client")
+    def test_boto3_client_uses_correct_region_not_credentials_region(
+        self, mock_utils_create_client, mock_dz_create_client
+    ):
         """Test that boto3 clients are created with domain region, not AWS credentials region."""
-        # Mock boto3 client
+        # Mock clients
         mock_client = MagicMock()
-        mock_boto3.client.return_value = mock_client
+        mock_utils_create_client.return_value = mock_client
+        mock_dz_create_client.return_value = mock_client
 
         # Simulate GitHub Actions scenario:
         # - AWS credentials configured for us-east-2 (this would be in AWS_DEFAULT_REGION env var)
@@ -103,14 +108,14 @@ class TestRegionConfigurationRegression:
         # Call the function that should create DataZone client
         result = get_datazone_project_info("integration-test-test", config)
 
-        # Verify boto3.client was called with the DOMAIN region (first call is CloudFormation for domain resolution)
-        calls = mock_boto3.client.call_args_list
-        assert len(calls) > 0, "Expected at least one boto3.client call"
+        # Verify create_client was called with the DOMAIN region (first call is CloudFormation for domain resolution)
+        calls = mock_utils_create_client.call_args_list
+        assert len(calls) > 0, "Expected at least one create_client call"
 
         # First call should be CloudFormation with correct region
         first_call_args, first_call_kwargs = calls[0]
         assert first_call_args[0] == "cloudformation"
-        assert first_call_kwargs["region_name"] == datazone_domain_region
+        assert first_call_kwargs["region"] == datazone_domain_region
 
         # Should succeed without region configuration errors
         assert "error" not in result or "Region must be specified" not in str(
@@ -118,12 +123,16 @@ class TestRegionConfigurationRegression:
         )
 
     @patch.dict("os.environ", {"AWS_DEFAULT_REGION": "us-east-2"})
-    @patch("smus_cicd.helpers.utils.boto3")
-    def test_domain_region_overrides_aws_env_region(self, mock_boto3):
+    @patch("smus_cicd.helpers.datazone.create_client")
+    @patch("smus_cicd.helpers.utils.create_client")
+    def test_domain_region_overrides_aws_env_region(
+        self, mock_utils_create_client, mock_dz_create_client
+    ):
         """Test that domain.region takes precedence over AWS_DEFAULT_REGION environment variable."""
-        # Mock boto3 client
+        # Mock clients
         mock_client = MagicMock()
-        mock_boto3.client.return_value = mock_client
+        mock_utils_create_client.return_value = mock_client
+        mock_dz_create_client.return_value = mock_client
 
         # Environment has AWS_DEFAULT_REGION=us-east-2 (simulating GitHub Actions)
         # But pipeline manifest domain.region=us-east-1
@@ -143,13 +152,13 @@ class TestRegionConfigurationRegression:
         # Call function
         get_datazone_project_info("test-project", config)
 
-        # Verify ALL boto3 clients use domain region (us-east-1), not env region (us-east-2)
-        calls = mock_boto3.client.call_args_list
+        # Verify ALL create_client calls use domain region (us-east-1), not env region (us-east-2)
+        calls = mock_utils_create_client.call_args_list
         for call in calls:
             args, kwargs = call
             assert (
-                kwargs["region_name"] == "us-east-1"
-            ), f"Service {args[0]} used wrong region: {kwargs['region_name']}"
+                kwargs["region"] == "us-east-1"
+            ), f"Service {args[0]} used wrong region: {kwargs['region']}"
 
     def test_all_commands_config_consistency(self):
         """Test that all commands set up config consistently."""

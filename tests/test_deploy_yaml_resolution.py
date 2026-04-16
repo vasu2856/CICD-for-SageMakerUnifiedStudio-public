@@ -1,140 +1,81 @@
-"""Test that YAML files are resolved during deploy before S3 upload."""
+"""Test that ContextResolver resolves variables in workflow YAML content."""
 
-import os
-import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-
-from smus_cicd.commands.deploy import _copy_and_resolve_yaml
+from smus_cicd.helpers.context_resolver import ContextResolver
 
 
-def test_copy_and_resolve_yaml_with_proj_variables():
-    """Test that {proj.*} variables are resolved in YAML files."""
-    # Create a temporary source YAML file with placeholders
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as src:
-        src.write(
-            """
+@patch("smus_cicd.helpers.context_resolver.ContextResolver._build_context")
+def test_resolve_yaml_with_proj_variables(mock_build_context):
+    """Test that {proj.*} variables are resolved in YAML content."""
+    mock_build_context.return_value = {
+        "proj": {
+            "name": "test-project",
+            "iam_role_name": "AmazonSageMakerUserIAMExecutionRole",
+            "connection": {},
+        },
+        "domain": {
+            "id": "test-domain-id",
+            "name": "test-domain",
+            "region": "us-east-1",
+        },
+        "stage": {"name": "test"},
+        "env": {},
+    }
+
+    resolver = ContextResolver(
+        project_name="test-project",
+        domain_id="test-domain-id",
+        region="us-east-1",
+        domain_name="test-domain",
+        stage_name="test",
+        env_vars={},
+    )
+
+    content = """\
 tasks:
   - name: test_task
     iam_role_name: '{proj.iam_role_name}'
     project_name: '{proj.name}'
 """
-        )
-        src_path = src.name
 
-    try:
-        # Create a temporary destination path
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as dest:
-            dest_path = dest.name
+    resolved = resolver.resolve(content)
 
-        try:
-            # Mock config
-            config = {
-                "domain_id": "test-domain-id",
-                "region": "us-east-1",
-                "domain_name": "test-domain",
-                "stage_name": "test",
-            }
-
-            # Mock ContextResolver to avoid AWS calls
-            with patch(
-                "smus_cicd.helpers.context_resolver.ContextResolver"
-            ) as mock_resolver_class:
-                mock_resolver = MagicMock()
-                mock_resolver.resolve.return_value = """
-tasks:
-  - name: test_task
-    iam_role_name: 'AmazonSageMakerUserIAMExecutionRole'
-    project_name: 'test-project'
-"""
-                mock_resolver_class.return_value = mock_resolver
-
-                # Call the function
-                _copy_and_resolve_yaml(src_path, dest_path, "test-project", config)
-
-                # Verify resolver was called
-                mock_resolver_class.assert_called_once_with(
-                    project_name="test-project",
-                    domain_id="test-domain-id",
-                    region="us-east-1",
-                    domain_name="test-domain",
-                    stage_name="test",
-                    env_vars={},
-                )
-                mock_resolver.resolve.assert_called_once()
-
-            # Verify the destination file has resolved content
-            with open(dest_path, "r") as f:
-                content = f.read()
-                assert "AmazonSageMakerUserIAMExecutionRole" in content
-                assert "{proj.iam_role_name}" not in content
-
-        finally:
-            if os.path.exists(dest_path):
-                os.unlink(dest_path)
-    finally:
-        if os.path.exists(src_path):
-            os.unlink(src_path)
+    assert "AmazonSageMakerUserIAMExecutionRole" in resolved
+    assert "{proj.iam_role_name}" not in resolved
+    assert "test-project" in resolved
+    assert "{proj.name}" not in resolved
 
 
-def test_copy_and_resolve_yaml_without_variables():
-    """Test that YAML files without variables are copied correctly."""
-    # Create a temporary source YAML file without placeholders
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as src:
-        src.write(
-            """
+@patch("smus_cicd.helpers.context_resolver.ContextResolver._build_context")
+def test_resolve_yaml_without_variables(mock_build_context):
+    """Test that YAML content without variables passes through unchanged."""
+    mock_build_context.return_value = {
+        "proj": {"name": "test-project", "connection": {}},
+        "domain": {
+            "id": "test-domain-id",
+            "name": "test-domain",
+            "region": "us-east-1",
+        },
+        "stage": {"name": ""},
+        "env": {},
+    }
+
+    resolver = ContextResolver(
+        project_name="test-project",
+        domain_id="test-domain-id",
+        region="us-east-1",
+        domain_name="test-domain",
+        env_vars={},
+    )
+
+    content = """\
 tasks:
   - name: test_task
     iam_role_name: 'StaticRole'
 """
-        )
-        src_path = src.name
 
-    try:
-        # Create a temporary destination path
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as dest:
-            dest_path = dest.name
+    resolved = resolver.resolve(content)
 
-        try:
-            # Mock config
-            config = {
-                "domain_id": "test-domain-id",
-                "region": "us-east-1",
-                "domain_name": "test-domain",
-            }
-
-            # Mock ContextResolver - resolver is always called now
-            with patch(
-                "smus_cicd.helpers.context_resolver.ContextResolver"
-            ) as mock_resolver_class:
-                mock_resolver = MagicMock()
-                # Return content unchanged when no variables present
-                mock_resolver.resolve.return_value = """
-tasks:
-  - name: test_task
-    iam_role_name: 'StaticRole'
-"""
-                mock_resolver_class.return_value = mock_resolver
-
-                _copy_and_resolve_yaml(src_path, dest_path, "test-project", config)
-
-                # Verify resolver was called (always called now)
-                mock_resolver_class.assert_called_once()
-                mock_resolver.resolve.assert_called_once()
-
-            # Verify the destination file has same content
-            with open(dest_path, "r") as f:
-                content = f.read()
-                assert "StaticRole" in content
-
-        finally:
-            if os.path.exists(dest_path):
-                os.unlink(dest_path)
-    finally:
-        if os.path.exists(src_path):
-            os.unlink(src_path)
+    assert resolved == content
+    assert "StaticRole" in resolved

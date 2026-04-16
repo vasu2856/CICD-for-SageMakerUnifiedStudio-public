@@ -2,10 +2,10 @@
 
 import json
 
-import boto3
 import typer
 
 from ..application import ApplicationManifest
+from ..helpers.boto3_client import create_client
 from ..helpers.utils import (  # noqa: F401
     build_domain_config,
     get_datazone_project_info,
@@ -207,7 +207,7 @@ def describe_command(
                                             and "ListConnections" in conn_info
                                         ):
                                             try:
-                                                sts_client = boto3.client("sts")
+                                                sts_client = create_client("sts")
                                                 identity = (
                                                     sts_client.get_caller_identity()
                                                 )
@@ -242,7 +242,7 @@ def describe_command(
                                             and "ListConnections" in error_msg
                                         ):
                                             try:
-                                                sts_client = boto3.client("sts")
+                                                sts_client = create_client("sts")
                                                 identity = (
                                                     sts_client.get_caller_identity()
                                                 )

@@ -4,10 +4,10 @@ import os
 import tempfile
 from typing import Any, Dict
 
-import boto3
 import typer
 
 from ...helpers import airflow_serverless, datazone
+from ...helpers.boto3_client import create_client
 from ...helpers.bundle_storage import ensure_bundle_local
 from ..models import BootstrapAction
 
@@ -115,7 +115,7 @@ def handle_workflow_create(
 
     typer.echo(f"🔍 Using execution role for workflows: {role_arn}")
 
-    s3_client = boto3.client("s3", region_name=region)
+    s3_client = create_client("s3", region=region)
     workflows_created = []
 
     # Find DAG files in S3

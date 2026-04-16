@@ -5,12 +5,12 @@ Executes resource deletion in the required dependency order for a single stage.
 
 from typing import List
 
-import boto3
 from botocore.exceptions import ClientError
 from rich.console import Console
 
 from ..helpers import s3 as s3_helper
 from ..helpers.airflow_serverless import delete_workflow
+from ..helpers.boto3_client import create_client
 from ..helpers.datazone import (
     delete_project,
     get_domain_from_target_config,
@@ -213,7 +213,7 @@ def _destroy_stage(
             )
             continue
         try:
-            dz_client = boto3.client("datazone", region_name=effective_region)
+            dz_client = create_client("datazone", region=effective_region)
             dz_client.delete_connection(
                 domainIdentifier=domain_id, identifier=connection_id
             )
@@ -263,13 +263,13 @@ def _destroy_stage(
     # Step d: Delete QuickSight (dashboards → datasets → data sources)
     # -----------------------------------------------------------------------
     try:
-        account_id = boto3.client(
-            "sts", region_name=effective_region
+        account_id = create_client(
+            "sts", region=effective_region
         ).get_caller_identity()["Account"]
     except Exception:
         account_id = None
 
-    qs_client = boto3.client("quicksight", region_name=effective_region)
+    qs_client = create_client("quicksight", region=effective_region)
 
     for qs_type in (
         "quicksight_dashboard",
@@ -439,7 +439,7 @@ def _destroy_stage(
                 )
                 continue
             try:
-                dz_client = boto3.client("datazone", region_name=effective_region)
+                dz_client = create_client("datazone", region=effective_region)
                 CATALOG_DELETE_API[catalog_type](dz_client, domain_id_cat, resource_id)
                 _log(f"  ✅ Deleted {catalog_type}: {resource_name} ({resource_id})")
                 results.append(
