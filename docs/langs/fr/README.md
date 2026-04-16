@@ -68,8 +68,8 @@ aws-smus-cicd-cli deploy --targets test --manifest manifest.yaml
 # Run validation tests
 aws-smus-cicd-cli test --manifest manifest.yaml --targets test
 
-# Nettoyer quand c'est terminé
-aws-smus-cicd-cli destroy --targets test --force
+# Clean up when done
+aws-smus-cicd-cli destroy -manifest manifest.yaml --targets test --force
 ```
 
 **See it in action:** [Live GitHub Actions Example](https://github.com/aws/CICD-for-SageMakerUnifiedStudio/actions/runs/17631303500)
@@ -582,6 +582,9 @@ notebooks_workflow:
     nb_churn:
       operator: airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator
       retries: 0
+      domain_id: "{domain.id}"
+      project_id: "{proj.id}"
+      domain_region: "{domain.region}"
       input_config:
         input_path: notebooks/bundle/notebooks/customer_churn_prediction.ipynb
         input_params: {}
@@ -597,6 +600,9 @@ notebooks_workflow:
     nb_sales:
       operator: airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator
       retries: 0
+      domain_id: "{domain.id}"
+      project_id: "{proj.id}"
+      domain_region: "{domain.region}"
       input_config:
         input_path: notebooks/bundle/notebooks/retail_sales_forecasting.ipynb
         input_params: {}
@@ -612,6 +618,9 @@ notebooks_workflow:
     nb_segment:
       operator: airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator
       retries: 0
+      domain_id: "{domain.id}"
+      project_id: "{proj.id}"
+      domain_region: "{domain.region}"
       input_config:
         input_path: notebooks/bundle/notebooks/customer_segmentation_analysis.ipynb
         input_params: {}
@@ -733,6 +742,9 @@ ml_training_workflow:
     ml_training_notebook:
       operator: "airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator"
       retries: 0
+      domain_id: "{domain.id}"
+      project_id: "{proj.id}"
+      domain_region: "{domain.region}"
       input_config:
         input_path: "ml/bundle/training-workflows/ml_training_notebook.ipynb"
         input_params:
@@ -855,6 +867,9 @@ ml_deployment_workflow:
     ml_deployment_notebook:
       operator: "airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator"
       retries: 0
+      domain_id: "{domain.id}"
+      project_id: "{proj.id}"
+      domain_region: "{domain.region}"
       input_config:
         input_path: "ml/bundle/deployment-workflows/ml_deployment_notebook.ipynb"
         input_params:
@@ -965,6 +980,9 @@ genai_dev_workflow:
     bedrock_agent_notebook:
       operator: "airflow.providers.amazon.aws.operators.sagemaker_unified_studio.SageMakerNotebookOperator"
       retries: 0
+      domain_id: "{domain.id}"
+      project_id: "{proj.id}"
+      domain_region: "{domain.region}"
       input_config:
         input_path: "genai/bundle/workflows/bedrock_agent_notebook.ipynb"
         input_params:
@@ -1167,6 +1185,7 @@ All setup scripts are idempotent and safe to run multiple times. Use `--dry-run`
 ### Guides
 - **[Application Manifest](docs/manifest.md)** - Complete YAML configuration reference
 - **[CLI Commands](docs/cli-commands.md)** - All available commands and options
+- **[Rollback Guide](docs/rollback-guide.md)** - Recover from bad deployments and automate rollback
 - **[Bootstrap Actions](docs/bootstrap-actions.md)** - Automated deployment actions and event-driven workflows
 - **[Substitutions & Variables](docs/substitutions-and-variables.md)** - Dynamic configuration
 - **[Connections Guide](docs/connections.md)** - Configure AWS service integrations
